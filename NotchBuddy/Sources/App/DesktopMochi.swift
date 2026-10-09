@@ -615,19 +615,6 @@ final class DesktopMochiController {
             return
         }
 
-        #if !APPSTORE
-        if let ctx = islandController?.windowContextAtPoint(mouse) {
-            // Attach window context; Mochi returns to pre-drag position
-            AppState.shared.promptContext = ctx
-            SoundEngine.shared.play("approve")
-            engine?.triggerEmote(.happy, duration: 0.6, silent: true)
-            let origin = clampToVisibleFrame(dragOriginAtStart)
-            panel?.setFrameOrigin(origin)
-            persistPosition()
-            islandController?.expand(to: .prompt)
-            return
-        }
-        #endif
         // Elsewhere: keep new position
         persistPosition()
     }

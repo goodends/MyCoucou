@@ -27,9 +27,9 @@ struct ShortcutsSettingsView: View {
     private var globalSection: some View {
         GroupBox(String(localized: "shortcut.group.global")) {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(globalActions, id: \.self) { action in
+                ForEach(ShortcutAction.allCases, id: \.self) { action in
                     shortcutRow(action)
-                    if action != globalActions.last {
+                    if action != ShortcutAction.allCases.last {
                         Divider().padding(.leading, 24)
                     }
                 }
@@ -46,15 +46,7 @@ struct ShortcutsSettingsView: View {
         }
     }
 
-    /// Shortcuts listed here. The App Store build hides the ones it can't run.
-    private var globalActions: [ShortcutAction] {
-        #if APPSTORE
-        ShortcutAction.allCases.filter { !$0.isNonAppStore }
-        #else
-        ShortcutAction.allCases
-        #endif
-    }
-
+    
     @ViewBuilder
     private func shortcutRow(_ action: ShortcutAction) -> some View {
         let isEnabled    = enabled[action] ?? action.enabledByDefault

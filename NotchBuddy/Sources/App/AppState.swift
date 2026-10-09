@@ -205,8 +205,7 @@ final class AppState: ObservableObject {
     }()
 
     // Context for prompt (window attach / file)
-    @Published var promptContext: PromptContext? = nil
-
+    
     // Dropped file (set during upload flow)
     @Published var droppedFile: DroppedFile? = nil
 
@@ -581,12 +580,6 @@ final class AppState: ObservableObject {
 
 }
 
-// MARK: - Supporting types
-
-enum PromptContext {
-    case window(appName: String, title: String, url: String?)
-    case file(name: String, fileURL: URL?)
-}
 
 struct DroppedFile {
     var url: URL

@@ -12,7 +12,6 @@ enum ShortcutAction: String, CaseIterable, Sendable {
     case openChat          = "openChat"           // ⌃⌥Space — open island on chat, focus field
     case goToAlert         = "goToAlert"          // ⌃⌥A — jump to pending alert
     case jumpToTerminal    = "jumpToTerminal"     // ⌃⌥T — focus agent terminal
-    case attachFrontWindow = "attachFrontWindow"  // ⌃⌥W — attach front window (non-AppStore)
     case nextPill          = "nextPill"           // ⌃⌥] — next pill, open if closed
     case prevPill          = "prevPill"           // ⌃⌥[ — previous pill, open if closed
     case muteToggle        = "muteToggle"         // ⌃⌥M — mute / unmute sounds
@@ -42,7 +41,6 @@ enum ShortcutAction: String, CaseIterable, Sendable {
         case .openChat:          return String(localized: "shortcut.open-chat")
         case .goToAlert:         return String(localized: "shortcut.go-to-alert")
         case .jumpToTerminal:    return String(localized: "shortcut.jump-to-terminal")
-        case .attachFrontWindow: return String(localized: "shortcut.attach-front-window")
         case .nextPill:          return String(localized: "shortcut.next-pill")
         case .prevPill:          return String(localized: "shortcut.prev-pill")
         case .muteToggle:        return String(localized: "shortcut.mute-toggle")
@@ -53,7 +51,6 @@ enum ShortcutAction: String, CaseIterable, Sendable {
 
     /// Whether this action should be omitted from App Store builds.
     var isAppStoreOnly: Bool { false }
-    var isNonAppStore: Bool  { self == .attachFrontWindow }
 
     /// Whether the shortcut is enabled by default (all new global shortcuts are on by default;
     /// `toggleIsland` is off by default to match the pre-existing behaviour).
@@ -98,7 +95,6 @@ enum ShortcutLogic {
         .openChat:          ShortcutSpec(keyCode: 49, nsFlags: ShortcutSpec.ctrlOpt),  // ⌃⌥Space
         .goToAlert:         ShortcutSpec(keyCode: 0,  nsFlags: ShortcutSpec.ctrlOpt),  // ⌃⌥A
         .jumpToTerminal:    ShortcutSpec(keyCode: 17, nsFlags: ShortcutSpec.ctrlOpt),  // ⌃⌥T
-        .attachFrontWindow: ShortcutSpec(keyCode: 13, nsFlags: ShortcutSpec.ctrlOpt),  // ⌃⌥W
         .nextPill:          ShortcutSpec(keyCode: 30, nsFlags: ShortcutSpec.ctrlOpt),  // ⌃⌥]
         .prevPill:          ShortcutSpec(keyCode: 33, nsFlags: ShortcutSpec.ctrlOpt),  // ⌃⌥[
         .muteToggle:        ShortcutSpec(keyCode: 46, nsFlags: ShortcutSpec.ctrlOpt),  // ⌃⌥M

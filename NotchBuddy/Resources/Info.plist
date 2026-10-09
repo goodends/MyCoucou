@@ -35,8 +35,6 @@
 	<string>14</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSAccessibilityUsageDescription</key>
-	<string>Pour lire le titre de la fenêtre active et l'attacher comme contexte.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

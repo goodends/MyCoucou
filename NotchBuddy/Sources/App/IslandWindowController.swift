@@ -512,11 +512,6 @@ final class IslandWindowController: NSWindowController {
             performJumpToTerminal()
             #endif
 
-        case .attachFrontWindow:
-            #if !APPSTORE
-            performAttachFrontWindow()
-            #endif
-
         case .nextPill:
             cyclePill(by: +1)
 
@@ -654,19 +649,6 @@ final class IslandWindowController: NSWindowController {
         collapse(allowPendingApproval: true)
     }
 
-    private func performAttachFrontWindow() {
-        guard let app = state.lastExternalApp else {
-            SoundEngine.shared.play("error"); return
-        }
-        guard let ctx = WindowContextCapture.captureActive(from: app) else {
-            SoundEngine.shared.play("error"); return
-        }
-        state.promptContext = ctx
-        SoundEngine.shared.play("approve")
-        NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.happy)
-        islandPanel.makeKey()
-        expand(to: .prompt)
-    }
     #endif
 
     // MARK: - Keyboard (Escape closes)
@@ -783,17 +765,9 @@ final class IslandWindowController: NSWindowController {
                 self.state.stateOverride = nil
 
                 #if !APPSTORE
-                let windowCtx = self.windowContextAtPoint(mouse)
                 let inNotchZone = self.window?.frame.contains(mouse) == true
 
-                if let ctx = windowCtx {
-                    // Drop on a window → attach context as before
-                    self.hideDragGhost()
-                    self.state.promptContext = ctx
-                    SoundEngine.shared.play("approve")
-                    NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.happy)
-                    self.expand(to: .prompt)
-                } else if !inNotchZone {
+                if !inNotchZone {
                     // Drop outside notch zone → install Mochi on the desktop.
                     // Prevent hideDragGhost from closing the ghost panel so we can promote it.
                     let ghost = self.dragGhostPanel
@@ -1018,36 +992,6 @@ final class IslandWindowController: NSWindowController {
                   app.activationPolicy == .regular else { continue }
             // CG → AppKit: flip Y
             return (CGRect(x: x, y: screenMaxY - y - h, width: w, height: h), pid)
-        }
-        return nil
-    }
-
-    // MARK: - Window context at screen point (for drag-attach)
-
-    func windowContextAtPoint(_ screenPoint: NSPoint) -> PromptContext? {
-        let screen = window?.screen ?? NSScreen.main
-        // CGWindowList uses top-left origin; NSEvent.mouseLocation uses bottom-left
-        let screenMaxY = screen?.frame.maxY ?? NSScreen.main!.frame.maxY
-        let cgPoint = CGPoint(x: screenPoint.x, y: screenMaxY - screenPoint.y)
-
-        guard let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
-        ) as? [[String: Any]] else { return nil }
-
-        let ourBundle = Bundle.main.bundleIdentifier ?? ""
-
-        for info in windowList {
-            guard let b = info[kCGWindowBounds as String] as? [String: Any],
-                  let x = b["X"] as? CGFloat, let y = b["Y"] as? CGFloat,
-                  let w = b["Width"] as? CGFloat, let h = b["Height"] as? CGFloat else { continue }
-            guard CGRect(x: x, y: y, width: w, height: h).contains(cgPoint) else { continue }
-
-            let pid = info[kCGWindowOwnerPID as String] as? pid_t ?? 0
-            guard let app = NSRunningApplication(processIdentifier: pid),
-                  app.bundleIdentifier != ourBundle,
-                  app.activationPolicy == .regular else { continue }
-
-            return WindowContextCapture.captureActive(from: app)
         }
         return nil
     }

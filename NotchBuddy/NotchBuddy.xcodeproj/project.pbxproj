@@ -44,11 +44,9 @@
 		25F66E99460D62478899A292 /* MochiWardrobe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */; };
 		26E35C79CCD09FEBA04A3EF6 /* LinkTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6762C38A8952A90F394EDFE4 /* LinkTestView.swift */; };
 		273FC0FA14AAF6CE62FD14AE /* DesktopMochi.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */; };
-		2875610F701376BD65573386 /* WindowContextCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */; };
 		295F8FE5A9E2E8F1A6389DEE /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53E4CAD2BCC77B280689B0F /* HomeView.swift */; };
 		2BE3B4CBF7028A6097EBD51E /* SessionHistoryLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8458EAFC88088FDD09E3BBBD /* SessionHistoryLoader.swift */; };
 		2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */; };
-		2CC2E3B688B15BBEB3AE3BCE /* WindowContextCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */; };
 		3756B7E1A55D9CEC8C4D34A4 /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		378BF7A3B16C93463C6B1AD8 /* ChatOverscrollBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9CCB64C0031DBA1E2A2BD8 /* ChatOverscrollBackGesture.swift */; };
 		38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */; };
@@ -371,7 +369,6 @@
 		DE18399D1CD69468CCF57966 /* MochiActivityState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiActivityState.swift; sourceTree = "<group>"; };
 		E18E74B3586BC0861C69E70A /* InstructionComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstructionComposer.swift; sourceTree = "<group>"; };
 		E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiOutfitDrawing.swift; sourceTree = "<group>"; };
-		E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowContextCapture.swift; sourceTree = "<group>"; };
 		EBB84A66045EB20CAC93A8A6 /* AskQuestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskQuestion.swift; sourceTree = "<group>"; };
 		EE60A834934474CDAE022FF8 /* SearchAndSpotlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchAndSpotlight.swift; sourceTree = "<group>"; };
 		EF9CCB64C0031DBA1E2A2BD8 /* ChatOverscrollBackGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatOverscrollBackGesture.swift; sourceTree = "<group>"; };
@@ -446,7 +443,6 @@
 				6FD65943C32E150F1CD65C31 /* UploadSequenceEngine.swift */,
 				F4A13AEE6E06F46CEC9D908C /* UserIdentity.swift */,
 				888B3E1420BCB6292BDC8117 /* WeeklyRecapView.swift */,
-				E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */,
 				9207F9B32D9C7844F5332A31 /* PhoneLink */,
 			);
 			path = App;
@@ -836,7 +832,6 @@
 				FAD78D74C6906D4EC8AA4101 /* UploadSequenceEngine.swift in Sources */,
 				8A6B3688D6B3BF728D106D8B /* UserIdentity.swift in Sources */,
 				01B96F947DF2BDC352E8526D /* WeeklyRecapView.swift in Sources */,
-				2875610F701376BD65573386 /* WindowContextCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -983,7 +978,6 @@
 				ECECA2F225E82B7C951658D7 /* UploadSequenceEngine.swift in Sources */,
 				63F9F3AAC881D3EDDDD8AED9 /* UserIdentity.swift in Sources */,
 				FB58020A389126865363C342 /* WeeklyRecapView.swift in Sources */,
-				2CC2E3B688B15BBEB3AE3BCE /* WindowContextCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
