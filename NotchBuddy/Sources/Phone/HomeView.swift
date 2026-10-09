@@ -1,15 +1,14 @@
 import SwiftUI
 import UIKit
 
-/// The tabs, in glass on iOS 26: the agents, the services, the decisions you
+/// The tabs, in glass on iOS 26: the agents, the decisions you
 /// took, and a search through every turn.
-enum CoucouTab: Hashable { case agents, services, history, search }
+enum CoucouTab: Hashable { case agents, history, search }
 
 struct HomeView: View {
     let link: PhoneLink
     @State private var tab: CoucouTab = .agents
     @State private var agentsPath: [String] = []
-    @State private var servicesPath: [String] = []
     @State private var introDone = false
     @AppStorage("onboardingDone") private var onboardingDone = false
 
@@ -17,9 +16,6 @@ struct HomeView: View {
         TabView(selection: $tab) {
             Tab("Agents", systemImage: "sparkles", value: CoucouTab.agents) {
                 AgentsTab(link: link, path: $agentsPath)
-            }
-            Tab("Services", systemImage: "square.grid.2x2", value: CoucouTab.services) {
-                ServicesTab(link: link, path: $servicesPath)
             }
             Tab("History", systemImage: "clock.arrow.circlepath", value: CoucouTab.history) {
                 NavigationStack { HistoryView(link: link) }
@@ -71,9 +67,6 @@ struct HomeView: View {
         if PillCatalog.isSession(id) {
             tab = .agents
             agentsPath = [id]
-        } else {
-            tab = .services
-            servicesPath = [id]
         }
     }
 }
@@ -173,29 +166,6 @@ struct AgentsTab: View {
                     }
                 }
                 #endif
-            }
-        }
-    }
-}
-
-/// The service Mochi (GitHub, Stripe…), each with what it saw.
-struct ServicesTab: View {
-    let link: PhoneLink
-    @Binding var path: [String]
-    @Namespace private var zoom
-
-    var body: some View {
-        NavigationStack(path: $path) {
-            ScrollView {
-                ServicesList(services: link.services)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-            }
-            .background(Color.black)
-            .refreshable { await link.refresh() }
-            .navigationTitle("Services")
-            .navigationDestination(for: String.self) { id in
-                ServiceDetailView(link: link, pillId: id)
             }
         }
     }

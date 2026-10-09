@@ -201,8 +201,7 @@ struct TeamView: View {
     }
 
     /// Who fills the free spots, in this order.
-    static let regulars = ["integration_github", "integration_stripe", "integration_vercel", "integration_resend",
-                           "integration_calcom", "integration_n8n", "integration_notion", "agent_codex"]
+    static let regulars = ["agent_codex"]
 
     @ViewBuilder private func tile(_ index: Int) -> some View {
         let team = team

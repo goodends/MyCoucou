@@ -5,29 +5,6 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject private var state = AppState.shared
     @ObservedObject private var demoEngine = DemoEngine.shared
-    @State private var apiKey: String = KeychainStore.shared.get("anthropic-api-key") ?? ""
-
-    // Claude model — dynamic list fetched from the API, static fallback if unavailable
-    private static let fallbackModels: [(id: String, label: String)] = [
-        ("claude-sonnet-4-6",         "Claude Sonnet 4.6"),
-        ("claude-sonnet-5-5",         "Claude Sonnet 5.5"),
-        ("claude-opus-5-5",           "Claude Opus 5.5"),
-        ("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
-    ]
-    private static let customModelTag = "__custom__"
-    @State private var fetchedModels: [(id: String, label: String)] = []
-    @State private var modelChoice: String = {
-        let m = AppState.shared.claudeModel
-        return SettingsView.fallbackModels.contains { $0.id == m } ? m : SettingsView.customModelTag
-    }()
-    @State private var customModel: String = {
-        let m = AppState.shared.claudeModel
-        return SettingsView.fallbackModels.contains { $0.id == m } ? "" : m
-    }()
-    private var displayModels: [(id: String, label: String)] {
-        fetchedModels.isEmpty ? Self.fallbackModels : fetchedModels
-    }
-    @State private var launchAtStartup: Bool = (SMAppService.mainApp.status == .enabled)
     @State private var statusMessage: String = ""
     @State private var showDiff: Bool = false
     @State private var pendingHookJSON: String = ""
@@ -85,36 +62,12 @@ struct SettingsView: View {
     @State private var hermesSupportsApprovals: Bool = false
     #endif
 
-    // Multi-provider chat keys
-    @State private var googleKey: String  = KeychainStore.shared.get("google-api-key") ?? ""
-    @State private var openAIKey: String  = KeychainStore.shared.get("openai-api-key") ?? ""
-    @State private var ollamaURL:    String = AppState.shared.ollamaServerURL
-    @State private var lmstudioURL:  String = AppState.shared.lmstudioServerURL
-    @State private var connectingOllama:    Bool = false
-    @State private var connectingLMStudio:  Bool = false
-
-    // Integration keys
-    @State private var resendKey: String    = KeychainStore.shared.get("resend-api-key")  ?? ""
-    @State private var resendFrom: String   = KeychainStore.shared.get("resend-from")     ?? ""
-    @State private var n8nUrl: String       = KeychainStore.shared.get("n8n-url")         ?? ""
-    @State private var n8nKey: String       = KeychainStore.shared.get("n8n-api-key")     ?? ""
-    @State private var vercelToken: String  = KeychainStore.shared.get("vercel-token")    ?? ""
-    @State private var githubToken: String  = KeychainStore.shared.get("github-token")    ?? ""
-    @State private var stripeKey: String    = KeychainStore.shared.get("stripe-api-key")  ?? ""
-    @State private var calcomKey: String    = KeychainStore.shared.get("calcom-api-key")  ?? ""
-    @State private var notionKey: String    = KeychainStore.shared.get("notion-api-key")  ?? ""
-
     // Hotkey
     @State private var hotkeyFlags: UInt    = AppState.shared.hotkeyFlags
     @State private var hotkeyCode: UInt16   = AppState.shared.hotkeyCode
 
-    // Vercel project filter
-    @State private var vercelProjects: [String] = []
-    @State private var loadingVercel: Bool = false
-
-    // n8n workflow filter
-    @State private var n8nWorkflows: [String] = []
-    @State private var loadingN8n: Bool = false
+    // Startup
+    @State private var launchAtStartup: Bool = (SMAppService.mainApp.status == .enabled)
 
     // Bindings in minutes for the absence field
     private var absenceMinutes: Binding<Double> {
@@ -173,10 +126,7 @@ struct SettingsView: View {
                         set: { if let v = $0 { selectedSection = v; statusMessage = "" } }
                     )) {
                         SettingsSidebarRow(title: "General",      icon: "gearshape.fill",                    color: "#8E939C").tag("general")
-                        SettingsSidebarRow(title: "Active pills", icon: "square.grid.2x2.fill",              color: "#F5A524").tag("activepills")
                         SettingsSidebarRow(title: "Agents",       icon: "terminal.fill",                     color: "#3B9EFF").tag("agents")
-                        SettingsSidebarRow(title: "Chat",         icon: "bubble.left.and.bubble.right.fill", color: "#E07950").tag("chat")
-                        SettingsSidebarRow(title: "Integrations", icon: "puzzlepiece.extension.fill",        color: "#7C5CFF").tag("integrations")
                         SettingsSidebarRow(title: "Shortcuts",    icon: "keyboard.fill",                     color: "#6366F1").tag("shortcuts")
                     }
                     .listStyle(.sidebar)
@@ -216,23 +166,6 @@ struct SettingsView: View {
             #if !APPSTORE
             state.refreshPlanRelayState()
             #endif
-            guard fetchedModels.isEmpty,
-                  let key = KeychainStore.shared.get("anthropic-api-key"), !key.isEmpty else { return }
-            Task {
-                let models = await ClaudeService.fetchModels(apiKey: key)
-                guard !models.isEmpty else { return }
-                await MainActor.run {
-                    fetchedModels = models
-                    let m = state.claudeModel
-                    if models.contains(where: { $0.id == m }) {
-                        modelChoice = m
-                        customModel = ""
-                    } else if modelChoice != Self.customModelTag {
-                        modelChoice = Self.customModelTag
-                        customModel = m
-                    }
-                }
-            }
         }
     }
 
@@ -241,10 +174,7 @@ struct SettingsView: View {
     private var sectionTitle: String {
         switch selectedSection {
         case "general":      return String(localized: "General")
-        case "activepills":  return String(localized: "Active pills")
         case "agents":       return String(localized: "Agents")
-        case "chat":         return String(localized: "Chat")
-        case "integrations": return String(localized: "Integrations")
         case "shortcuts":    return String(localized: "Shortcuts")
         default:             return String(localized: "General")
         }
@@ -252,10 +182,7 @@ struct SettingsView: View {
 
     @ViewBuilder private var sectionContent: some View {
         switch selectedSection {
-        case "activepills":  activePillsSection
         case "agents":       agentsSection
-        case "chat":         chatSection
-        case "integrations": integrationsSection
         case "shortcuts":    ShortcutsSettingsView()
         default:             generalSection
         }
@@ -491,47 +418,6 @@ struct SettingsView: View {
         connectedScreens = NSScreen.screens.compactMap { screen in
             guard let uuid = IslandWindowController.displayUUID(screen) else { return nil }
             return (uuid, screen.localizedName)
-        }
-    }
-
-    // MARK: - Active pills section
-
-    @ViewBuilder private var activePillsSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Choose the tools you use. Coucou only shows what you declare here.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-
-                Text(String(format: String(localized: "settings.slots-used %lld"), Int64(state.activeIntegrations.count)))
-                    .font(.system(size: 11))
-                    .foregroundColor(state.activeIntegrations.count >= 4 ? .orange : .secondary)
-
-                Picker(String(localized: "settings.main-pill"), selection: $state.mainPillId) {
-                    ForEach(PillCatalog.available.filter { $0.category == .workspace && !$0.comingSoon }, id: \.id) { def in
-                        Text(def.name).tag(def.id)
-                    }
-                }
-                .onChange(of: state.mainPillId) { _, newId in
-                    state.activeIntegrations.remove(newId)
-                    state.loadIntegrationTasks()
-                    state.setFocus(newId)
-                }
-
-                ForEach(PillCategory.allCases, id: \.self) { cat in
-                    let catPills = PillCatalog.available.filter { $0.category == cat }
-                    if !catPills.isEmpty {
-                        Divider()
-                        Text(cat.title)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
-                        ForEach(catPills, id: \.id) { def in
-                            pillRow(def)
-                        }
-                    }
-                }
-            }
-            .padding(6)
         }
     }
 
@@ -989,271 +875,7 @@ struct SettingsView: View {
         #endif
     }
 
-    // MARK: - Chat section
-
-    @ViewBuilder private var chatSection: some View {
-        GroupBox(String(localized: "chat.anthropic-api.title")) {
-            VStack(alignment: .leading, spacing: 8) {
-                SecureField(String(localized: "chat.api-key.claude"), text: $apiKey)
-                    .textFieldStyle(.roundedBorder)
-                Button(String(localized: "Save")) {
-                    KeychainStore.shared.set("anthropic-api-key", value: apiKey)
-                    statusMessage = String(localized: "status.key-saved")
-                }
-                .buttonStyle(.borderedProminent)
-
-                Divider().padding(.vertical, 2)
-
-                Picker(String(localized: "chat.model"), selection: $modelChoice) {
-                    ForEach(displayModels, id: \.id) { preset in
-                        Text(preset.label).tag(preset.id)
-                    }
-                    Text(String(localized: "chat.model.custom")).tag(Self.customModelTag)
-                }
-                .onChange(of: modelChoice) { _, choice in
-                    if choice != Self.customModelTag {
-                        state.claudeModel = choice
-                    } else {
-                        applyCustomModel(customModel)
-                    }
-                }
-
-                if modelChoice == Self.customModelTag {
-                    TextField(String(localized: "chat.model.custom-id"), text: $customModel)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: customModel) { _, value in applyCustomModel(value) }
-                }
-
-                Text(String(localized: "chat.model.description"))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
-            .padding(6)
-        }
-
-        GroupBox(String(localized: "chat.other-providers.title")) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(String(localized: "chat.other-providers.description"))
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-
-                HStack(spacing: 8) {
-                    Circle().fill(Color(hex: "#4285F4")).frame(width: 8, height: 8)
-                    Text(String(localized: "chat.google-ai")).font(.system(size: 12, weight: .semibold))
-                }
-                SecureField(String(localized: "chat.api-key.google"), text: $googleKey)
-                    .textFieldStyle(.roundedBorder)
-                Button(String(localized: "Save")) {
-                    KeychainStore.shared.set("google-api-key", value: googleKey)
-                    statusMessage = String(localized: "status.google-key-saved")
-                }
-                .buttonStyle(.borderedProminent)
-
-                Divider()
-
-                HStack(spacing: 8) {
-                    Circle().fill(Color(hex: "#10A37F")).frame(width: 8, height: 8)
-                    Text(String(localized: "chat.openai")).font(.system(size: 12, weight: .semibold))
-                }
-                SecureField(String(localized: "chat.api-key.openai"), text: $openAIKey)
-                    .textFieldStyle(.roundedBorder)
-                Button(String(localized: "Save")) {
-                    KeychainStore.shared.set("openai-api-key", value: openAIKey)
-                    statusMessage = String(localized: "status.openai-key-saved")
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding(.vertical, 4)
-        }
-
-        GroupBox(String(localized: "chat.local.title")) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(String(localized: "chat.local.description"))
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-
-                // ── Ollama ──────────────────────────────────────────────────────
-                HStack(spacing: 8) {
-                    Circle().fill(Color(hex: "#FACC15")).frame(width: 8, height: 8)
-                    Text("Ollama").font(.system(size: 12, weight: .semibold))
-                    if !state.ollamaServerURL.isEmpty {
-                        Text(String(localized: "Connected"))
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(hex: "#22C55E"))
-                    }
-                }
-                if state.ollamaServerURL.isEmpty {
-                    TextField("http://127.0.0.1:11434", text: $ollamaURL)
-                        .textFieldStyle(.roundedBorder)
-                    Button(connectingOllama ? String(localized: "chat.connecting") : String(localized: "chat.connect")) {
-                        Task { await connectLocal(provider: .ollama) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(connectingOllama)
-                } else {
-                    Text(state.ollamaServerURL)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.secondary)
-                    Button(String(localized: "chat.disconnect")) {
-                        state.ollamaServerURL = ""
-                        ollamaURL = ""
-                        state.fetchedProviderModels[.ollama] = nil
-                        state.providerModelFetchError[.ollama] = nil
-                        if state.chatProvider == .ollama { state.chatProvider = .anthropic }
-                        statusMessage = String(localized: "status.local.ollama-disconnected")
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                Divider()
-
-                // ── LM Studio ───────────────────────────────────────────────────
-                HStack(spacing: 8) {
-                    Circle().fill(Color(hex: "#A3E635")).frame(width: 8, height: 8)
-                    Text("LM Studio").font(.system(size: 12, weight: .semibold))
-                    if !state.lmstudioServerURL.isEmpty {
-                        Text(String(localized: "Connected"))
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(hex: "#22C55E"))
-                    }
-                }
-                if state.lmstudioServerURL.isEmpty {
-                    TextField("http://127.0.0.1:1234", text: $lmstudioURL)
-                        .textFieldStyle(.roundedBorder)
-                    Button(connectingLMStudio ? String(localized: "chat.connecting") : String(localized: "chat.connect")) {
-                        Task { await connectLocal(provider: .lmstudio) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(connectingLMStudio)
-                } else {
-                    Text(state.lmstudioServerURL)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.secondary)
-                    Button(String(localized: "chat.disconnect")) {
-                        state.lmstudioServerURL = ""
-                        lmstudioURL = ""
-                        state.fetchedProviderModels[.lmstudio] = nil
-                        state.providerModelFetchError[.lmstudio] = nil
-                        if state.chatProvider == .lmstudio { state.chatProvider = .anthropic }
-                        statusMessage = String(localized: "status.local.lmstudio-disconnected")
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-            .padding(.vertical, 4)
-        }
-    }
-
-    // MARK: - Integrations section
-
-    @ViewBuilder private var integrationsSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
-
-                // Resend
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: "#22C55E")).frame(width: 8, height: 8)
-                        Text("Resend").font(.system(size: 12, weight: .semibold))
-                    }
-                    SecureField("API key  (re_…)", text: $resendKey)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("From address  (you@yourdomain.com)", text: $resendFrom)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                // n8n
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: "#F29B38")).frame(width: 8, height: 8)
-                        Text("n8n").font(.system(size: 12, weight: .semibold))
-                    }
-                    TextField("Instance URL  (https://…)", text: $n8nUrl)
-                        .textFieldStyle(.roundedBorder)
-                    SecureField("API key", text: $n8nKey)
-                        .textFieldStyle(.roundedBorder)
-                    IntegrationFilterRow(
-                        label: String(localized: "integrations.workflows"),
-                        items: n8nWorkflows,
-                        filter: $state.n8nWorkflowFilter,
-                        loading: loadingN8n,
-                        onLoad: loadN8nWorkflows
-                    )
-                }
-
-                // Vercel
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: "#7C5CFF")).frame(width: 8, height: 8)
-                        Text("Vercel").font(.system(size: 12, weight: .semibold))
-                    }
-                    SecureField("Token", text: $vercelToken)
-                        .textFieldStyle(.roundedBorder)
-                    IntegrationFilterRow(
-                        label: String(localized: "integrations.projects"),
-                        items: vercelProjects,
-                        filter: $state.vercelProjectFilter,
-                        loading: loadingVercel,
-                        onLoad: loadVercelProjects
-                    )
-                }
-
-                // GitHub
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: "#F4505E")).frame(width: 8, height: 8)
-                        Text("GitHub").font(.system(size: 12, weight: .semibold))
-                    }
-                    SecureField("Personal Access Token", text: $githubToken)
-                        .textFieldStyle(.roundedBorder)
-                    Text(String(localized: "integrations.github.token-hint"))
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(hex: "#8E939C"))
-                }
-
-                // Stripe
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: "#0570DE")).frame(width: 8, height: 8)
-                        Text("Stripe").font(.system(size: 12, weight: .semibold))
-                    }
-                    SecureField("Secret key  (sk_live_… or sk_test_…)", text: $stripeKey)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                // Cal.com
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: "#C9956A")).frame(width: 8, height: 8)
-                        Text("Cal.com").font(.system(size: 12, weight: .semibold))
-                    }
-                    SecureField("API key  (cal_live_…)", text: $calcomKey)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                // Notion
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: "#E8E8E8")).frame(width: 8, height: 8)
-                        Text("Notion").font(.system(size: 12, weight: .semibold))
-                    }
-                    SecureField("Integration token  (secret_…)", text: $notionKey)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                Button(String(localized: "integrations.save")) { saveIntegrations() }
-                    .buttonStyle(.borderedProminent)
-            }
-            .padding(6)
-        }
-    }
-
     // MARK: - Actions
-
-    private func applyCustomModel(_ value: String) {
-        let id = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !id.isEmpty { state.claudeModel = id }
-    }
 
     private func toggleStartup(_ on: Bool) {
         do {
@@ -1315,42 +937,6 @@ struct SettingsView: View {
         }
     }
     #endif
-
-    private func connectLocal(provider: ChatProvider) async {
-        let rawURL = provider == .ollama ? ollamaURL : lmstudioURL
-        let candidate = rawURL.isEmpty
-            ? (provider == .ollama ? "http://127.0.0.1:11434" : "http://127.0.0.1:1234")
-            : rawURL
-        let normalised = LocalChat.normaliseURL(candidate)
-        guard normalised.hasPrefix("http://") || normalised.hasPrefix("https://") else {
-            statusMessage = String(localized: "status.local.url-invalid")
-            return
-        }
-        if provider == .ollama { connectingOllama = true } else { connectingLMStudio = true }
-        statusMessage = ""
-        let result = await LocalChat.fetchModelsResult(baseURL: normalised)
-        if provider == .ollama { connectingOllama = false } else { connectingLMStudio = false }
-        let name = provider == .ollama ? "Ollama" : "LM Studio"
-        switch result {
-        case .success(let models) where models.isEmpty:
-            statusMessage = String(format: String(localized: "status.local.no-models %@"), name)
-        case .success(let models):
-            if provider == .ollama {
-                state.ollamaServerURL = normalised
-                ollamaURL = normalised
-                state.fetchedProviderModels[.ollama] = nil
-                state.providerModelFetchError[.ollama] = nil
-            } else {
-                state.lmstudioServerURL = normalised
-                lmstudioURL = normalised
-                state.fetchedProviderModels[.lmstudio] = nil
-                state.providerModelFetchError[.lmstudio] = nil
-            }
-            statusMessage = String(localized: "status.local.connected \(models.count)")
-        case .failure:
-            statusMessage = String(format: String(localized: "status.local.unreachable %1$@ %2$@"), name, normalised)
-        }
-    }
 
     private func installHooks() {
         do {
@@ -1677,232 +1263,6 @@ struct SettingsView: View {
         }
     }
     #endif
-
-    private func saveIntegrations() {
-        saveKey("resend-api-key",  value: resendKey)
-        saveKey("resend-from",     value: resendFrom)
-        saveKey("n8n-url",         value: n8nUrl)
-        saveKey("n8n-api-key",     value: n8nKey)
-        saveKey("vercel-token",    value: vercelToken)
-
-        // Detect GitHub token changes before writing
-        let prevGithubToken = KeychainStore.shared.get("github-token")
-        saveKey("github-token", value: githubToken)
-        let nextGithubToken = KeychainStore.shared.get("github-token")
-        if nextGithubToken != prevGithubToken {
-            AppState.shared.githubPulse = nil
-            AppState.shared.githubActivity = nil
-            if nextGithubToken == nil { AppState.shared.githubStats = nil }
-            if nextGithubToken != nil {
-                GithubPoller.shared.triggerPulseNow()
-                GithubPoller.shared.refreshActivityIfStale()
-            }
-        }
-
-        saveKey("stripe-api-key",  value: stripeKey)
-        saveKey("calcom-api-key",  value: calcomKey)
-        saveKey("notion-api-key",  value: notionKey)
-        statusMessage = String(localized: "status.integrations-saved")
-    }
-
-    private func saveKey(_ key: String, value: String) {
-        if value.isEmpty {
-            KeychainStore.shared.remove(key)
-        } else {
-            KeychainStore.shared.set(key, value: value)
-        }
-    }
-
-    // MARK: - Vercel project list
-
-    private func loadVercelProjects() {
-        guard let token = KeychainStore.shared.get("vercel-token") else {
-            statusMessage = "❌ Save Vercel token first."
-            return
-        }
-        loadingVercel = true
-        guard let url = URL(string: "https://api.vercel.com/v9/projects?limit=100") else { return }
-        var req = URLRequest(url: url, timeoutInterval: 10)
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        URLSession.shared.dataTask(with: req) { data, response, _ in
-            let names: [String]
-            if let data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let projects = json["projects"] as? [[String: Any]] {
-                names = projects.compactMap { $0["name"] as? String }.sorted()
-            } else {
-                names = []
-            }
-            DispatchQueue.main.async {
-                self.vercelProjects = names
-                self.loadingVercel = false
-                if names.isEmpty { self.statusMessage = "❌ No Vercel projects found." }
-            }
-        }.resume()
-    }
-
-    // MARK: - n8n workflow list
-
-    private func loadN8nWorkflows() {
-        guard let apiKey  = KeychainStore.shared.get("n8n-api-key"),
-              let rawBase = KeychainStore.shared.get("n8n-url") else {
-            statusMessage = "❌ Save n8n URL and API key first."
-            return
-        }
-        loadingN8n = true
-        let base = rawBase.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let urls = ["\(base)/api/v1/workflows?limit=100", "\(base)/rest/workflows?limit=100"]
-        fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: 0)
-    }
-
-    private func fetchN8nWorkflows(urls: [String], apiKey: String, idx: Int) {
-        guard idx < urls.count, let url = URL(string: urls[idx]) else {
-            DispatchQueue.main.async { self.loadingN8n = false; self.statusMessage = "❌ No n8n workflows found." }
-            return
-        }
-        var req = URLRequest(url: url, timeoutInterval: 10)
-        req.setValue(apiKey, forHTTPHeaderField: "X-N8N-API-KEY")
-        URLSession.shared.dataTask(with: req) { data, response, _ in
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard let data, code == 200 else {
-                self.fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: idx + 1)
-                return
-            }
-            let items: [[String: Any]]
-            if let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-               let arr = obj["data"] as? [[String: Any]] { items = arr }
-            else if let arr = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] { items = arr }
-            else { items = [] }
-            let names = items.compactMap { $0["name"] as? String }.sorted()
-            DispatchQueue.main.async {
-                self.n8nWorkflows = names
-                self.loadingN8n = false
-                if names.isEmpty { self.statusMessage = "❌ No n8n workflows found." }
-            }
-        }.resume()
-    }
-
-    @ViewBuilder
-    private func pillRow(_ def: PillDefinition) -> some View {
-        let isMain = def.id == state.mainPillId
-        let isOn   = state.activeIntegrations.contains(def.id)
-        let atMax  = state.activeIntegrations.count >= 4 && !isOn && !isMain
-        let hint: String? = {
-            if isMain { return nil }
-            if def.comingSoon { return String(localized: "Coming soon") }
-            #if !APPSTORE
-            if def.id == "agent_gemini"        && !HookServer.geminiHooksInstalled()      { return String(localized: "Hooks not installed") }
-            if def.id == "agent_antigravity"   && !HookServer.agyHooksInstalled()        { return String(localized: "Hooks not installed") }
-            if def.id == "agent_codex"         && !HookServer.codexHooksInstalled()      { return String(localized: "Hooks not installed") }
-            if def.id == "agent_copilot"       && !HookServer.copilotHooksInstalled()    { return String(localized: "Hooks not installed") }
-            if def.id == "agent_muse"          && !HookServer.museHooksInstalled()       { return String(localized: "Hooks not installed") }
-            if def.id == "agent_opencode"      && !HookServer.openCodePluginInstalled()  { return String(localized: "Plugin not installed") }
-            if def.id == "agent_amp"           && !HookServer.ampPluginInstalled()       { return String(localized: "Plugin not installed") }
-            if def.id == SpotifyController.pillId && !SpotifyController.shared.isInstalled { return String(localized: "Not installed") }
-            #endif
-            if def.category == .ai {
-                if let provider = ChatProvider(pillID: def.id), provider.isLocal {
-                    let url = provider == .ollama ? state.ollamaServerURL : state.lmstudioServerURL
-                    if url.isEmpty { return String(localized: "Not connected") }
-                } else {
-                    let keyId = def.id == "ai_anthropic" ? "anthropic-api-key"
-                               : def.id == "ai_google"    ? "google-api-key" : "openai-api-key"
-                    if KeychainStore.shared.get(keyId) == nil { return String(localized: "Key not configured") }
-                }
-            }
-            return nil
-        }()
-        HStack(spacing: 8) {
-            // The dot is the row's colour control: it looks as it always did,
-            // and a click opens the palette.
-            Button {
-                colorPalettePill = def.id
-            } label: {
-                Circle()
-                    .fill(Color(hex: def.color))
-                    .frame(width: 10, height: 10)
-            }
-            .buttonStyle(.plain)
-            .help(String(localized: "Color"))
-            .accessibilityLabel(Text(def.name + " · " + String(localized: "Color")))
-            .popover(isPresented: Binding(
-                get: { colorPalettePill == def.id },
-                set: { open in if !open && colorPalettePill == def.id { colorPalettePill = nil } }
-            ), arrowEdge: .bottom) {
-                PillColorPalette(
-                    current: def.color,
-                    isCustom: state.pillColors[def.id] != nil,
-                    pick: { hex in
-                        state.setPillColor(def.id, hex)
-                        colorPalettePill = nil
-                    }
-                )
-            }
-            Text(def.name)
-                .font(.system(size: 12))
-                .foregroundColor(atMax ? .secondary : .primary)
-            Spacer()
-            if isMain {
-                Text("Main")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            } else {
-                if let h = hint {
-                    Text(h)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                }
-                Toggle("", isOn: Binding(
-                    get: { isOn },
-                    set: { _ in state.toggleIntegration(def.id) }
-                ))
-                .labelsHidden()
-                .disabled(atMax)
-            }
-        }
-    }
-}
-
-// MARK: - Pill colour palette (Active pills, opened from a row's dot)
-
-private struct PillColorPalette: View {
-    /// The colour the pill is painted with now.
-    let current: String
-    /// The user picked it: "Default" is offered, to go back to the catalog's.
-    let isCustom: Bool
-    /// nil = back to the catalog's colour.
-    let pick: (String?) -> Void
-
-    var body: some View {
-        let now = PillColors.normalized(current)
-        HStack(spacing: 7) {
-            ForEach(PillColors.palette, id: \.self) { hex in
-                Button {
-                    pick(hex)
-                } label: {
-                    Circle()
-                        .fill(Color(hex: hex))
-                        .frame(width: 18, height: 18)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.primary, lineWidth: 1.5)
-                                .padding(-3)
-                                .opacity(hex == now ? 1 : 0)
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(hex))
-            }
-            if isCustom {
-                Button(String(localized: "Default")) {
-                    pick(nil)
-                }
-                .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-    }
 }
 
 // MARK: - Sidebar background (NSVisualEffectView .sidebar)

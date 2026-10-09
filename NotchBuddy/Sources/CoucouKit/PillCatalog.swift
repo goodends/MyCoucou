@@ -5,15 +5,11 @@ import Foundation
 enum PillCategory: String, CaseIterable {
     case workspace
     case agent
-    case ai
-    case service
 
     var title: String {
         switch self {
         case .workspace: return "Where you code"
         case .agent:     return "Agents"
-        case .ai:        return "AI for the chat"
-        case .service:   return "Services"
         }
     }
 }
@@ -94,36 +90,6 @@ enum PillCatalog {
         // `coucou_agent: claude-desktop` from CLAUDE_CODE_ENTRYPOINT, so nothing to install.
         .init(id: "agent_claude-desktop", name: "Claude Desktop", color: "#D97757",
               category: .agent,     subtitle: "Agent",        source: .agent),
-        // ── AI for the chat ──────────────────────────────────────────────────
-        .init(id: "ai_anthropic",        name: "Anthropic",   color: ChatProvider.anthropic.accentHex,
-              category: .ai,        subtitle: "Chat",         source: .n8n),
-        .init(id: "ai_google",           name: "Google AI",   color: ChatProvider.google.accentHex,
-              category: .ai,        subtitle: "Chat",         source: .n8n),
-        .init(id: "ai_openai",           name: "OpenAI",      color: ChatProvider.openai.accentHex,
-              category: .ai,        subtitle: "Chat",         source: .n8n),
-        .init(id: "ai_ollama",           name: "Ollama",      color: ChatProvider.ollama.accentHex,
-              category: .ai,        subtitle: "Chat",         source: .n8n),
-        .init(id: "ai_lmstudio",         name: "LM Studio",   color: ChatProvider.lmstudio.accentHex,
-              category: .ai,        subtitle: "Chat",         source: .n8n),
-        // ── Services ─────────────────────────────────────────────────────────
-        .init(id: "integration_resend",  name: "Resend",      color: "#22C55E",
-              category: .service,   subtitle: "Integration",  source: .n8n),
-        .init(id: "integration_n8n",     name: "n8n",         color: "#F29B38",
-              category: .service,   subtitle: "Integration",  source: .n8n),
-        .init(id: "integration_vercel",  name: "Vercel",      color: "#7C5CFF",
-              category: .service,   subtitle: "Integration",  source: .n8n),
-        .init(id: "integration_github",  name: "GitHub",      color: "#F4505E",
-              category: .service,   subtitle: "Integration",  source: .n8n),
-        .init(id: "integration_notion",  name: "Notion",      color: "#8C8C8C",
-              category: .service,   subtitle: "Integration",  source: .n8n),
-        .init(id: "integration_calcom",  name: "Cal.com",     color: "#C9956A",
-              category: .service,   subtitle: "Integration",  source: .n8n),
-        .init(id: "integration_stripe",  name: "Stripe",      color: "#0570DE",
-              category: .service,   subtitle: "Integration",  source: .n8n),
-        .init(id: "integration_music",   name: "Apple Music", color: "#FA2D48",
-              category: .service,   subtitle: "Integration",  source: .n8n, githubOnly: true),
-        .init(id: "integration_spotify", name: "Spotify",     color: "#1DB954",
-              category: .service,   subtitle: "Integration",  source: .n8n, githubOnly: true),
     ]
 
     /// Pills available in the current build target.

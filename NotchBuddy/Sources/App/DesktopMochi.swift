@@ -42,20 +42,8 @@ struct DesktopBotView: View {
                 // Desktop Mochi is always the "main" Mochi — always dressed
                 engine.setOutfit(appState.resolvedOutfit, animated: true)
 
-                // Dance when music plays (same rules as compact mode)
-                let dancing: Bool = {
-                    #if !APPSTORE
-                    let music = appState.musicPlaying && appState.activeIntegrations.contains("integration_music")
-                    let spotify = SpotifyController.shared.isPlaying
-                        && appState.activeIntegrations.contains(SpotifyController.pillId)
-                    guard music || spotify else { return false }
-                    let allowed: Set<BotState> = [.idle, .working, .thinking, .searching, .finished]
-                    return allowed.contains(appState.effectiveState)
-                    #else
-                    return false
-                    #endif
-                }()
-                engine.setDancing(dancing)
+                // Mochi no longer reacts to music services (Spotify/Music removed).
+                engine.setDancing(false)
                 engine.update(dt: dt)
 
                 var c = ctx

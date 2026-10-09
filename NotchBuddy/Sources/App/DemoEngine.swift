@@ -32,10 +32,6 @@ final class DemoEngine: ObservableObject {
     private var demoInjectedTaskIds: [String] = []   // integration task IDs added by demo
     private var realTaskIdsAtStart: Set<String> = [] // real task IDs that existed before demo
     private var demoCycleIndex: Int = 0
-    private let rotatingIntegrationIds = [
-        "integration_stripe", "integration_calcom",
-        "integration_n8n", "integration_notion", "integration_vercel"
-    ]
     private var demoDiffIds: [String: [Int]] = [:]   // [pillId: [diffId]]
     private var lastApprovalDecision: String = "allow"
     private var lastQuestionAnswer: String? = nil
@@ -49,24 +45,6 @@ final class DemoEngine: ObservableObject {
         var stateOverride: BotState?
         var isPinned: Bool
         var noteMessage: String?
-        // Integration data
-        var vercelDeployments: [VercelDeployment]
-        var resendEmails: [ResendEmail]
-        var resendTotal: Int?
-        var githubPulse: GitHubPulse?
-        var githubActivity: GitHubActivity?
-        var githubStats: GitHubStats?
-        var stripePayments: [StripePayment]
-        var stripeBalance: Int
-        var stripeDisplayBalance: Int
-        var stripeCurrency: String
-        var stripeLoaded: Bool
-        var stripeError: String?
-        var calcomBookings: [CalcomBooking]
-        var calcomLoaded: Bool
-        var n8nRuns: [N8nRun]
-        var notionPages: [NotionPage]
-        var notionLoaded: Bool
         // NOTE: pendingApproval and pendingQuestion are intentionally NOT snapshotted.
         // HookServer's file descriptors are authoritative for real requests.
         var mode: IslandMode
@@ -96,23 +74,6 @@ final class DemoEngine: ObservableObject {
             stateOverride:       s.stateOverride,
             isPinned:            s.isPinned,
             noteMessage:         s.noteMessage,
-            vercelDeployments:   s.vercelDeployments,
-            resendEmails:        s.resendEmails,
-            resendTotal:         s.resendTotal,
-            githubPulse:         s.githubPulse,
-            githubActivity:      s.githubActivity,
-            githubStats:         s.githubStats,
-            stripePayments:      s.stripePayments,
-            stripeBalance:       s.stripeBalance,
-            stripeDisplayBalance: s.stripeDisplayBalance,
-            stripeCurrency:      s.stripeCurrency,
-            stripeLoaded:        s.stripeLoaded,
-            stripeError:         s.stripeError,
-            calcomBookings:      s.calcomBookings,
-            calcomLoaded:        s.calcomLoaded,
-            n8nRuns:             s.n8nRuns,
-            notionPages:         s.notionPages,
-            notionLoaded:        s.notionLoaded,
             mode:                s.mode,
             view:                s.view
         )
@@ -133,9 +94,6 @@ final class DemoEngine: ObservableObject {
             updatedAt: now
         )
         #endif
-
-        // Inject integration data (no activeIntegrations setter, no UserDefaults write)
-        injectIntegrationData()
 
         // Observe mode changes to unblock waitUntilVisible()
         modeCancellable = s.$mode
@@ -164,7 +122,6 @@ final class DemoEngine: ObservableObject {
         guard isActive else { return }
         isActive = false
         DemoEngine.isPollerPaused = false
-        GithubPoller.shared.triggerPulseNow()
 
         demoTask?.cancel()
         demoTask = nil
@@ -203,25 +160,6 @@ final class DemoEngine: ObservableObject {
         s.chatHistory   = snap.chatHistory
         s.stateOverride = snap.stateOverride
         s.noteMessage   = snap.noteMessage
-
-        // Restore integration data
-        s.vercelDeployments    = snap.vercelDeployments
-        s.resendEmails         = snap.resendEmails
-        s.resendTotal          = snap.resendTotal
-        s.githubPulse          = snap.githubPulse
-        s.githubActivity       = snap.githubActivity
-        s.githubStats          = snap.githubStats
-        s.stripePayments       = snap.stripePayments
-        s.stripeBalance        = snap.stripeBalance
-        s.stripeDisplayBalance = snap.stripeDisplayBalance
-        s.stripeCurrency       = snap.stripeCurrency
-        s.stripeLoaded         = snap.stripeLoaded
-        s.stripeError          = snap.stripeError
-        s.calcomBookings       = snap.calcomBookings
-        s.calcomLoaded         = snap.calcomLoaded
-        s.n8nRuns              = snap.n8nRuns
-        s.notionPages          = snap.notionPages
-        s.notionLoaded         = snap.notionLoaded
 
         // Restore tasks: keep real tasks that arrived during the demo, discard demo-only ones.
         // For tasks that existed before the demo (realTaskIdsAtStart), use the CURRENT version
@@ -275,126 +213,6 @@ final class DemoEngine: ObservableObject {
 
     // MARK: Integration data injection (no UserDefaults writes)
 
-    private func injectIntegrationData() {
-        let s = AppState.shared
-        let now = Date()
-
-        // GitHub
-        s.githubStats = GitHubStats(totalRepos: 34, totalStars: 127)
-        s.githubPulse = GitHubPulse(
-            login: "demo-user",
-            myPRs: [
-                GitHubPR(id: "my-app/auth#42", title: "feat: OAuth2 PKCE flow",
-                         url: "https://github.com/demo/my-app/pull/42",
-                         repo: "my-app", number: 42, isDraft: false, ci: .success, review: .approved),
-                GitHubPR(id: "my-app/api#38", title: "fix: rate limit headers",
-                         url: "https://github.com/demo/my-app/pull/38",
-                         repo: "my-app", number: 38, isDraft: false, ci: .pending, review: .pending),
-            ],
-            toReview: [
-                GitHubPR(id: "my-app/ui#21", title: "refactor: design system tokens",
-                         url: "https://github.com/demo/my-app/pull/21",
-                         repo: "my-app", number: 21, isDraft: false, ci: .success, review: .pending),
-            ],
-            mainCI: [
-                GitHubRepoCI(repo: "my-app", url: "https://github.com/demo/my-app/actions",
-                             branch: "main", ci: .success),
-            ],
-            fetchedAt: now
-        )
-        s.githubActivity = nil
-
-        // Stripe
-        s.stripeCurrency       = "eur"
-        s.stripeBalance        = 124750
-        s.stripeDisplayBalance = 124750
-        s.stripeLoaded         = true
-        s.stripeError          = nil
-        s.stripePayments = [
-            StripePayment(id: "py_demo1", amount: 4900, currency: "eur",
-                          description: "Pro plan — monthly",
-                          createdAt: now.addingTimeInterval(-3600), status: "succeeded"),
-            StripePayment(id: "py_demo2", amount: 9900, currency: "eur",
-                          description: "Pro plan — annual",
-                          createdAt: now.addingTimeInterval(-7200), status: "succeeded"),
-            StripePayment(id: "py_demo3", amount: 2900, currency: "eur",
-                          description: "Starter plan",
-                          createdAt: now.addingTimeInterval(-14400), status: "succeeded"),
-        ]
-
-        // Vercel
-        s.vercelDeployments = [
-            VercelDeployment(id: "dpl_demo1", projectName: "my-app",
-                             url: "my-app-abc123.vercel.app", state: "READY",
-                             createdAt: now.addingTimeInterval(-1800),
-                             commitMessage: "feat: auth refactor", branch: "main"),
-            VercelDeployment(id: "dpl_demo2", projectName: "my-app",
-                             url: "my-app-prev.vercel.app", state: "READY",
-                             createdAt: now.addingTimeInterval(-86400),
-                             commitMessage: "fix: mobile nav", branch: "main"),
-        ]
-
-        // Resend
-        s.resendTotal = 1284
-        s.resendEmails = [
-            ResendEmail(id: "re_demo1", to: ["alice@example.com"], subject: "Welcome to my-app",
-                        createdAt: now.addingTimeInterval(-600), lastEvent: "delivered"),
-            ResendEmail(id: "re_demo2", to: ["bob@example.com"], subject: "Your weekly digest",
-                        createdAt: now.addingTimeInterval(-3600), lastEvent: "opened"),
-        ]
-
-        // Cal.com
-        let cal = Calendar.current
-        let tomorrow = cal.date(byAdding: .day, value: 1, to: now)!
-        let tomorrowMorning = cal.date(bySettingHour: 10, minute: 0, second: 0, of: tomorrow)!
-        let tomorrowNoon    = cal.date(bySettingHour: 14, minute: 30, second: 0, of: tomorrow)!
-        s.calcomBookings = [
-            CalcomBooking(id: 1001, title: "Product demo call",
-                          startTime: tomorrowMorning,
-                          endTime: tomorrowMorning.addingTimeInterval(3600),
-                          status: "ACCEPTED",
-                          attendeeName: "Alice Martin",
-                          attendeeEmail: "alice@example.com",
-                          attendeeNotes: "Interested in the Pro plan"),
-            CalcomBooking(id: 1002, title: "Onboarding call",
-                          startTime: tomorrowNoon,
-                          endTime: tomorrowNoon.addingTimeInterval(1800),
-                          status: "ACCEPTED",
-                          attendeeName: "Bob Chen",
-                          attendeeEmail: "bob@example.com",
-                          attendeeNotes: nil),
-        ]
-        s.calcomLoaded = true
-
-        // n8n
-        s.n8nRuns = [
-            N8nRun(workflow: "Notify on new Stripe payment", detail: "3 payments processed",
-                   success: true, date: now.addingTimeInterval(-300)),
-        ]
-
-        // Notion
-        s.notionPages = [
-            NotionPage(id: "notion_demo1", title: "Product Roadmap Q4",
-                       emoji: "🗺️", lastEditedAt: now.addingTimeInterval(-1800),
-                       url: "https://notion.so/demo/roadmap"),
-            NotionPage(id: "notion_demo2", title: "Auth Refactor Notes",
-                       emoji: "🔐", lastEditedAt: now.addingTimeInterval(-7200),
-                       url: "https://notion.so/demo/auth-notes"),
-        ]
-        s.notionLoaded = true
-
-        // Inject GitHub pill only — rotating 4th integration added per cycle.
-        var injected: [String] = []
-        let githubId = "integration_github"
-        if !s.tasks.contains(where: { $0.id == githubId }),
-           let def = PillCatalog.available.first(where: { $0.id == githubId }) {
-            s.tasks.append(AgentTask(id: def.id, name: def.name, color: def.color,
-                                     state: .idle, steps: [], source: def.source, isIntegration: true))
-            injected.append(githubId)
-        }
-        demoInjectedTaskIds = injected
-        s.syncMode()
-    }
 
     // MARK: Demo loop
 
@@ -412,18 +230,7 @@ final class DemoEngine: ObservableObject {
         let s = AppState.shared
         let mainPillId = s.mainPillId
 
-        // Inject the rotating 4th integration pill for this cycle.
-        let rotId = rotatingIntegrationIds[demoCycleIndex % rotatingIntegrationIds.count]
-        if !s.tasks.contains(where: { $0.id == rotId }),
-           let def = PillCatalog.available.first(where: { $0.id == rotId }) {
-            let rotState: BotState = (rotId == "integration_n8n") ? .finished : .idle
-            let rotSteps: [String] = (rotId == "integration_n8n")
-                ? ["Notify on new Stripe payment", "3 nodes executed", "Workflow success"]
-                : []
-            s.tasks.append(AgentTask(id: def.id, name: def.name, color: def.color,
-                                     state: rotState, steps: rotSteps, source: def.source, isIntegration: true))
-            if !demoInjectedTaskIds.contains(rotId) { demoInjectedTaskIds.append(rotId) }
-        }
+        // Cycle through demo states (no longer injects rotating integration pills).
         s.syncMode()
 
         // ── Step 1: Start VS Code session ────────────────────────────────────────
@@ -599,9 +406,7 @@ final class DemoEngine: ObservableObject {
         demoDiffIds.removeValue(forKey: mainPillId)
 
         s.tasks.removeAll { $0.id == "demo_codex" }
-        // Remove rotating integration and advance cycle counter.
-        s.tasks.removeAll { $0.id == rotId }
-        demoInjectedTaskIds.removeAll { $0 == rotId }
+        // No rotating integration anymore — advance cycle counter only.
         demoCycleIndex += 1
 
         if s.pendingApproval?.sessionId == "demo_session" { s.pendingApproval = nil }
@@ -631,7 +436,7 @@ final class DemoEngine: ObservableObject {
 
     // MARK: Chat streaming
 
-    /// Called by ClaudeService when the user types in chat during a demo.
+    /// Streams a chat response for the demo.
     func streamChatResponse(for query: String) async {
         await streamChatResponse(for: query, gen: self.generation)
     }

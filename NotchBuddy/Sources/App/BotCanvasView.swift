@@ -48,23 +48,8 @@ struct BotCanvasView: View {
                     : nil
                 #endif
 
-                // Compute shouldDance per-frame (no observer lag)
-                let dancing: Bool = {
-                    #if !APPSTORE
-                    let active = AppState.shared.activeIntegrations
-                    let music = AppState.shared.musicPlaying && active.contains("integration_music")
-                    let spotify = SpotifyController.shared.isPlaying && active.contains(SpotifyController.pillId)
-                    guard music || spotify else { return false }
-                    let allowed: Set<BotState> = [.idle, .working, .thinking, .searching, .finished]
-                    guard allowed.contains(state.effectiveState) else { return false }
-                    if state.mode == .compact { return true }
-                    guard state.mode == .expanded && state.view == .overview else { return false }
-                    return (music && state.focusId == "integration_music")
-                        || (spotify && state.focusId == SpotifyController.pillId)
-                    #else
-                    return false
-                    #endif
-                }()
+                // Mochi no longer reacts to music services (Spotify/Music removed).
+                let dancing = false
                 engine.setDancing(dancing)
                 let isWardrobe = state.mode == .expanded && state.view == .wardrobe
                 let isFocusMain = state.focusId == state.mainPillId || state.focusId == nil

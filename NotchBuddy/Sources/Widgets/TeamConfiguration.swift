@@ -11,13 +11,6 @@ enum MochiChoice: String, AppEnum {
     case codex = "agent_codex"
     case antigravity = "agent_antigravity"
     case gemini = "agent_gemini"
-    case github = "integration_github"
-    case stripe = "integration_stripe"
-    case vercel = "integration_vercel"
-    case resend = "integration_resend"
-    case calcom = "integration_calcom"
-    case n8n = "integration_n8n"
-    case notion = "integration_notion"
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Mochi"
 
@@ -28,13 +21,6 @@ enum MochiChoice: String, AppEnum {
         .codex: "Codex",
         .antigravity: "Antigravity",
         .gemini: "Gemini CLI",
-        .github: "GitHub",
-        .stripe: "Stripe",
-        .vercel: "Vercel",
-        .resend: "Resend",
-        .calcom: "Cal.com",
-        .n8n: "n8n",
-        .notion: "Notion",
     ]
 
     /// The pill shown, nil for automatic.
