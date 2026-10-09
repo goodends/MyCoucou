@@ -186,7 +186,7 @@ struct BotCanvasView: View {
                                              progress: state.uploadProgress,
                                              nw: state.notchWidth, nh: state.notchHeight)
         let actualH: CGFloat = (state.mode == .expanded && state.view == .prompt)
-            ? 600
+            ? min(500, 240 + CGFloat(state.focusTask?.history.count ?? 0) * 40)
             : islandH
         let (botCx, botCy, _, _) = botPosition(mode: state.mode, view: state.view,
                                                 islandW: islandW, islandH: actualH,

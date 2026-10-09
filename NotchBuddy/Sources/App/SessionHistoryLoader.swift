@@ -102,9 +102,16 @@ enum SessionHistoryLoader {
               let type = ev["type"] as? String,
               let msg = ev["message"] as? [String: Any]
         else { return }
+        // Skip system-injected meta events (tool_result echoes, task notifications,
+        // permission prompts, etc.) — they're not actual conversation turns.
+        if ev["isMeta"] as? Bool == true { return }
         switch type {
         case "user":
             if let text = msg["content"] as? String, !text.isEmpty {
+                // Belt-and-suspenders: skip anything that looks like an XML
+                // system message (e.g. <task-notification>…</task-notification>).
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.hasPrefix("<") { return }
                 entries.append(HistoryEntry(role: .user, content: text))
             }
         case "assistant":

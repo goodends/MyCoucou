@@ -1125,7 +1125,9 @@ final class IslandWindowController: NSWindowController {
         // Chat view resizes dynamically — must match IslandContainer.chatPromptHeight
         let islandH: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            islandH = 600
+            let base: CGFloat = 240
+            let perMsg: CGFloat = 40
+            islandH = min(500, base + CGFloat(s.focusTask?.history.count ?? 0) * perMsg)
         } else {
             islandH = fixedH
         }
@@ -1220,7 +1222,9 @@ final class IslandPanel: NSPanel {
                                       progress: s.uploadProgress, nw: nw, nh: nh)
         let h: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            h = 600
+            let base: CGFloat = 240
+            let perMsg: CGFloat = 40
+            h = min(500, base + CGFloat(s.focusTask?.history.count ?? 0) * perMsg)
         } else {
             h = fixedH
         }
