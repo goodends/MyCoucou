@@ -146,6 +146,10 @@ struct OverviewView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 if let task = state.focusTask, PillCatalog.isChatablePill(id: task.id) {
+                    // Mirror right-card pill tap: lock the chat to the current
+                    // overview session so its host shows in the bottom-right label
+                    // (e.g. "Orca") instead of falling back to the global tasks[].
+                    if let s = state.overviewSession { state.focusedSessionId = s.sessionId }
                     state.view = .prompt
                 }
             }
@@ -1120,9 +1124,23 @@ struct PromptView: View {
     }
 
     private var focusTaskLabel: String {
+        // 1. The session the user explicitly tapped into (right-card pill tap, or
+        //    a follow-up left-card tap after the first SessionStart has populated
+        //    its hostApp/sessionBundleId).
+        if let s = state.focusedClaudeSession {
+            return ClaudeHost.name(for: s.hostApp ?? s.sessionBundleId)
+        }
+        // 2. The session driving the left card (matches what the user just saw
+        //    on the home view, even on the very first click before any tap has
+        //    set focusedSessionId).
+        if let s = state.overviewSession {
+            return ClaudeHost.name(for: s.hostApp ?? s.sessionBundleId)
+        }
+        // 3. Last-resort: the global integration_claude task's most-recent host
+        //    (may be stale from a previous terminal session).
         guard let task = state.focusTask else { return "Claude Code" }
         if task.id == "integration_claude" {
-            return ClaudeHost.pillName(hostApp: task.hostApp)
+            return ClaudeHost.name(for: task.hostApp ?? task.sessionBundleId)
         }
         return task.name
     }
@@ -1141,10 +1159,6 @@ struct PromptView: View {
             CardBackground(wash: .indigo)
 
             VStack(alignment: .leading, spacing: 6) {
-                if let ctx = state.promptContext {
-                    ContextChip(context: ctx).padding(.top, 4)
-                }
-
                 if state.focusedClaudeSession != nil {
                     // A Claude-session pill was tapped: render that session's JSONL
                     // history instead of the focus task's in-memory log.
@@ -1397,12 +1411,8 @@ struct TypingDotsView: View {
 struct SearchingView: View {
     @ObservedObject var state: AppState
 
-    var label: String {
-        switch state.promptContext {
-        case .window(_, let title, _): return String(format: String(localized: "Claude is reading %@…"), title)
-        case .file(let name, _):       return String(format: String(localized: "Claude is reading %@…"), name)
-        case nil:                      return String(localized: "Claude is searching…")
-        }
+    private var label: String {
+        String(localized: "Claude is searching…")
     }
 
     var body: some View {
@@ -1410,9 +1420,6 @@ struct SearchingView: View {
             CardBackground(wash: .indigo)
 
             VStack(alignment: .leading, spacing: 8) {
-                if let ctx = state.promptContext {
-                    ContextChip(context: ctx)
-                }
                 ShimmeringText(label)
                     .font(.system(size: 13.5))
             }
@@ -2473,41 +2480,6 @@ struct CodeBlock: View {
     }
 }
 
-struct ContextChip: View {
-    let context: PromptContext
-    @State private var glowing = false
-
-    var label: String {
-        switch context {
-        case .window(let app, _, let url):
-            if let url = url, let host = URL(string: url)?.host { return "\(app) · \(host)" }
-            return app
-        case .file(let name, _): return name
-        }
-    }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(LinearGradient(colors: [Color(hex: "#FF6B5B"), Color(hex: "#F7B32B"), Color(hex: "#2DD4A7"), Color(hex: "#38BDF8"), Color(hex: "#A78BFA")], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: 7, height: 7)
-            Text(label)
-                .font(.system(size: 11.5))
-                .foregroundColor(Color(hex: "#F1F2F4"))
-        }
-        .padding(.horizontal, 10).padding(.vertical, 4)
-        .background(Color.white.opacity(0.1))
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(Color.white.opacity(glowing ? 0.75 : 0), lineWidth: 1.5))
-        .scaleEffect(glowing ? 1.06 : 1.0)
-        .onAppear {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.55)) { glowing = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                withAnimation(.easeOut(duration: 0.3)) { glowing = false }
-            }
-        }
-    }
-}
 
 struct MailField: View {
     let label: String
