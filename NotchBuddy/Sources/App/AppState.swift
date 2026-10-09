@@ -62,7 +62,6 @@ final class AppState: ObservableObject {
     /// ticker / pill views that take an AgentTask. Source is always `.claudeCode`;
     /// `id` carries the sessionId so list lookups still work.
     func overviewTask(for session: ClaudeSession) -> AgentTask {
-        let color = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
         let botState: BotState
         switch session.state {
         case .spawning: botState = .thinking
@@ -74,7 +73,7 @@ final class AppState: ObservableObject {
         return AgentTask(
             id: "claude:\(session.sessionId)",
             name: session.projectName,
-            color: color,
+            color: session.bodyColor,
             state: botState,
             stepIndex: max(0, steps.count - 1),
             steps: steps,
@@ -82,7 +81,8 @@ final class AppState: ObservableObject {
             sessionCwd: session.cwd,
             sessionId: session.sessionId,
             sessionBundleId: session.sessionBundleId,
-            hostApp: session.hostApp
+            hostApp: session.hostApp,
+            outfit: session.outfit
         )
     }
 
