@@ -1334,6 +1334,10 @@ struct PromptView: View {
         if let task = state.focusTask,
            let idx = state.tasks.firstIndex(where: { $0.id == task.id }) {
             state.tasks[idx].history.append(HistoryEntry(role: .user, content: query))
+            // Same trick HookServer.appendHistory uses: reassign the slot so
+            // @Published on `tasks` fires and ChatSessionView's onChange
+            // picks the new in-memory entry up before JSONL catches up.
+            state.tasks[idx] = state.tasks[idx]
             appendAppLog("nb.log", "send: pill=\(task.id) session=\(state.focusedSessionId ?? "<nil>") text=\(query.prefix(40))")
             focused = true
             Task { @MainActor in
