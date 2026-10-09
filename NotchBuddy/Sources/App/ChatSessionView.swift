@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// Replaces PromptView. Renders the active Claude Code session as a chat-bubble
-/// stream parsed from the JSONL log on disk. Refreshes every 2 s so the view
-/// tracks the running session in real time. No hooks, no events, no
-/// Equatable gymnastics — just the file on disk.
+/// Loads the JSONL for the tapped Claude Code session and renders it with the
+/// same ChatBubble look as PromptView's history. Drops in as a substitute for
+/// the in-memory `historyBinding` when a session pill is tapped.
 struct ChatSessionView: View {
     @ObservedObject var state: AppState
     @State private var lines: [ChatLine] = []
@@ -13,64 +12,38 @@ struct ChatSessionView: View {
     private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(Color(hex: state.focusTask?.color ?? "#7B8089"))
-                    .frame(width: 6, height: 6)
-                Text(headerLabel)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundColor(Color(hex: "#7B8089"))
-                Spacer()
-                Text(loadError == nil ? "\(lines.count) lines" : "err")
-                    .font(.system(size: 10))
-                    .foregroundColor(loadError == nil ? Color(hex: "#5C6370") : Color(hex: "#F4505E"))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-
-            Divider().opacity(0.25)
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 6) {
-                        if let err = loadError {
-                            Text(err)
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(Color(hex: "#F4505E"))
-                                .padding(.horizontal, 12)
-                                .padding(.top, 12)
-                        }
-                        ForEach(lines) { line in
-                            chatBubble(line)
-                                .id(line.id)
-                        }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    if let err = loadError {
+                        Text(err)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(Color(hex: "#F4505E"))
+                            .padding(.horizontal, 12)
+                            .padding(.top, 12)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                    ForEach(lines) { line in
+                        ChatBubble(message: ChatMessage(parsedLineRole: line.role.rawValue, content: line.content))
+                            .id(line.id)
+                    }
                 }
-                .onChange(of: lines.count) { _, _ in
-                    if let last = lines.last {
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
+                .padding(.vertical, 2)
+            }
+            .onChange(of: lines.count) { _, _ in
+                if let last = lines.last {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
             }
         }
-        .background(Color(hex: "#0B0C0E"))
         .onAppear { reload() }
         .onReceive(timer) { _ in reload() }
         .onChange(of: state.focusId) { _, _ in reload() }
-    }
-
-    private var headerLabel: String {
-        guard let task = state.focusTask else { return "no agent focused" }
-        if task.id == "integration_claude" {
-            return ClaudeHost.pillName(hostApp: task.hostApp)
+        .onChange(of: state.focusedSessionId) { _, _ in
+            lastLoadedURL = ""  // force a reload even when the URL didn't change
+            reload()
         }
-        return task.name
     }
 
     // MARK: - Rendering
@@ -132,9 +105,26 @@ struct ChatSessionView: View {
     // MARK: - Loading
 
     private func reload() {
-        let url: URL? = {
+        // Resolve which Claude session to render. A tapped session pill sets
+        // `focusedSessionId` so we read that session's JSONL even when it differs
+        // from the focus task's last-known cwd.
+        let target: (cwd: String, sid: String)? = {
+            if let s = state.focusedClaudeSession {
+                return (s.cwd, s.sessionId)
+            }
             if let cwd = state.focusTask?.sessionCwd, let sid = state.focusTask?.sessionId {
-                return SessionHistoryLoader.jsonlURL(cwd: cwd, sessionId: sid)
+                return (cwd, sid)
+            }
+            return nil
+        }()
+        let url: URL? = {
+            if let t = target {
+                let direct = SessionHistoryLoader.jsonlURL(cwd: t.cwd, sessionId: t.sid)
+                if FileManager.default.fileExists(atPath: direct.path) { return direct }
+                // cwd from the hook may be wrong (e.g. Orca sets cwd to the app dir).
+                // Fall back to scanning all ~/.claude/projects/*/ for a matching JSONL.
+                if let found = SessionHistoryLoader.locateSessionAcrossProjects(t.sid) { return found }
+                return direct
             } else if let cwd = state.focusTask?.sessionCwd {
                 return SessionHistoryLoader.mostRecentSessionURL(cwd: cwd)
             } else {

@@ -15,6 +15,22 @@ final class AppState: ObservableObject {
     @Published var tasks: [AgentTask] = []
     @Published var focusId: String? = nil
 
+    // Active Claude Code sessions (one per running Claude process). Mirrors the hook's
+    // session_id, used by the overview's right-side list. Ordered most-recent-first;
+    // HookServer maintains order. Not persisted — SessionStart re-fires on process launch.
+    @Published var claudeSessions: [ClaudeSession] = []
+
+    /// When set, ChatSessionView reads the JSONL for this Claude session instead of
+    /// `focusTask`. Set when the user taps a Claude-session pill on the overview.
+    /// Cleared when that session ends.
+    @Published var focusedSessionId: String? = nil
+
+    /// Convenience: the ClaudeSession matching `focusedSessionId`, or nil.
+    var focusedClaudeSession: ClaudeSession? {
+        guard let id = focusedSessionId else { return nil }
+        return claudeSessions.first { $0.sessionId == id }
+    }
+
     // Bot state override
     @Published var stateOverride: BotState? = nil
 
@@ -568,6 +584,32 @@ final class AppState: ObservableObject {
         tasks[idx].state = state
     }
 
+    // MARK: - Claude session list (right-side overview)
+
+    /// Insert or refresh a Claude Code session. Empty / "unknown" session ids are no-ops.
+    /// Existing sessions are updated in place and promoted to the front; new sessions
+    /// are prepended so the list stays sorted by recency.
+    func upsertClaudeSession(
+        sessionId: String,
+        cwd: String,
+        hostApp: String?,
+        sessionBundleId: String?,
+        projectName: String,
+        phase: SessionPhase,
+        eventTime: Date
+    ) {
+        claudeSessions.upsert(
+            sessionId: sessionId, cwd: cwd, hostApp: hostApp,
+            sessionBundleId: sessionBundleId, projectName: projectName,
+            phase: phase, eventTime: eventTime
+        )
+    }
+
+    /// Remove a Claude Code session by id. No-op if absent. Does NOT touch tasks/focus.
+    func removeClaudeSession(sessionId: String) {
+        claudeSessions.removeById(sessionId)
+    }
+
     func setFocus(_ id: String) {
         guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }
         focusId = id
@@ -888,4 +930,17 @@ struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
     let role: ChatRole
     var content: String   // var for streaming updates
+
+    init(role: ChatRole, content: String) {
+        self.role = role
+        self.content = content
+    }
+
+    /// Map a parsed JSONL line into a chat message. `thinking` / `toolCall` /
+    /// `system` lines render as assistant messages (left-aligned, markdown),
+    /// since `ChatBubble` only distinguishes user vs assistant layout.
+    init(parsedLineRole: String, content: String) {
+        self.role = (parsedLineRole == "user") ? .user : .assistant
+        self.content = content
+    }
 }

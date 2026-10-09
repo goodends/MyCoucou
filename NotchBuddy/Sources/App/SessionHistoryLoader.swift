@@ -43,6 +43,26 @@ enum SessionHistoryLoader {
         return mostRecentJSONL(in: alt)
     }
 
+    /// Find the `.jsonl` for `sessionId` across ALL `~/.claude/projects/*/`.
+    /// Used when the session's cwd doesn't match the JSONL's project directory
+    /// (e.g. Orca launches Claude Code with a process cwd different from the
+    /// session's logical project — the JSONL still lives in the project dir).
+    static func locateSessionAcrossProjects(_ sessionId: String) -> URL? {
+        let fm = FileManager.default
+        let homes = [
+            fm.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects"),
+            URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".claude/projects"),
+        ]
+        for home in homes {
+            guard let dirs = try? fm.contentsOfDirectory(at: home, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { continue }
+            for dir in dirs {
+                let candidate = dir.appendingPathComponent("\(sessionId).jsonl")
+                if fm.fileExists(atPath: candidate.path) { return candidate }
+            }
+        }
+        return nil
+    }
+
     private static func mostRecentJSONL(in dir: URL) -> URL? {
         let fm = FileManager.default
         guard let projectDirs = try? fm.contentsOfDirectory(

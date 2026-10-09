@@ -155,7 +155,7 @@ struct OverviewView: View {
 
             // Right card: agent pills
             CardBackground(wash: nil) {
-                AgentPillsView(state: state)
+                ClaudeSessionsListView(state: state)
             }
         }
         .onChange(of: state.focusId) { _, new in
@@ -1249,7 +1249,12 @@ struct PromptView: View {
                     ContextChip(context: ctx).padding(.top, 4)
                 }
 
-                if !historyBinding.isEmpty {
+                if state.focusedClaudeSession != nil {
+                    // A Claude-session pill was tapped: render that session's JSONL
+                    // history instead of the focus task's in-memory log.
+                    ChatSessionView(state: state)
+                        .frame(maxHeight: .infinity)
+                } else if !historyBinding.isEmpty {
                     ScrollViewReader { proxy in
                         ScrollView(.vertical) {
                             VStack(alignment: .leading, spacing: 6) {
@@ -3848,6 +3853,167 @@ struct AgentPill: View {
             guard !swapping else { return }
             withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { isHovered = newHover }
         }
+    }
+}
+
+// MARK: - Active Claude Code sessions (overview right card)
+
+// One pill per running Claude Code process. Mirrors `AgentPill`'s visual language
+// (dark capsule, mini Mochi, hover scale) but adds a one-line subtitle showing the
+// short cwd and the app the session is locked into.
+struct ClaudeSessionPill: View {
+    let session: ClaudeSession
+    let onTap: () -> Void
+    @State private var isHovered = false
+
+    private static let claudeColor = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
+
+    /// Synthesise an `AgentTask` so we can reuse `MiniBotCanvasView` without forking it.
+    private var botTask: AgentTask {
+        AgentTask(
+            id: "session:\(session.sessionId)",
+            name: session.projectName,
+            color: Self.claudeColor,
+            state: botState(for: session.state),
+            steps: [],
+            source: .claudeCode
+        )
+    }
+
+    private var subtitle: String {
+        let cwdShort = (session.cwd as NSString).lastPathComponent
+        let host = ClaudeHost.name(for: session.hostApp ?? session.sessionBundleId)
+        return cwdShort + " · " + host
+    }
+
+    private func botState(for phase: SessionPhase) -> BotState {
+        switch phase {
+        case .spawning: return .thinking
+        case .working:  return .working
+        case .finished: return .finished
+        case .stopped:  return .idle
+        }
+    }
+
+    private var stateDotColor: String {
+        switch session.state {
+        case .spawning: return "#5EEAD4"  // cyan
+        case .working:  return Self.claudeColor
+        case .finished: return "#22C55E"  // green
+        case .stopped:  return "#5F646D"  // dim
+        }
+    }
+
+    var body: some View {
+        Button(action: { onTap() }) {
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    Capsule()
+                        .fill(isHovered
+                              ? Color(hex: Self.claudeColor).opacity(0.18)
+                              : Color(hex: "#0E0F11"))
+                    Capsule()
+                        .stroke(Color(hex: Self.claudeColor).opacity(isHovered ? 0.55 : 0.14), lineWidth: 1)
+
+                    HStack(spacing: 0) {
+                        MiniBotCanvasView(task: botTask)
+                            .frame(width: 22 / 0.6, height: 22 / 0.6)
+                            .frame(width: 22, height: 22, alignment: .center)
+                            .padding(.leading, 8)
+                        Spacer(minLength: 0)
+                    }
+                    .allowsHitTesting(false)
+
+                    VStack(spacing: 1) {
+                        Text(session.projectName)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(isHovered
+                                             ? Color(hex: Self.claudeColor).lighter(by: 0.3)
+                                             : Color(hex: "#6B7079"))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text(subtitle)
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(hex: "#5F646D"))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.leading, 34)
+                    .padding(.trailing, 18)
+                    .allowsHitTesting(false)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+                .shadow(color: Color(hex: Self.claudeColor).opacity(isHovered ? 0.35 : 0), radius: 10, x: 0, y: 2)
+
+                Circle()
+                    .fill(Color(hex: stateDotColor))
+                    .frame(width: 6, height: 6)
+                    .offset(x: -6, y: 4)
+                    .allowsHitTesting(false)
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .brightness(isHovered ? 0.06 : 0)
+        .onHover { newHover in
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { isHovered = newHover }
+        }
+    }
+}
+
+/// Right-side card content: live Claude Code sessions, with a one-pill fallback to the
+/// existing service pills when no session is active. Lazy so off-screen rows do no work
+/// (and the view costs 0% CPU while the island is hidden).
+struct ClaudeSessionsListView: View {
+    @ObservedObject var state: AppState
+    @State private var swapping = false
+
+    /// 30-min idle threshold for zombie sessions (killed Claude process with no SessionEnd).
+    private static let idleCutoff: TimeInterval = 30 * 60
+
+    private var live: [ClaudeSession] {
+        let cutoff = Date().addingTimeInterval(-Self.idleCutoff)
+        return state.claudeSessions.filter { $0.lastEventAt >= cutoff }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            if live.isEmpty {
+                // Idle / no Claude running: fall back to the user's toggled-on integrations.
+                AgentPillsView(state: state)
+            } else {
+                LazyVStack(spacing: 4) {
+                    ForEach(Array(live.prefix(4))) { s in
+                        ClaudeSessionPill(session: s) { tap(s) }
+                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    }
+                    if live.count > 4 {
+                        Text("+ \(live.count - 4) more")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(hex: "#5F646D"))
+                            .padding(.top, 1)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .animation(.spring(response: 0.4, dampingFraction: 0.78), value: live.count)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func tap(_ s: ClaudeSession) {
+        guard !swapping else { return }
+        swapping = true
+        SoundEngine.shared.play("blip")
+        // Open the chat view for this session. PromptView swaps its in-memory
+        // history for ChatSessionView's JSONL stream when focusedClaudeSession is set.
+        state.focusedSessionId = s.sessionId
+        state.view = .prompt
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
     }
 }
 

@@ -72,6 +72,75 @@ enum AgentSource: Equatable {
     case agent   // third-party agent via coucou_agent field
 }
 
+// MARK: - Claude Code session (per-session tracking for the overview's active-session list)
+
+/// Per-session view of a running Claude Code process. One Claude Code window / terminal tab
+/// = one `ClaudeSession`. Distinct from `AgentTask`, which still represents the single
+/// `integration_claude` pill (one per project/host at most).
+struct ClaudeSession: Identifiable, Equatable {
+    let id: String                  // == sessionId
+    let sessionId: String           // Claude Code UUID; matches ~/.claude/projects/.../<sid>.jsonl
+    var cwd: String                 // last known working directory
+    var hostApp: String?            // bundle id of the terminal running the session; nil = VS Code / editor
+    var sessionBundleId: String?    // bundle id of the app hosting the session (always set by the hook)
+    var projectName: String         // cwd.lastPathComponent, after aliasProjectName
+    var state: SessionPhase
+    var startedAt: Date
+    var lastEventAt: Date           // used for lazy GC of zombie sessions (>30 min idle)
+}
+
+/// Visual phase of a session in the right-side list. Distinct from `BotState` so the
+/// pill dot can stay simple (cyan/green/dim) regardless of the focus pill's many states.
+enum SessionPhase: String, Equatable {
+    case spawning   // SessionStart just received
+    case working    // UserPromptSubmit / PreToolUse / PostToolUse
+    case finished   // Stop (turn complete, badge shown for 5s)
+    case stopped    // StopFailure / Interrupt
+}
+
+extension Array where Element == ClaudeSession {
+    /// Insert a new session, or update its fields in place and promote to the front.
+    /// Empty / "unknown" `sessionId` is a no-op. List stays sorted most-recent-first.
+    mutating func upsert(
+        sessionId: String,
+        cwd: String,
+        hostApp: String?,
+        sessionBundleId: String?,
+        projectName: String,
+        phase: SessionPhase,
+        eventTime: Date
+    ) {
+        guard !sessionId.isEmpty, sessionId != "unknown" else { return }
+        if let idx = firstIndex(where: { $0.sessionId == sessionId }) {
+            var s = self[idx]
+            s.cwd = cwd
+            s.hostApp = hostApp
+            s.sessionBundleId = sessionBundleId
+            s.projectName = projectName
+            s.state = phase
+            s.lastEventAt = eventTime
+            remove(at: idx)
+            insert(s, at: 0)
+        } else {
+            insert(
+                ClaudeSession(
+                    id: sessionId, sessionId: sessionId,
+                    cwd: cwd, hostApp: hostApp, sessionBundleId: sessionBundleId,
+                    projectName: projectName, state: phase,
+                    startedAt: eventTime, lastEventAt: eventTime
+                ),
+                at: 0
+            )
+        }
+    }
+
+    /// Remove a session by id. No-op if absent.
+    mutating func removeById(_ sessionId: String) {
+        guard !sessionId.isEmpty else { return }
+        removeAll { $0.sessionId == sessionId }
+    }
+}
+
 // MARK: - History (per-agent session log fed by HookServer)
 
 enum ChatRole { case user, assistant }

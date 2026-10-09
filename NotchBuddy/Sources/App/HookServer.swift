@@ -52,6 +52,7 @@ final class HookServer: @unchecked Sendable {
     private var focusBeforeQuestion: String? = nil    // saved focus to restore after question
     private var activeSessionId: String? = nil        // current Claude Code session
     private var focusBeforeApproval: String? = nil    // saved focus to restore after approval
+    private var lastClaudeSessionId: String? = nil    // last Claude Code session id (for SessionEnd lookup)
 
     private init() {}
 
@@ -399,6 +400,13 @@ final class HookServer: @unchecked Sendable {
         }
 
         let focused = state.focusId == agentId
+        // Track every Claude Code event so the right-side session list stays current.
+        // Both `integration_claude` (VS Code / Warp / iTerm …) and `agent_claude-desktop`
+        // (Claude Desktop app) share `AgentSource.claudeCode` — the relay tags the
+        // desktop session with `coucou_agent: claude-desktop` so it routes through the
+        // external-agent branch with a different pill id.
+        let isClaudeSession = PillCatalog.definition(for: agentId)?.source == .claudeCode
+        if isClaudeSession { lastClaudeSessionId = sessionId }
         // For sessions that carry no id, derive a unique key from pill + cwd so that
         // concurrent anonymous sessions are tracked independently in RecapStore.
         let recapSessionId = (sessionId == "unknown" || sessionId.isEmpty)
@@ -450,6 +458,7 @@ final class HookServer: @unchecked Sendable {
 
         case "SessionStart":
             activeSessionId = sessionId
+            if isClaudeSession { updateClaudeSession(phase: .spawning, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
             if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                 state.tasks[idx].finalLine = nil
@@ -469,6 +478,7 @@ final class HookServer: @unchecked Sendable {
 
         case "UserPromptSubmit":
             activeSessionId = sessionId
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
             if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
             state.updateTask(id: agentId, state: .thinking)
@@ -494,6 +504,7 @@ final class HookServer: @unchecked Sendable {
             let input = payload["tool_input"] as? [String: Any] ?? [:]
             let step = localizedStep(tool: tool, input: input)
             appendStep(id: agentId, step: step)
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
             nbLog("PreToolUse \(tool)")
 
         case "PostToolUse":
@@ -507,10 +518,12 @@ final class HookServer: @unchecked Sendable {
                 appendStep(id: agentId, step: step)
                 RecapStore.shared.recordFileDiff(sessionId: recapSessionId, path: diff.name, added: diff.added, removed: diff.removed)
             }
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
 
         case "PostToolUseFailure":
             state.updateTask(id: agentId, state: .working)
             appendStep(id: agentId, step: "⚠ failed")
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
 
         case "Notification":
             let message = payload["message"] as? String ?? ""
@@ -535,6 +548,7 @@ final class HookServer: @unchecked Sendable {
                 }
                 appendHistory(id: agentId, role: .assistant, content: rawFinal)
             }
+            if isClaudeSession { updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             RecapStore.shared.stop(sessionId: recapSessionId)
             SoundEngine.shared.play("finish")
@@ -561,6 +575,7 @@ final class HookServer: @unchecked Sendable {
             } else {
                 setPillBadge(id: agentId, badge: .error)
             }
+            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
 
         case "Interrupt":
             // Codex: user stopped the turn
@@ -568,16 +583,32 @@ final class HookServer: @unchecked Sendable {
             activeSessionId = nil
             state.updateTask(id: agentId, state: .idle)
             clearPillBadge(id: agentId)
+            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
 
         case "SessionEnd":
             activeSessionId = nil
+            // SessionEnd payload is empty; fall back to the last seen session id.
+            let endedSid: String = {
+                if isClaudeSession, let cached = lastClaudeSessionId, !cached.isEmpty { return cached }
+                if !sessionId.isEmpty, sessionId != "unknown" { return sessionId }
+                return ""
+            }()
+            if isClaudeSession, !endedSid.isEmpty {
+                AppState.shared.removeClaudeSession(sessionId: endedSid)
+                if AppState.shared.focusedSessionId == endedSid {
+                    AppState.shared.focusedSessionId = nil
+                }
+            }
+            lastClaudeSessionId = nil
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                 state.tasks[idx].finalLine = nil
                 state.tasks[idx].history = []
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             state.clearSessionDiffs(for: agentId)
-            state.removeTask(id: agentId)
+            // Don't drop the focus pill while other live Claude Code sessions exist.
+            let otherLive = !endedSid.isEmpty && state.claudeSessions.contains { $0.sessionId != endedSid }
+            if !otherLive { state.removeTask(id: agentId) }
             RecapStore.shared.sessionEnd(sessionId: recapSessionId)
 
         case "SubagentStart":
@@ -1014,6 +1045,29 @@ final class HookServer: @unchecked Sendable {
         }
         if state.focusId == nil { state.focusId = id }
         state.syncMode()
+    }
+
+    /// Mirror the Claude Code session into AppState.claudeSessions.
+    /// Centralises the per-event bookkeeping so each case body only chooses the phase.
+    @MainActor
+    private func updateClaudeSession(
+        phase: SessionPhase,
+        sessionId: String,
+        cwd: String,
+        hostApp: String?,
+        bundleId: String?,
+        projectName: String
+    ) {
+        guard !sessionId.isEmpty, sessionId != "unknown" else { return }
+        AppState.shared.upsertClaudeSession(
+            sessionId: sessionId,
+            cwd: cwd,
+            hostApp: hostApp,
+            sessionBundleId: bundleId,
+            projectName: projectName,
+            phase: phase,
+            eventTime: .now
+        )
     }
 
     // MARK: - Badge helpers
