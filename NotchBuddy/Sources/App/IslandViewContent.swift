@@ -1350,6 +1350,18 @@ struct PromptView: View {
             // @Published on `tasks` fires and ChatSessionView's onChange
             // picks the new in-memory entry up before JSONL catches up.
             state.tasks[idx] = state.tasks[idx]
+            // Notify the open ChatSessionView (if any) so it can prepend this
+            // exact prompt to its render immediately, scoped to the session
+            // the user is currently looking at — not whichever session some
+            // other chat might be reading `focusTask.history` for.
+            NotificationCenter.default.post(
+                name: .userSentChatMessage,
+                object: nil,
+                userInfo: [
+                    "sessionId": state.focusedSessionId as Any,
+                    "content": query,
+                ]
+            )
             appendAppLog("nb.log", "send: pill=\(task.id) session=\(state.focusedSessionId ?? "<nil>") text=\(query.prefix(40))")
             focused = true
             Task { @MainActor in
