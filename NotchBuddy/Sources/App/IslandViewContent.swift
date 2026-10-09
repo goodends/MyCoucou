@@ -55,7 +55,7 @@ struct OverviewView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(Color(hex: agent.color))
+                                .fill(Color(hex: ClaudeSessionPill.stateDotColor(for: agent.state)))
                                 .frame(width: 7, height: 7)
                             Text(agent.name)
                                 .font(.system(size: 12, weight: .semibold))
@@ -1861,10 +1861,10 @@ struct ClaudeSessionPill: View {
         )
     }
 
+    /// Under the project name: just the host terminal (the project name is
+    /// already the title above, so repeating the cwd here was redundant).
     private var subtitle: String {
-        let cwdShort = (session.cwd as NSString).lastPathComponent
-        let host = ClaudeHost.name(for: session.hostApp ?? session.sessionBundleId)
-        return cwdShort + " · " + host
+        ClaudeHost.name(for: session.hostApp ?? session.sessionBundleId)
     }
 
     private func botState(for phase: SessionPhase) -> BotState {
@@ -1877,11 +1877,27 @@ struct ClaudeSessionPill: View {
     }
 
     private var stateDotColor: String {
-        switch session.state {
-        case .spawning: return "#5EEAD4"  // cyan
-        case .working:  return Self.claudeColor
-        case .finished: return "#22C55E"  // green
-        case .stopped:  return "#5F646D"  // dim
+        Self.stateDotColor(for: botTask.state)
+    }
+
+    /// Shared mapping so the overview's left card and the right-card pill
+    /// show the same status colour for the same session. Takes BotState
+    /// (already-mapped from SessionPhase inside `botTask`) so it lines up
+    /// with the overview card's `AgentTask.state` field too.
+    static func stateDotColor(for state: BotState) -> String {
+        switch state {
+        case .thinking:   return "#5EEAD4"  // cyan  (spawning)
+        case .working:    return claudeColor
+        case .finished:   return "#22C55E"  // green
+        case .idle:       return "#5F646D"  // dim   (stopped)
+        default:          return "#5F646D"  // searching / approval / question / error / ratelimit / sleeping / dizzy
+        }
+    }
+
+    private var showsTypingDots: Bool {
+        switch botTask.state {
+        case .working, .thinking: return true
+        default: return false
         }
     }
 
@@ -1933,6 +1949,11 @@ struct ClaudeSessionPill: View {
                     .frame(width: 6, height: 6)
                     .offset(x: -6, y: 4)
                     .allowsHitTesting(false)
+                if showsTypingDots {
+                    TypingDotsView()
+                        .offset(x: -22, y: 0)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .buttonStyle(.plain)
