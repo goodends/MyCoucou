@@ -63,11 +63,12 @@ struct BotCanvasView: View {
                 let isWardrobe = state.mode == .expanded && state.view == .wardrobe
                 let isFocusMain = state.focusId == state.mainPillId || state.focusId == nil
                 let showOutfit = isFocusMain || state.mode != .expanded || isWardrobe
-                // Active session's outfit wins over the seasonal / user-picked one,
-                // so the overview shows one consistent character across both cards.
-                let sessionOutfit = state.overviewSession?.outfit ?? .none
-                let resolved = sessionOutfit != .none ? sessionOutfit : state.resolvedOutfit
-                engine.setOutfit(showOutfit ? resolved : .none,
+                // Active session's outfit wins — always, no fallback to the
+                // user's stored preference. The old `resolvedOutfit` fallback
+                // made the main Mochi show a seasonal pumpkin while the right
+                // pill showed the session's actual outfit, which is exactly
+                // the inconsistency the user reported.
+                engine.setOutfit(showOutfit ? (state.overviewSession?.outfit ?? .none) : .none,
                                  animated: state.view != .wardrobe)
 
                 engine.update(dt: dt)

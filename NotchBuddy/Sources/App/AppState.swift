@@ -33,6 +33,16 @@ final class AppState: ObservableObject {
     // HookServer maintains order. Not persisted — SessionStart re-fires on process launch.
     @Published var claudeSessions: [ClaudeSession] = []
 
+    /// Session ids the user has explicitly told the app to stop monitoring.
+    /// Persisted so a restart doesn't bring the noise back. `upsertClaudeSession`
+    /// checks this and skips the entry, which keeps the right-side list clean
+    /// even as the underlying process keeps firing hook events.
+    @Published var hiddenClaudeSessionIds: Set<String> = Set(
+        UserDefaults.standard.stringArray(forKey: "hiddenClaudeSessionIds") ?? []
+    ) {
+        didSet { UserDefaults.standard.set(Array(hiddenClaudeSessionIds), forKey: "hiddenClaudeSessionIds") }
+    }
+
     /// Per-session step log (rolling window of ~20). Populated by HookServer so the
     /// overview's left ticker can show real-time activity even when the focus task
     /// is shared across concurrent Claude sessions.
@@ -525,7 +535,9 @@ final class AppState: ObservableObject {
 
     /// Insert or refresh a Claude Code session. Empty / "unknown" session ids are no-ops.
     /// Existing sessions are updated in place and promoted to the front; new sessions
-    /// are prepended so the list stays sorted by recency.
+    /// are prepended so the list stays sorted by recency. Sessions the user has
+    /// asked us to stop monitoring (see `hideClaudeSession`) are skipped entirely
+    /// so the right-side list stays clean.
     func upsertClaudeSession(
         sessionId: String,
         cwd: String,
@@ -535,11 +547,26 @@ final class AppState: ObservableObject {
         phase: SessionPhase,
         eventTime: Date
     ) {
+        guard !hiddenClaudeSessionIds.contains(sessionId) else { return }
         claudeSessions.upsert(
             sessionId: sessionId, cwd: cwd, hostApp: hostApp,
             sessionBundleId: sessionBundleId, projectName: projectName,
             phase: phase, eventTime: eventTime
         )
+    }
+
+    /// Mark a session as "stop monitoring": drop it from the right-side list
+    /// and keep future hook events from re-adding it. Persists across restarts.
+    func hideClaudeSession(_ sessionId: String) {
+        hiddenClaudeSessionIds.insert(sessionId)
+        claudeSessions.removeById(sessionId)
+        if focusedSessionId == sessionId { focusedSessionId = nil }
+    }
+
+    /// Reverse of `hideClaudeSession` — used by Settings to let the user
+    /// bring a previously hidden session back into the list.
+    func unhideClaudeSession(_ sessionId: String) {
+        hiddenClaudeSessionIds.remove(sessionId)
     }
 
     /// Remove a Claude Code session by id. No-op if absent. Does NOT touch tasks/focus.
