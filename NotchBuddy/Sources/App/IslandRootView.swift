@@ -33,11 +33,11 @@ struct IslandContainer: View {
     private let openSpring = Animation.spring(response: 0.5, dampingFraction: 0.72)
     private let closeEase  = Animation.timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
 
-    private var chatPromptHeight: CGFloat {
-        let base: CGFloat = 240
-        let perMsg: CGFloat = 40
-        return min(500, base + CGFloat(state.focusTask?.history.count ?? 0) * perMsg)
-    }
+    /// Fixed height for the chat (`.prompt`) island. Used to be a function of
+    /// `focusTask.history.count`, which made the island grow every time the
+    /// user sent a message and didn't even account for `ChatSessionView` whose
+    /// messages come from JSONL — so a long session rendered in a 240px stub.
+    private let chatPromptHeight: CGFloat = 500
 
     /// Pixels the content must be pushed down to clear the concave ear transparent area.
     /// = 0 in expanded mode (no ears), = earRadius in compact/notch mode.
