@@ -96,7 +96,7 @@ struct BotCanvasView: View {
                 engine.drawHandsAndExtras(context: ctx, size: size)
             }
         }
-        .onChange(of: state.effectiveState) { _, newState in
+        .onChange(of: state.mainMochiState) { _, newState in
             engine.setState(newState)
         }
         .onChange(of: state.view) { _, newView in
@@ -145,7 +145,7 @@ struct BotCanvasView: View {
             engine.greet()
         }
         .onAppear {
-            engine.setState(state.effectiveState, force: true)
+            engine.setState(state.mainMochiState, force: true)
             let isWardrobe = state.mode == .expanded && state.view == .wardrobe
             let isFocusMain = state.focusId == state.mainPillId || state.focusId == nil
             let showOutfit = isFocusMain || state.mode != .expanded || isWardrobe
