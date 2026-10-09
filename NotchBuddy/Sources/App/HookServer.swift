@@ -451,7 +451,12 @@ final class HookServer: @unchecked Sendable {
         case "SessionStart":
             activeSessionId = sessionId
             if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId) }
-            if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
+            if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
+                state.tasks[idx].finalLine = nil
+                state.tasks[idx].history = []
+                state.tasks[idx].sessionId = sessionId
+            }
+            state.scheduleReloadHistoryFromJSONL(for: agentId)
             nbLog("SessionStart \(isExternalAgent ? agentId : projectName) (\(sessionId.prefix(8)))")
             NotificationCenter.default.post(name: .checkMondayRecap, object: nil)
             if state.isPresent { expandIfNeeded(to: .overview) }
@@ -469,7 +474,9 @@ final class HookServer: @unchecked Sendable {
             state.updateTask(id: agentId, state: .thinking)
             if let prompt = payload["prompt"] as? String, !prompt.isEmpty {
                 appendStep(id: agentId, step: String(prompt.prefix(60)))
+                appendHistory(id: agentId, role: .user, content: prompt)
             }
+            state.scheduleReloadHistoryFromJSONL(for: agentId)
             RecapStore.shared.userPromptSubmit(sessionId: recapSessionId, pillId: agentId, project: projectName)
             NotificationCenter.default.post(name: .checkMondayRecap, object: nil)
             if state.isPresent { expandIfNeeded(to: .overview) }
@@ -526,7 +533,9 @@ final class HookServer: @unchecked Sendable {
                 if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                     state.tasks[idx].finalLine = finalText
                 }
+                appendHistory(id: agentId, role: .assistant, content: rawFinal)
             }
+            state.scheduleReloadHistoryFromJSONL(for: agentId)
             RecapStore.shared.stop(sessionId: recapSessionId)
             SoundEngine.shared.play("finish")
             if focused {
@@ -562,7 +571,11 @@ final class HookServer: @unchecked Sendable {
 
         case "SessionEnd":
             activeSessionId = nil
-            if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
+            if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
+                state.tasks[idx].finalLine = nil
+                state.tasks[idx].history = []
+            }
+            state.scheduleReloadHistoryFromJSONL(for: agentId)
             state.clearSessionDiffs(for: agentId)
             state.removeTask(id: agentId)
             RecapStore.shared.sessionEnd(sessionId: recapSessionId)
@@ -1026,6 +1039,14 @@ final class HookServer: @unchecked Sendable {
         state.tasks[idx].steps.append(step)
         if state.tasks[idx].steps.count > 20 { state.tasks[idx].steps.removeFirst() }
         state.tasks[idx].stepIndex = state.tasks[idx].steps.count - 1
+    }
+
+    @MainActor
+    private func appendHistory(id: String, role: ChatRole, content: String) {
+        let state = AppState.shared
+        guard let idx = state.tasks.firstIndex(where: { $0.id == id }) else { return }
+        state.tasks[idx].history.append(HistoryEntry(role: role, content: content))
+        state.tasks[idx] = state.tasks[idx]  // force @Published to detect the change
     }
 
     // MARK: - Project name alias mapping

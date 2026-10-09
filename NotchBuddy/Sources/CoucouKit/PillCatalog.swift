@@ -143,3 +143,22 @@ enum PillCatalog {
         all.first { $0.id == id }
     }
 }
+
+// MARK: - Chatable pill predicate
+
+extension PillCatalog {
+    /// True for pills whose session log can be opened as a chat view (focused
+    /// agent history). Integrations (Resend, Vercel, …) are NOT chatable —
+    /// clicking them only updates focus and keeps the home view.
+    static func isChatablePill(id: String) -> Bool {
+        switch id {
+        case "integration_claude",
+             "agent_cursor", "agent_codex", "agent_antigravity",
+             "agent_gemini", "agent_copilot", "agent_muse",
+             "agent_opencode", "agent_amp", "agent_claude-desktop":
+            return true
+        default:
+            return false
+        }
+    }
+}

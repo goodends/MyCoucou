@@ -34,9 +34,9 @@ struct IslandContainer: View {
     private let closeEase  = Animation.timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
 
     private var chatPromptHeight: CGFloat {
-        let base: CGFloat = 240
-        let perMsg: CGFloat = 40
-        return min(300, base + CGFloat(state.chatHistory.count) * perMsg)
+        // ChatSessionView shows the raw JSONL. 600 leaves the tab bar visible
+        // on a typical MacBook screen (1000 pushed it off).
+        return 600
     }
 
     /// Pixels the content must be pushed down to clear the concave ear transparent area.
@@ -161,7 +161,7 @@ struct IslandContainer: View {
                 islandHeight = newView == .prompt ? chatPromptHeight : h
             }
         }
-        .onChange(of: state.chatHistory.count) { _, _ in
+        .onChange(of: state.focusTask?.history.count ?? 0) { _, _ in
             guard state.mode == .expanded, state.view == .prompt else { return }
             withAnimation(openSpring) { islandHeight = chatPromptHeight }
         }

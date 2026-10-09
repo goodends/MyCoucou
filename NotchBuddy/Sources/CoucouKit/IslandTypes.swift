@@ -59,15 +59,27 @@ struct AgentTask: Identifiable, Equatable {
     var miniEye: EyeShape? = nil
     var pillBadge: PillBadge? = nil  // alert badge shown on pill when not focused
     var sessionCwd: String?  = nil  // last known working directory (Claude Code sessions)
+    var sessionId: String?   = nil  // Claude Code session id (matches ~/.claude/projects/.../<sessionId>.jsonl)
     var sessionBundleId: String? = nil  // app the session runs in (hook bundle_id), for "Open terminal"
     var finalLine: String?   = nil  // last assistant message shown as static text after Stop
     var hostApp: String?     = nil  // bundle id of the terminal running a Claude Code session; nil = VS Code
+    var history: [HistoryEntry] = []  // full prompt/response log from UserPromptSubmit + Stop hooks
 }
 
 enum AgentSource: Equatable {
     case claudeCode
     case n8n
     case agent   // third-party agent via coucou_agent field
+}
+
+// MARK: - History (per-agent session log fed by HookServer)
+
+enum ChatRole { case user, assistant }
+
+struct HistoryEntry: Identifiable, Equatable {
+    let id = UUID()
+    let role: ChatRole
+    var content: String
 }
 
 // MARK: - Chat provider

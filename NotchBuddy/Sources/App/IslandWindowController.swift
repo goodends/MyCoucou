@@ -740,6 +740,15 @@ final class IslandWindowController: NSWindowController {
                 guard self.isBotHit(event.locationInWindow) else { return }
                 // Notch Mochi is invisible when on desktop — no drag, no slap
                 guard !self.state.mochiOnDesktop else { return }
+                // On the home view, a Mochi click opens the focused agent's chat
+                // instead of slapping — covers the user-reported case where clicking
+                // the left card triggered the dizzy/confused state.
+                if self.state.mode == .expanded && self.state.view == .overview {
+                    if let task = self.state.focusTask, PillCatalog.isChatablePill(id: task.id) {
+                        self.state.view = .prompt
+                    }
+                    return
+                }
                 self.attachDragStart = NSEvent.mouseLocation
                 // Post slap only when expanded
                 guard self.state.mode == .expanded else { return }
@@ -1116,9 +1125,7 @@ final class IslandWindowController: NSWindowController {
         // Chat view resizes dynamically — must match IslandContainer.chatPromptHeight
         let islandH: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            let base: CGFloat = 240
-            let perMsg: CGFloat = 40
-            islandH = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
+            islandH = 600
         } else {
             islandH = fixedH
         }
@@ -1213,9 +1220,7 @@ final class IslandPanel: NSPanel {
                                       progress: s.uploadProgress, nw: nw, nh: nh)
         let h: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            let base: CGFloat = 240
-            let perMsg: CGFloat = 40
-            h = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
+            h = 600
         } else {
             h = fixedH
         }

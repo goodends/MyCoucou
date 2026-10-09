@@ -145,6 +145,12 @@ struct OverviewView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if let task = state.focusTask, PillCatalog.isChatablePill(id: task.id) {
+                    state.view = .prompt
+                }
+            }
             .frame(width: 322)
 
             // Right card: agent pills
@@ -1211,7 +1217,25 @@ struct PromptView: View {
     @ObservedObject var state: AppState
     @State private var text: String = ""
     @FocusState private var focused: Bool
-    @State private var showModelPicker = false
+    @State private var showNotWiredToast = false
+
+    private var historyBinding: [HistoryEntry] {
+        state.focusTask?.history ?? []
+    }
+
+    private var focusTaskLabel: String {
+        guard let task = state.focusTask else { return "Claude Code" }
+        if task.id == "integration_claude" {
+            return ClaudeHost.pillName(hostApp: task.hostApp)
+        }
+        return task.name
+    }
+
+    private func scrollHistoryToBottom(proxy: ScrollViewProxy) {
+        if let last = historyBinding.last(where: { !$0.content.isEmpty }) {
+            proxy.scrollTo(last.id, anchor: .bottom)
+        }
+    }
 
     #if !APPSTORE
     @State private var dictation = MacDictation()
@@ -1225,12 +1249,12 @@ struct PromptView: View {
                     ContextChip(context: ctx).padding(.top, 4)
                 }
 
-                if !state.chatHistory.isEmpty {
+                if !historyBinding.isEmpty {
                     ScrollViewReader { proxy in
-                        ScrollView(.vertical, showsIndicators: false) {
+                        ScrollView(.vertical) {
                             VStack(alignment: .leading, spacing: 6) {
-                                ForEach(state.chatHistory) { msg in
-                                    ChatBubble(message: msg).id(msg.id)
+                                ForEach(historyBinding) { entry in
+                                    ChatBubble(message: ChatMessage(role: entry.role, content: entry.content)).id(entry.id)
                                 }
                                 if state.stateOverride != nil {
                                     HStack { TypingDotsView(); Spacer(minLength: 32) }
@@ -1239,22 +1263,18 @@ struct PromptView: View {
                             }
                             .padding(.vertical, 2)
                         }
-                        .onChange(of: state.chatHistory) { _, _ in
-                            if let last = state.chatHistory.last(where: { !$0.content.isEmpty }) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
+                        .onChange(of: historyBinding) { _, _ in
+                            scrollHistoryToBottom(proxy: proxy)
                         }
                         .onChange(of: state.stateOverride) { _, v in
                             if v != nil {
                                 withAnimation { proxy.scrollTo("typing", anchor: .bottom) }
-                            } else if let last = state.chatHistory.last(where: { !$0.content.isEmpty }) {
-                                withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                            } else {
+                                withAnimation { scrollHistoryToBottom(proxy: proxy) }
                             }
                         }
                         .onAppear {
-                            if let last = state.chatHistory.last {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
+                            scrollHistoryToBottom(proxy: proxy)
                         }
                     }
                     .frame(maxHeight: .infinity)
@@ -1264,41 +1284,34 @@ struct PromptView: View {
 
                 HStack(spacing: 0) {
                     Spacer()
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                            showModelPicker.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Circle()
-                                .fill(Color(hex: state.chatProvider.accentHex))
-                                .frame(width: 6, height: 6)
-                            Text(state.activeChatModel)
-                                .font(.system(size: 10.5, weight: .medium))
-                                .foregroundColor(Color(hex: "#7B8089"))
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 8))
-                                .foregroundColor(Color(hex: "#5C6370"))
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.06))
-                        .clipShape(Capsule())
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(Color(hex: state.focusTask?.color ?? "#7B8089"))
+                            .frame(width: 6, height: 6)
+                        Text(focusTaskLabel)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(Color(hex: "#7B8089"))
                     }
-                    .buttonStyle(.plain)
-                    .popover(isPresented: $showModelPicker, arrowEdge: .bottom) {
-                        ModelPickerView(state: state, isPresented: $showModelPicker)
-                            .frame(width: 300)
-                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Capsule())
                 }
                 .padding(.horizontal, 10)
 
                 HStack(spacing: 8) {
-                    TextField(state.chatHistory.isEmpty ? String(localized: "Ask me anything…") : String(localized: "Continue…"), text: $text)
+                    TextField(historyBinding.isEmpty ? String(localized: "Ask me anything…") : String(localized: "Continue…"), text: $text)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13))
                         .focused($focused)
                         .onSubmit { sendMessage() }
+
+                    if showNotWiredToast {
+                        Text("暂未发送 — 真注入是后续 PR")
+                            .font(.system(size: 10.5))
+                            .foregroundColor(Color(hex: "#F4B400"))
+                            .lineLimit(1)
+                    }
 
                     #if !APPSTORE
                     // Dictate instead of typing (on-device speech recognition when available)
@@ -1341,15 +1354,16 @@ struct PromptView: View {
             .padding(.bottom, 14)
         }
         .padding(.bottom, 10)
-        .onAppear { focused = true }
-        .onChange(of: state.view) { _, view in
-            if view == .prompt {
-                state.fetchModelsIfNeeded(for: state.chatProvider)
-            }
+        .onAppear {
+            focused = true
+            if let id = state.focusId { state.scheduleReloadHistoryFromJSONL(for: id) }
         }
-        .onChange(of: state.chatProvider) { _, provider in
-            if state.view == .prompt {
-                state.fetchModelsIfNeeded(for: provider)
+        .onChange(of: state.view) { _, view in
+            if view == .prompt { focused = true }
+        }
+        .onChange(of: state.focusId) { _, newId in
+            if state.view == .prompt, let id = newId {
+                state.scheduleReloadHistoryFromJSONL(for: id)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .islandSendMessage)) { _ in
@@ -1359,7 +1373,9 @@ struct PromptView: View {
         .onReceive(NotificationCenter.default.publisher(for: .islandNewConversation)) { _ in
             guard state.view == .prompt else { return }
             text = ""
-            state.chatHistory = []
+            if let id = state.focusId, let idx = state.tasks.firstIndex(where: { $0.id == id }) {
+                state.tasks[idx].history = []
+            }
             ClaudeService.shared.clearConversation()
             focused = true
         }
@@ -1379,12 +1395,28 @@ struct PromptView: View {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
         text = ""
-        focused = false
-        state.chatHistory.append(ChatMessage(role: .user, content: query))
-        state.stateOverride = .thinking
-        Task {
-            await ClaudeService.shared.chat(query: query, context: state.promptContext, state: state)
-            await MainActor.run { focused = true }
+
+        // Write to the focused agent's history. Real injection into the running
+        // agent process is not wired yet — the existing hook protocol only accepts
+        // allow/always/ask/deny/answer decision JSON (see HookServer.swift:820-855).
+        // This appends locally so the user sees their input in the chat, and
+        // triggers an emote + 3s toast as a "not yet sent" hint.
+        if let task = state.focusTask,
+           let idx = state.tasks.firstIndex(where: { $0.id == task.id }) {
+            state.tasks[idx].history.append(HistoryEntry(role: .user, content: query))
+            appendAppLog("nb.log", "send to agent: not yet wired (pill=\(task.id))")
+            NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.annoyed)
+            showNotWiredToast = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
+            focused = true
+        } else {
+            // Defensive fallback — normally focusTask is non-nil after launch.
+            state.chatHistory.append(ChatMessage(role: .user, content: query))
+            state.stateOverride = .thinking
+            Task {
+                await ClaudeService.shared.chat(query: query, context: state.promptContext, state: state)
+                await MainActor.run { focused = true }
+            }
         }
     }
 }
@@ -1392,7 +1424,7 @@ struct PromptView: View {
 
 // MARK: - Model / provider picker
 
-/// Wrapping horizontal flow layout — used by ModelPickerView and QuestionView.
+/// Wrapping horizontal flow layout — used by QuestionView.
 struct ChipFlowLayout: Layout {
     var spacing: CGFloat = 6
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
@@ -1417,135 +1449,6 @@ struct ChipFlowLayout: Layout {
             maxX = max(maxX, x - spacing)
         }
         return (CGSize(width: max(maxX, 0), height: y + lineH), pts)
-    }
-}
-
-struct ModelPickerView: View {
-    @ObservedObject var state: AppState
-    @Binding var isPresented: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Provider chips — wrap; hide local providers when not connected and not already active
-            let visibleProviders = ChatProvider.allCases.filter { p in
-                if p == .ollama   { return !AppState.shared.ollamaServerURL.isEmpty   || state.chatProvider == .ollama }
-                if p == .lmstudio { return !AppState.shared.lmstudioServerURL.isEmpty || state.chatProvider == .lmstudio }
-                return true
-            }
-            ChipFlowLayout(spacing: 6) {
-                ForEach(visibleProviders, id: \.self) { provider in
-                    Button {
-                        guard provider != state.chatProvider else { return }
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                            state.chatProvider = provider
-                        }
-                        NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.surprised)
-                        SoundEngine.shared.play("pop")
-                    } label: {
-                        HStack(spacing: 5) {
-                            Circle()
-                                .fill(Color(hex: provider.accentHex))
-                                .frame(width: 7, height: 7)
-                            Text(provider.displayName)
-                                .font(.system(size: 12, weight: state.chatProvider == provider ? .semibold : .regular))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(state.chatProvider == provider
-                                    ? Color(hex: provider.accentHex).opacity(0.18)
-                                    : Color.white.opacity(0.06))
-                        .overlay(Capsule().stroke(
-                            state.chatProvider == provider
-                                ? Color(hex: provider.accentHex).opacity(0.5)
-                                : Color.white.opacity(0.1),
-                            lineWidth: 1))
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            Divider().opacity(0.2)
-
-            // Model list for current provider — fetched dynamically
-            modelListView
-                .frame(height: 260, alignment: .top)
-        }
-        .padding(14)
-        .background(Color(hex: "#16171B"))
-        .onAppear {
-            // Force-refresh local providers every time the picker opens
-            if state.chatProvider.isLocal {
-                state.fetchedProviderModels[state.chatProvider] = nil
-                state.providerModelFetchError[state.chatProvider] = nil
-            }
-            state.fetchModelsIfNeeded(for: state.chatProvider)
-        }
-        .onChange(of: state.chatProvider) { _, provider in
-            if provider.isLocal {
-                state.fetchedProviderModels[provider] = nil
-                state.providerModelFetchError[provider] = nil
-            }
-            state.fetchModelsIfNeeded(for: provider)
-        }
-    }
-
-    @ViewBuilder
-    private var modelListView: some View {
-        if state.loadingProviderModels.contains(state.chatProvider) {
-            HStack(spacing: 8) {
-                ProgressView().scaleEffect(0.7)
-                Text("Loading models…")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "#8A8F98"))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 4)
-        } else if let error = state.providerModelFetchError[state.chatProvider] {
-            Text(error)
-                .font(.system(size: 11))
-                .foregroundColor(Color(hex: "#8A8F98"))
-                .padding(.vertical, 4)
-        } else if let models = state.fetchedProviderModels[state.chatProvider] {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(models, id: \.id) { model in
-                        Button {
-                            switch state.chatProvider {
-                            case .anthropic: state.claudeModel = model.id
-                            case .google:    state.googleChatModel = model.id
-                            case .openai:    state.openAIChatModel = model.id
-                            case .ollama:    state.ollamaChatModel = model.id
-                            case .lmstudio:  state.lmstudioChatModel = model.id
-                            }
-                            isPresented = false
-                            SoundEngine.shared.play("blip")
-                        } label: {
-                            HStack {
-                                Text(model.label)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(state.activeChatModel == model.id
-                                                     ? Color(hex: state.chatProvider.accentHex)
-                                                     : Color(hex: "#C8CDD4"))
-                                Spacer()
-                                if state.activeChatModel == model.id {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundColor(Color(hex: state.chatProvider.accentHex))
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(state.activeChatModel == model.id
-                                        ? Color(hex: state.chatProvider.accentHex).opacity(0.1)
-                                        : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -3863,6 +3766,9 @@ struct AgentPillsView: View {
                         AgentPill(task: task, state: state, swapping: $swapping) {
                             swapping = true
                             state.setFocus(task.id)
+                            if PillCatalog.isChatablePill(id: task.id) {
+                                state.view = .prompt
+                            }
                             SoundEngine.shared.play("blip")
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
                         }

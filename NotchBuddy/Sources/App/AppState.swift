@@ -579,6 +579,52 @@ final class AppState: ObservableObject {
         tasks[idx].pillBadge = badge
     }
 
+    // MARK: - Session history reload (JSONL)
+    //
+    // The hook pipe only sees events that happen *after* Coucou started. To show
+    // the full session (including pre-Coucou prompts/responses) we read Claude
+    // Code's own `~/.claude/projects/.../<sessionId>.jsonl` log on demand.
+    //
+    // For agents without a JSONL file (Cursor, Codex, Resend, …) this is a no-op;
+    // their history still arrives via HookServer.appendHistory.
+
+    private var reloadWorkItems: [String: DispatchWorkItem] = [:]
+
+    /// Coalesce rapid events: cancel any pending reload for this task and schedule
+    /// a new one 100 ms later. Called by HookServer after each event.
+    @MainActor
+    func scheduleReloadHistoryFromJSONL(for taskId: String) {
+        reloadWorkItems[taskId]?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            self?.reloadHistoryFromJSONL(for: taskId)
+        }
+        reloadWorkItems[taskId] = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: item)
+    }
+
+    /// Read the JSONL and replace `tasks[idx].history` wholesale. The reassign
+    /// at the end forces `@Published` to fire — mutating a struct field inside
+    /// an array doesn't always trigger SwiftUI re-render on its own.
+    @MainActor
+    func reloadHistoryFromJSONL(for taskId: String) {
+        guard let idx = tasks.firstIndex(where: { $0.id == taskId }) else { return }
+        let url: URL?
+        if let cwd = tasks[idx].sessionCwd, let sid = tasks[idx].sessionId {
+            url = SessionHistoryLoader.jsonlURL(cwd: cwd, sessionId: sid)
+        } else if let cwd = tasks[idx].sessionCwd {
+            url = SessionHistoryLoader.mostRecentSessionURL(cwd: cwd)
+        } else {
+            // Fallback: SessionStart never fired (Coucou started after Claude Code).
+            // Scan every project and use the most recently modified .jsonl anywhere.
+            url = SessionHistoryLoader.mostRecentSessionAcrossProjects()
+        }
+        guard let url, FileManager.default.fileExists(atPath: url.path) else { return }
+        let entries = SessionHistoryLoader.loadHistory(from: url)
+        tasks[idx].history = entries
+        tasks[idx] = tasks[idx]  // force @Published to detect the change
+        appendAppLog("nb.log", "reloadJSONL \(taskId) → \(entries.count) entries from \(url.lastPathComponent)")
+    }
+
     /// Called on main thread after each GitHub pulse poll. Fires badge + sound based on events.
     func handleGitHubEvents(_ events: [GitHubEvent]) {
         guard !events.isEmpty else { return }
@@ -837,8 +883,6 @@ struct NotionPage: Identifiable {
 }
 
 // MARK: - Chat
-
-enum ChatRole { case user, assistant }
 
 struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
