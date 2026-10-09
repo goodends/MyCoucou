@@ -1240,7 +1240,7 @@ struct PromptView: View {
                         .onSubmit { sendMessage() }
 
                     if showNotWiredToast {
-                        Text("暂未发送 — 真注入是后续 PR")
+                        Text("暂未发送 — Orca 里没找到该 session")
                             .font(.system(size: 10.5))
                             .foregroundColor(Color(hex: "#F4B400"))
                             .lineLimit(1)
@@ -1328,19 +1328,23 @@ struct PromptView: View {
         guard !query.isEmpty else { return }
         text = ""
 
-        // Write to the focused agent's history. Real injection into the running
-        // agent process is not wired yet — the existing hook protocol only accepts
-        // allow/always/ask/deny/answer decision JSON (see HookServer.swift:820-855).
-        // This appends locally so the user sees their input in the chat, and
-        // triggers an emote + 3s toast as a "not yet sent" hint.
+        // Append the prompt locally so the user sees it immediately, then
+        // hand it to Orca to type into the running agent. When Orca can't
+        // reach the session we keep the local echo but flag it as not sent.
         if let task = state.focusTask,
            let idx = state.tasks.firstIndex(where: { $0.id == task.id }) {
             state.tasks[idx].history.append(HistoryEntry(role: .user, content: query))
-            appendAppLog("nb.log", "send to agent: not yet wired (pill=\(task.id))")
-            NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.annoyed)
-            showNotWiredToast = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
+            appendAppLog("nb.log", "send: pill=\(task.id) session=\(state.focusedSessionId ?? "<nil>") text=\(query.prefix(40))")
             focused = true
+            Task { @MainActor in
+                let sent = await state.sendToOrcaTerminal(query)
+                appendAppLog("nb.log", "send: orca sent=\(sent)")
+                if !sent {
+                    NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.annoyed)
+                    showNotWiredToast = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
+                }
+            }
         }
     }
 }

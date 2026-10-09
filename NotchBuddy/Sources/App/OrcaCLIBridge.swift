@@ -33,6 +33,19 @@ struct OrcaTerminalList: Decodable {
     let terminals: [OrcaTerminalInfo]
 }
 
+/// `terminal send` result: the input-acceptance verdict plus, when the host
+/// supports it, a prompt receipt whose `stages` say whether the agent
+/// actually took the prompt.
+struct OrcaSendReceipt: Decodable {
+    let accepted: Bool?
+    let bytesWritten: Int?
+    let prompt: OrcaPromptReceipt?
+}
+
+struct OrcaPromptReceipt: Decodable {
+    let stages: [String]?
+}
+
 actor OrcaCLIBridge {
     static let shared = OrcaCLIBridge()
 
@@ -107,6 +120,32 @@ actor OrcaCLIBridge {
     /// Activate the Orca window and switch to `handle`'s terminal tab.
     func focus(handle: String) async throws {
         _ = try await run(["terminal", "switch", "--terminal", handle])
+    }
+
+    /// Type `text` into `handle`'s agent and submit it (as if the user
+    /// pressed Enter). Blocks up to `waitSubmit` seconds for Orca to observe
+    /// the agent accept the prompt.
+    ///
+    /// Returns true only when the receipt reaches `submission_observed` or
+    /// `turn_started` — bytes written is necessary but not sufficient (an
+    /// idle or exited agent gets the bytes and does nothing).
+    @discardableResult
+    func send(handle: String, text: String, waitSubmit: Int = 5) async throws -> Bool {
+        let resp = try await run([
+            "terminal", "send",
+            "--terminal", handle,
+            "--text", text,
+            "--enter",
+            "--wait-submit", String(waitSubmit),
+        ])
+        guard resp["ok"] as? Bool == true,
+              let result = resp["result"] as? [String: Any],
+              let sendDict = result["send"] as? [String: Any],
+              let data = try? JSONSerialization.data(withJSONObject: sendDict),
+              let receipt = try? JSONDecoder().decode(OrcaSendReceipt.self, from: data)
+        else { throw OrcaCLIError.badShape("send returned no receipt: \(resp)") }
+        let stages = receipt.prompt?.stages ?? []
+        return stages.contains("submission_observed") || stages.contains("turn_started")
     }
 
     /// Resolve `cwd` to the Orca terminal hosting that session. Picks the

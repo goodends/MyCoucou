@@ -91,6 +91,34 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Orca terminal handle bound per Claude session, keyed by sessionId.
+    /// `task.id` is `"integration_claude"` for every Claude pill, so it can't
+    /// tell two running sessions apart; the session uuid can. Populated
+    /// lazily on the first send, then reused.
+    @Published var orcaHandleBySession: [String: String] = [:]
+
+    /// Type `text` into the Orca terminal hosting the focused Claude session
+    /// and submit it. Returns false when Orca can't reach the session (not
+    /// installed, no matching terminal, or the agent didn't take the prompt)
+    /// so the caller can show its "not sent" hint.
+    @discardableResult
+    func sendToOrcaTerminal(_ text: String) async -> Bool {
+        guard OrcaCLIBridge.isInstalled else { return false }
+        guard let key = focusedSessionId ?? focusTask?.id, !key.isEmpty else { return false }
+
+        var handle = orcaHandleBySession[key]
+        if handle == nil, let cwd = terminalLookupCwd {
+            handle = await OrcaCLIBridge.shared.handle(forCwd: cwd)
+            if let h = handle { orcaHandleBySession[key] = h }
+        }
+        guard let handle else { return false }
+        do {
+            return try await OrcaCLIBridge.shared.send(handle: handle, text: text)
+        } catch {
+            return false
+        }
+    }
+
     /// The Claude session that should drive the OverviewView's left card:
     /// either the user-tapped one, or the most-recently-active session when none
     /// was explicitly chosen. Keeps the home view in sync with what the user is
