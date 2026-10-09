@@ -11,6 +11,19 @@ final class AppState: ObservableObject {
     @Published var mode: IslandMode = .hidden
     @Published var view: IslandView = .overview
 
+    /// The island's own NSWindow, set once by IslandWindowController at boot.
+    /// Used by the overscroll-back gesture to filter NSEvent.scrollWheel to
+    /// scrolls that targeted this window — `NSEvent.addLocalMonitorForEvents`
+    /// delivers every scroll in the foreground app's process otherwise.
+    @Published var islandWindow: NSWindow? = nil
+
+    /// `true` when every nested ScrollView inside the island is at the
+    /// bottom (so the user has run out of room to scroll down any further).
+    /// `true` by default because views without any ScrollView (e.g. the
+    /// home view) should still accept the gesture immediately. The
+    /// bottom-of-chat predicate here is what the gesture actually checks.
+    @Published var scrollAtBottom: Bool = true
+
     // Tasks
     @Published var tasks: [AgentTask] = []
     @Published var focusId: String? = nil

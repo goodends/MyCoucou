@@ -1275,6 +1275,7 @@ struct PromptView: View {
                             }
                             .padding(.vertical, 2)
                         }
+                        .reportsScrollAtBottomViaGeometry(for: .prompt, state: state)
                         .onChange(of: historyBinding) { _, _ in
                             scrollHistoryToBottom(proxy: proxy)
                         }

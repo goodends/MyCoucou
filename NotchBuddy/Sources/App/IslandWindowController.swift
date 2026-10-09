@@ -93,6 +93,10 @@ final class IslandWindowController: NSWindowController {
         AppState.shared.notchWidth  = notchW
         AppState.shared.notchHeight = notchH
         AppState.shared.hasNotch = hasNotch
+        // Expose the panel reference so the overscroll-back gesture can
+        // filter scrollWheel events to "this window only". See
+        // ChatOverscrollBackGesture.swift.
+        AppState.shared.islandWindow = panel
 
         let contentSize = panel.contentRect(forFrameRect: panel.frame).size
 

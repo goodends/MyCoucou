@@ -251,7 +251,7 @@ enum IslandConst {
     static let expandedCorner: CGFloat = 22
 
     static let viewLayouts: [IslandView: ViewLayout] = [
-        // Home is the reference: height 150
+        // Home is the reference: height 160
         .overview:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .pills),
         // All non-chat views match home height (150) — law
         .empty:     ViewLayout(height: 160, botX: 70,  botY: nil, botDiameter: 62, agentMode: .none),

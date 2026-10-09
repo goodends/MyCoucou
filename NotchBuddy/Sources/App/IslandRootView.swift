@@ -479,6 +479,11 @@ struct IslandContentView: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .foregroundColor(Color(hex: "#F5F6F8"))
+        // Default-enabled BoringNotch-style gesture: only when the active
+        // ScrollView is scrolled to its bottom, an upward swipe pops back
+        // to home; on home, another upward swipe collapses the island.
+        // Implementation in ChatOverscrollBackGesture.swift.
+        .overscrollBackGesture(state: state)
     }
 }
 

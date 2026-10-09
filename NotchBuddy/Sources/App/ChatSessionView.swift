@@ -80,6 +80,7 @@ struct ChatSessionView: View {
             // height before scrollTo runs, so re-opening a session always lands
             // on the last message — no scroll-up animation.
             .defaultScrollAnchor(.bottom)
+            .reportsScrollAtBottomViaGeometry(for: .prompt, state: state)
             .onAppear {
                 reload()
                 hasOpenedOnce = true
