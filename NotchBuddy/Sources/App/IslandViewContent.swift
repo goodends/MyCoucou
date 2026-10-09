@@ -1215,8 +1215,20 @@ struct PromptView: View {
                     Spacer()
                 }
 
-                HStack(spacing: 0) {
+                HStack(spacing: 6) {
                     Spacer()
+                    #if !APPSTORE
+                    Button(action: { openChatTerminal() }) {
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(Color(hex: "#5F646D"))
+                            .frame(width: 16, height: 16)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "Open terminal"))
+                    #endif
                     HStack(spacing: 5) {
                         Circle()
                             .fill(Color(hex: state.focusTask?.color ?? "#7B8089"))
@@ -1351,6 +1363,25 @@ struct PromptView: View {
             }
         }
     }
+
+    #if !APPSTORE
+    /// Jump to the terminal hosting the focused session. Orca-prefer,
+    /// matching `performJumpToTerminal` (⌃⌥T) and the FinishedView's
+    /// "Open terminal" button.
+    private func openChatTerminal() {
+        let task = state.focusTask
+        Task { @MainActor in
+            // Orca hosts this session → jump to its exact tab.
+            if await state.jumpToOrcaTerminal() { return }
+            // Otherwise raise the app the session runs in (its terminal,
+            // or VS Code via ClaudeHost), then any known terminal.
+            if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
+               !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+            }
+        }
+    }
+    #endif
 }
 
 
