@@ -189,6 +189,17 @@ struct OverviewView: View {
 
     private func openAgentTarget(_ task: AgentTask?) {
         guard let task else { return }
+        // Orca first: if Orca hosts this session, switch to its exact
+        // terminal tab instead of merely raising the app.
+        Task { @MainActor in
+            if await state.jumpToOrcaTerminal() { return }
+            activateHostApp(for: task)
+        }
+    }
+
+    /// Fallback for when Orca doesn't host the session: raise the app that
+    /// runs it (VS Code, Cursor, a terminal, …).
+    private func activateHostApp(for task: AgentTask) {
         switch task.id {
         case "integration_claude":
             if ClaudeHost.activate(task.hostApp) { return }
@@ -580,11 +591,16 @@ struct FinishedView: View {
                     } else {
                         #if !APPSTORE
                         PrimaryButton("Open terminal") {
-                            // The app the session runs in (its terminal, or VS Code), then any known terminal
                             let task = state.focusTask
-                            if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
-                               !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
-                                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+                            Task { @MainActor in
+                                // Orca hosts this session → jump to its exact tab.
+                                if await state.jumpToOrcaTerminal() { return }
+                                // Otherwise raise the app the session runs in
+                                // (its terminal, or VS Code), then any known terminal.
+                                if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
+                                   !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
+                                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+                                }
                             }
                             NotificationCenter.default.post(name: .islandCollapse, object: nil)
                         }

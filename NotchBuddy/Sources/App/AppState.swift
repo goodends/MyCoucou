@@ -49,6 +49,48 @@ final class AppState: ObservableObject {
         return claudeSessions.first { $0.sessionId == id }
     }
 
+    /// cwd to look up when jumping to a terminal: prefer the focused Claude
+    /// session's (it always carries one), fall back to the focus task's.
+    private var terminalLookupCwd: String? {
+        if let cwd = focusedClaudeSession?.cwd, !cwd.isEmpty { return cwd }
+        if let cwd = focusTask?.sessionCwd, !cwd.isEmpty { return cwd }
+        return nil
+    }
+
+    /// Jump to the terminal hosting the current focus task. Prefers Orca —
+    /// it focuses the exact terminal tab rather than just raising the app.
+    /// Returns false when Orca isn't installed/running or doesn't host this
+    /// session, so the caller falls back to its usual app activation.
+    @discardableResult
+    func jumpToOrcaTerminal() async -> Bool {
+        guard OrcaCLIBridge.isInstalled else { return false }
+        guard let cwd = terminalLookupCwd else { return false }
+        guard let handle = await OrcaCLIBridge.shared.handle(forCwd: cwd) else { return false }
+        // Raise the Orca window first — `orca terminal switch` only changes
+        // the selected tab inside the app, it doesn't bring the window
+        // forward on macOS. Then give the activation a moment to settle:
+        // Orca restores its own remembered tab when the window becomes
+        // active, and that restore would clobber our switch if we raced it.
+        activateOrcaApp()
+        try? await Task.sleep(nanoseconds: 350_000_000)
+        do {
+            try await OrcaCLIBridge.shared.focus(handle: handle)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func activateOrcaApp() {
+        let bundleId = "com.stablyai.orca"
+        if let running = NSWorkspace.shared.runningApplications
+            .first(where: { $0.bundleIdentifier == bundleId }) {
+            running.activate(options: [.activateIgnoringOtherApps])
+        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
+        }
+    }
+
     /// The Claude session that should drive the OverviewView's left card:
     /// either the user-tapped one, or the most-recently-active session when none
     /// was explicitly chosen. Keeps the home view in sync with what the user is

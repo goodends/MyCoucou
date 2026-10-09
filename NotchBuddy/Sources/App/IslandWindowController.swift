@@ -642,9 +642,13 @@ final class IslandWindowController: NSWindowController {
             NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.annoyed)
             return
         }
-        if !TerminalTarget.activate(sessionBundleId: state.focusTask?.sessionBundleId) {
-            NSWorkspace.shared.open(
-                URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+        Task { @MainActor in
+            // Orca hosts this session → jump to its exact terminal tab.
+            if await state.jumpToOrcaTerminal() { return }
+            if !TerminalTarget.activate(sessionBundleId: state.focusTask?.sessionBundleId) {
+                NSWorkspace.shared.open(
+                    URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+            }
         }
         collapse(allowPendingApproval: true)
     }
