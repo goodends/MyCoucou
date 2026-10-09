@@ -547,6 +547,10 @@ final class HookServer: @unchecked Sendable {
                 }
                 appendHistory(id: agentId, role: .assistant, content: rawFinal)
             }
+            // Tag the just-finished task so FinishedView can show the right
+            // avatar / final-line / "Open terminal" — the focused task may
+            // be a different session entirely.
+            state.lastFinishedAgentId = agentId
             if isClaudeSession { updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             RecapStore.shared.stop(sessionId: recapSessionId)

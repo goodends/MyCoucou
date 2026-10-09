@@ -461,6 +461,30 @@ final class AppState: ObservableObject {
         stateOverride ?? focusTask?.state ?? .idle
     }
 
+    /// State the main Mochi (left side of home / chat) should display.
+    /// Mirrors the focused Claude session's state — same dot the user sees
+    /// on the right-side small avatar — instead of the global integration
+    /// task, which goes "busy" whenever any session is working even if the
+    /// user is currently looking at an idle one.
+    var mainMochiState: BotState {
+        if let override = stateOverride { return override }
+        if let session = overviewSession {
+            switch session.state {
+            case .spawning: return .thinking
+            case .working:  return .working
+            case .finished: return .finished
+            case .stopped:  return .idle
+            }
+        }
+        return focusTask?.state ?? .idle
+    }
+
+    /// Agent id of the most recent session that hit its Stop event.
+    /// `FinishedView` reads this so its avatar / final-line / "Open terminal"
+    /// all reflect the session that *just completed* — not the user's
+    /// currently focused task, which may be a different session entirely.
+    @Published var lastFinishedAgentId: String? = nil
+
     // MARK: - Task management
 
     func addTask(_ task: AgentTask) {

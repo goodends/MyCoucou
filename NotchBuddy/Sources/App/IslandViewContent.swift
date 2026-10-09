@@ -568,21 +568,32 @@ private func openClaudeDesktopApp() {
 struct FinishedView: View {
     @ObservedObject var state: AppState
 
+    /// The task that *just completed* — not the user's currently focused
+    /// one. Without this, the card can show the wrong avatar / final line
+    /// when focus points at a different session than the one that stopped.
+    private var finishingTask: AgentTask? {
+        if let id = state.lastFinishedAgentId,
+           let idx = state.tasks.firstIndex(where: { $0.id == id }) {
+            return state.tasks[idx]
+        }
+        return state.focusTask
+    }
+
     var body: some View {
         ZStack {
             CardBackground(wash: .green)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "Claude Code finished")
+                AgentWho(task: finishingTask, label: "Claude Code finished")
                 Text({
-                    if let fl = state.focusTask?.finalLine { return fl }
-                    if let s = state.focusTask?.steps.last(where: { !$0.isDiffStep }) { return s }
+                    if let fl = finishingTask?.finalLine { return fl }
+                    if let s = finishingTask?.steps.last(where: { !$0.isDiffStep }) { return s }
                     return String(localized: "Session finished")
                 }())
                     .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.tail)
                 HStack(spacing: 8) {
-                    if state.focusTask?.id == "agent_claude-desktop" {
+                    if finishingTask?.id == "agent_claude-desktop" {
                         // Sessions from the Claude desktop app live there, not in a terminal.
                         PrimaryButton("Open Claude") {
                             openClaudeDesktopApp()
@@ -591,7 +602,7 @@ struct FinishedView: View {
                     } else {
                         #if !APPSTORE
                         PrimaryButton("Open terminal") {
-                            let task = state.focusTask
+                            let task = finishingTask
                             Task { @MainActor in
                                 // Orca hosts this session → jump to its exact tab.
                                 if await state.jumpToOrcaTerminal() { return }
