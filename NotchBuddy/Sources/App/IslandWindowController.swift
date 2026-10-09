@@ -739,6 +739,13 @@ final class IslandWindowController: NSWindowController {
                     }
                     return
                 }
+                // In the chat view, a Mochi click goes back home — single-tap
+                // exit so the user doesn't have to scroll-then-overscroll to
+                // dismiss the keyboard / conversation.
+                if self.state.mode == .expanded && self.state.view == .prompt {
+                    self.state.view = .overview
+                    return
+                }
                 self.attachDragStart = NSEvent.mouseLocation
                 // Post slap only when expanded
                 guard self.state.mode == .expanded else { return }
