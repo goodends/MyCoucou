@@ -1,6 +1,14 @@
 import SwiftUI
 import Darwin
 
+extension Notification.Name {
+    /// `sendMessage` broadcasts this with `sessionId` + `content` so the
+    /// ChatSessionView for that exact session can prepend the prompt
+    /// before JSONL catches up — without leaking it into chats for other
+    /// sessions that happen to share `focusTask.history`.
+    static let userSentChatMessage = Notification.Name("userSentChatMessage")
+}
+
 /// Loads the JSONL for the tapped Claude Code session and renders it with the
 /// same ChatBubble look as PromptView's history. Drops in as a substitute for
 /// the in-memory `historyBinding` when a session pill is tapped.
@@ -45,6 +53,12 @@ struct ChatSessionView: View {
     /// the notch. Inspired by cc-switch's "structured reading" rows: a one-
     /// line preview that opens on tap.
     @State private var expandedDetailIds: Set<UUID> = []
+
+    /// Prompts the user has sent from THIS chat view (scoped via
+    /// `userSentChatMessage` notification) that haven't shown up in JSONL
+    /// yet. Kept local so a prompt sent in another chat session can't
+    /// leak into this one — `focusTask.history` is global and would.
+    @State private var pendingUserMessages: [String] = []
 
     /// Lines actually drawn. Always the tail of `lines` so the bottom stays
     /// current; the rest are summarised at the top with a fold-back chip.
@@ -121,6 +135,7 @@ struct ChatSessionView: View {
                 lastLoadedURL = ""  // force a reload even when the URL didn't change
                 hasOpenedOnce = false
                 showAllLines = false  // reset window for the new session
+                pendingUserMessages = []  // drop prompts queued for the previous session
                 reload()
                 if let last = visibleLines.last {
                     // Defer to next runloop so the new content is laid out first.
@@ -132,7 +147,21 @@ struct ChatSessionView: View {
         }
         .onReceive(timer) { _ in reload() }
         .onChange(of: state.focusId) { _, _ in reload() }
-        .onChange(of: state.focusTask?.history.count ?? 0) { _, _ in reload() }
+        // Capture prompts sent from THIS chat view only (scoped by sessionId).
+        // Reading focusTask.history here would let a prompt sent in another
+        // session leak into this chat — see the issue around cross-session
+        // bleed before switching to NotificationCenter.
+        .onReceive(NotificationCenter.default.publisher(for: .userSentChatMessage)) { note in
+            guard let info = note.userInfo else { return }
+            let sessionId = info["sessionId"] as? String
+            guard sessionId == state.focusedSessionId,
+                  let content = info["content"] as? String,
+                  !content.isEmpty,
+                  !pendingUserMessages.contains(content)
+            else { return }
+            pendingUserMessages.append(content)
+            reload()
+        }
         .onDisappear { stopWatching() }
     }
 
@@ -308,26 +337,20 @@ struct ChatSessionView: View {
         startWatching(url: url)
     }
 
-    /// Show the user's just-sent prompt instantly, before JSONL catches up.
-    ///
-    /// Why only the LAST user entry: `focusTask.history` is the global Claude
-    /// integration task's history, not per-session. If multiple Claude Code
-    /// sessions are active, blindly appending every entry would splice the
-    /// wrong session's turns into this chat and clobber the JSONL's order.
-    /// The freshest user entry is always the just-send one for the focused
-    /// session (sendMessage appends it synchronously), so that's safe to
-    /// surface; older user entries and assistant entries already arrived
-    /// through JSONL in their correct position.
+    /// Show this chat view's own pending prompts before JSONL catches up.
+    /// Source is `pendingUserMessages` (populated by the
+    /// `userSentChatMessage` notification scoped to this session) — NOT
+    /// `focusTask.history`, which is shared across every Claude Code session
+    /// and would bleed prompts from other chats into this one.
     private func mergeInMemory(_ jsonlLines: [ChatLine]) -> [ChatLine] {
-        guard let memHistory = state.focusTask?.history,
-              let lastUser = memHistory.last(where: { $0.role == .user })
-        else { return jsonlLines }
-        let key = Self.dedupKey(role: .user, content: lastUser.content)
-        if jsonlLines.contains(where: { Self.dedupKey(role: $0.role, content: $0.content) == key }) {
-            return jsonlLines
-        }
+        guard !pendingUserMessages.isEmpty else { return jsonlLines }
         var out = jsonlLines
-        out.append(ChatLine(role: .user, content: lastUser.content))
+        for content in pendingUserMessages {
+            let key = Self.dedupKey(role: .user, content: content)
+            if !out.contains(where: { Self.dedupKey(role: $0.role, content: $0.content) == key }) {
+                out.append(ChatLine(role: .user, content: content))
+            }
+        }
         return out
     }
 
