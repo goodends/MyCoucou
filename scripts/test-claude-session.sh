@@ -15,8 +15,6 @@ swiftc -swift-version 6 -strict-concurrency=complete \
     NotchBuddy/Sources/CoucouKit/DiffEngine.swift \
     NotchBuddy/Sources/CoucouKit/PillCatalog.swift \
     NotchBuddy/Sources/CoucouKit/PillColors.swift \
-    NotchBuddy/Sources/CoucouKit/ServiceDetail.swift \
-    NotchBuddy/Sources/CoucouKit/ServiceSnapshot.swift \
     NotchBuddy/Sources/CoucouKit/TurnSnapshot.swift \
     NotchBuddy/Sources/CoucouKit/QuestionPayload.swift \
     tests/_stubs.swift \

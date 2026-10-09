@@ -30,22 +30,31 @@ struct BotCanvasView: View {
                     if engine.morph < 0.05 { engine.slotH = 0; engine.slotHVel = 0 }
                 }
                 // Integration pills have a fixed brand color → use it as bodyColor.
-                // Claude Code tasks use state-based gradient (working=blue, thinking=purple, etc.).
+                // Active Claude Code session (overviewSession) drives the main Mochi's
+                // body color and outfit while it's the most-recent thing the user
+                // cares about — each session is randomly assigned a color + outfit
+                // on first appearance, and the main Mochi mirrors them.
                 #if !APPSTORE
                 if state.showingPlanDetail {
                     let hex = state.planDetailIsCodex
                         ? CodexPlanGauge.color(state.codexPlanUsage)
                         : ClaudePlanGauge.color(for: state.claudePlanUsage.flatMap { ClaudePlanGauge.dominantPct($0) })
                     engine.bodyColor = cgColorFromHex(hex)
+                } else if let session = state.overviewSession {
+                    engine.bodyColor = cgColorFromHex(session.bodyColor)
                 } else {
                     engine.bodyColor = (state.focusTask?.isIntegration == true)
                         ? cgColorFromHex(state.focusTask!.color)
                         : nil
                 }
                 #else
-                engine.bodyColor = (state.focusTask?.isIntegration == true)
-                    ? cgColorFromHex(state.focusTask!.color)
-                    : nil
+                if let session = state.overviewSession {
+                    engine.bodyColor = cgColorFromHex(session.bodyColor)
+                } else {
+                    engine.bodyColor = (state.focusTask?.isIntegration == true)
+                        ? cgColorFromHex(state.focusTask!.color)
+                        : nil
+                }
                 #endif
 
                 // Mochi no longer reacts to music services (Spotify/Music removed).
@@ -54,7 +63,11 @@ struct BotCanvasView: View {
                 let isWardrobe = state.mode == .expanded && state.view == .wardrobe
                 let isFocusMain = state.focusId == state.mainPillId || state.focusId == nil
                 let showOutfit = isFocusMain || state.mode != .expanded || isWardrobe
-                engine.setOutfit(showOutfit ? state.resolvedOutfit : .none,
+                // Active session's outfit wins over the seasonal / user-picked one,
+                // so the overview shows one consistent character across both cards.
+                let sessionOutfit = state.overviewSession?.outfit ?? .none
+                let resolved = sessionOutfit != .none ? sessionOutfit : state.resolvedOutfit
+                engine.setOutfit(showOutfit ? resolved : .none,
                                  animated: state.view != .wardrobe)
 
                 engine.update(dt: dt)
@@ -194,6 +207,12 @@ struct MiniBotCanvasView: View {
             let e = BotEngine()
             e.isMini = true
             e.bodyColor = cgColorFromHex(task.color)
+            // Apply outfit up-front (no animation) so the hat appears on the very
+            // first frame instead of fading in over the avatar's lifetime.
+            if let outfit = task.outfit {
+                e.outfit = outfit
+                e.outfitPresence = 1
+            }
             return e
         }())
     }
@@ -208,6 +227,9 @@ struct MiniBotCanvasView: View {
                 var ctx = context
                 engine.applyDance(&ctx, size: size)
                 engine.draw(context: ctx, size: size)
+                // Outfit draws after the body so hats / glasses layer on top.
+                engine.drawOutfitBehind(context: ctx, size: size)
+                engine.drawOutfitFront(context: ctx, size: size)
             }
         }
         .onChange(of: task.state) { _, newState in
@@ -217,6 +239,9 @@ struct MiniBotCanvasView: View {
         // Settings has to reach a mini Mochi that is already on screen.
         .onChange(of: task.color) { _, newColor in
             engine.bodyColor = cgColorFromHex(newColor)
+        }
+        .onChange(of: task.outfit) { _, newOutfit in
+            engine.setOutfit(newOutfit ?? .none, animated: false)
         }
         .onAppear {
             engine.setState(task.state, force: true)

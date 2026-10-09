@@ -1084,7 +1084,7 @@ final class BotEngine: ObservableObject {
     }
 
     func drawOutfitBehind(context: GraphicsContext, size: CGSize) {
-        guard outfit != .none, !isMini else { return }
+        guard outfit != .none else { return }
         let W = size.width, H = size.height, R = W * 0.3
         let cx = W / 2 + ox * R
         let cy = H / 2 + particleOverhang / 2 + oy * R + R * 0.06
@@ -1098,7 +1098,7 @@ final class BotEngine: ObservableObject {
     }
 
     func drawOutfitFront(context: GraphicsContext, size: CGSize) {
-        guard outfit != .none, !isMini else { return }
+        guard outfit != .none else { return }
         let W = size.width, H = size.height, R = W * 0.3
         let cx = W / 2 + ox * R
         let cy = H / 2 + particleOverhang / 2 + oy * R + R * 0.06

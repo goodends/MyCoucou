@@ -64,6 +64,9 @@ struct AgentTask: Identifiable, Equatable {
     var finalLine: String?   = nil  // last assistant message shown as static text after Stop
     var hostApp: String?     = nil  // bundle id of the terminal running a Claude Code session; nil = VS Code
     var history: [HistoryEntry] = []  // full prompt/response log from UserPromptSubmit + Stop hooks
+    /// Optional outfit (hat / glasses / scarf / etc.). Drawn by MiniBotCanvasView.
+    /// Default nil so existing AgentPill pills stay unchanged.
+    var outfit: Outfit? = nil
 }
 
 enum AgentSource: Equatable {
@@ -87,6 +90,14 @@ struct ClaudeSession: Identifiable, Equatable {
     var state: SessionPhase
     var startedAt: Date
     var lastEventAt: Date           // used for lazy GC of zombie sessions (>30 min idle)
+    /// Body color for this session's mini Mochi — random on first upsert,
+    /// fixed for the session's lifetime.
+    var bodyColor: String = "#F5F6F8"
+    /// Outfit (hat / glasses / scarf / …) for this session — random on first
+    /// upsert, fixed for the session's lifetime. Drives both the right-side
+    /// pill avatar and the main Mochi's appearance while this session is the
+    /// active one (`overviewSession`).
+    var outfit: Outfit = .none
 }
 
 /// Visual phase of a session in the right-side list. Distinct from `BotState` so the
@@ -99,8 +110,21 @@ enum SessionPhase: String, Equatable {
 }
 
 extension Array where Element == ClaudeSession {
+    /// Curated body colours for each session's mini Mochi avatar. Warm +
+    /// saturated so the character stays visible against the dark pill
+    /// background.
+    private static let avatarColors = [
+        "#F5A524", "#5EEAD4", "#EC4899", "#A78BFA", "#60A5FA", "#F87171"
+    ]
+    /// Every outfit except `.auto` (a picker sentinel) and `.none` (the default).
+    private static var avatarOutfits: [Outfit] {
+        Outfit.allCases.filter { $0 != .auto && $0 != .none }
+    }
+
     /// Insert a new session, or update its fields in place and promote to the front.
     /// Empty / "unknown" `sessionId` is a no-op. List stays sorted most-recent-first.
+    /// On first appearance, each session is randomly assigned a body color and an
+    /// outfit; re-upserts keep those picks.
     mutating func upsert(
         sessionId: String,
         cwd: String,
@@ -122,12 +146,15 @@ extension Array where Element == ClaudeSession {
             remove(at: idx)
             insert(s, at: 0)
         } else {
+            let bodyColor = Self.avatarColors.randomElement() ?? "#F5F6F8"
+            let outfit    = Self.avatarOutfits.randomElement() ?? .none
             insert(
                 ClaudeSession(
                     id: sessionId, sessionId: sessionId,
                     cwd: cwd, hostApp: hostApp, sessionBundleId: sessionBundleId,
                     projectName: projectName, state: phase,
-                    startedAt: eventTime, lastEventAt: eventTime
+                    startedAt: eventTime, lastEventAt: eventTime,
+                    bodyColor: bodyColor, outfit: outfit
                 ),
                 at: 0
             )

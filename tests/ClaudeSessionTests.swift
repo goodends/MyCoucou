@@ -91,6 +91,66 @@ enum ClaudeSessionTests {
               sessions.count == 1,
               failures: &failures)
 
+        // First upsert for a brand-new session assigns a curated bodyColor
+        // and a real outfit (not .auto, not .none).
+        let avatarColors: Set<String> = ["#F5A524", "#5EEAD4", "#EC4899",
+                                         "#A78BFA", "#60A5FA", "#F87171"]
+        sessions.upsert(
+            sessionId: "sid-c",
+            cwd: "/Users/me/proj-c",
+            hostApp: nil,
+            sessionBundleId: "com.microsoft.VSCode",
+            projectName: "proj-c",
+            phase: .working,
+            eventTime: Date(timeIntervalSince1970: 2000)
+        )
+        let newSession = sessions.first { $0.sessionId == "sid-c" }
+        check("new session gets a curated bodyColor",
+              newSession.map { avatarColors.contains($0.bodyColor) } ?? false,
+              failures: &failures)
+        check("new session gets a real outfit",
+              newSession.map { $0.outfit != .auto && $0.outfit != .none } ?? false,
+              failures: &failures)
+
+        // Re-upserting the same session id keeps its original bodyColor and outfit.
+        let originalColor  = newSession?.bodyColor
+        let originalOutfit = newSession?.outfit
+        sessions.upsert(
+            sessionId: "sid-c",
+            cwd: "/Users/me/proj-c",
+            hostApp: nil,
+            sessionBundleId: "com.microsoft.VSCode",
+            projectName: "proj-c-renamed",
+            phase: .finished,
+            eventTime: Date(timeIntervalSince1970: 2001)
+        )
+        let afterReUpsert = sessions.first { $0.sessionId == "sid-c" }
+        check("re-upsert keeps original bodyColor",
+              afterReUpsert?.bodyColor == originalColor,
+              failures: &failures)
+        check("re-upsert keeps original outfit",
+              afterReUpsert?.outfit == originalOutfit,
+              failures: &failures)
+
+        // Remove + fresh upsert of the same id gives another valid random combo.
+        sessions.removeById("sid-c")
+        sessions.upsert(
+            sessionId: "sid-c",
+            cwd: "/Users/me/proj-c",
+            hostApp: nil,
+            sessionBundleId: "com.microsoft.VSCode",
+            projectName: "proj-c",
+            phase: .working,
+            eventTime: Date(timeIntervalSince1970: 2002)
+        )
+        let afterRemoveAndReAdd = sessions.first { $0.sessionId == "sid-c" }
+        check("remove + fresh upsert produces another valid bodyColor",
+              afterRemoveAndReAdd.map { avatarColors.contains($0.bodyColor) } ?? false,
+              failures: &failures)
+        check("remove + fresh upsert produces another valid outfit",
+              afterRemoveAndReAdd.map { $0.outfit != .auto && $0.outfit != .none } ?? false,
+              failures: &failures)
+
         if failures > 0 {
             print("\n\(failures) test(s) failed."); exit(1)
         }

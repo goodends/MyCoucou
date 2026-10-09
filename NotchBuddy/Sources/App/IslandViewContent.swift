@@ -1942,14 +1942,17 @@ struct ClaudeSessionPill: View {
     private static let claudeColor = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
 
     /// Synthesise an `AgentTask` so we can reuse `MiniBotCanvasView` without forking it.
+    /// Each session keeps its own random body color + outfit, picked on first
+    /// appearance (see `Array<ClaudeSession>.upsert`).
     private var botTask: AgentTask {
         AgentTask(
             id: "session:\(session.sessionId)",
             name: session.projectName,
-            color: Self.claudeColor,
+            color: session.bodyColor,
             state: botState(for: session.state),
             steps: [],
-            source: .claudeCode
+            source: .claudeCode,
+            outfit: session.outfit
         )
     }
 
