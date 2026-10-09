@@ -1826,109 +1826,6 @@ struct TickerShimmerText: View {
     }
 }
 
-// MARK: - Agent pills (overview right card)
-
-struct AgentPillsView: View {
-    @ObservedObject var state: AppState
-    @State private var swapping = false
-
-    private var others: [AgentTask] {
-        state.tasks.filter { $0.id != state.focusId }
-    }
-
-    private var displayTasks: [AgentTask] {
-        Array(others.prefix(4))
-    }
-
-    private let columns = [
-        GridItem(.flexible(), spacing: 4),
-        GridItem(.flexible(), spacing: 4)
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(displayTasks) { task in
-                    AgentPill(task: task, state: state, swapping: $swapping) {
-                        swapping = true
-                        state.setFocus(task.id)
-                        if PillCatalog.isChatablePill(id: task.id) {
-                            state.view = .prompt
-                        }
-                        SoundEngine.shared.play("blip")
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct AgentPill: View {
-    let task: AgentTask
-    @ObservedObject var state: AppState
-    @Binding var swapping: Bool
-    let onTap: () -> Void
-    @State private var isHovered = false
-
-    private var effectiveColor: String { task.color }
-
-    // The Claude pill shows "VS Code" (or "Claude Code" for a terminal session) regardless of project name
-    private var displayName: String {
-        task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp) : task.name
-    }
-
-    var body: some View {
-        Button(action: { onTap() }) {
-            ZStack(alignment: .topTrailing) {
-                ZStack {
-                    Capsule()
-                        .fill(isHovered
-                              ? Color(hex: effectiveColor).opacity(0.18)
-                              : Color(hex: "#0E0F11"))
-                    Capsule()
-                        .stroke(Color(hex: effectiveColor).opacity(isHovered ? 0.55 : 0.14), lineWidth: 1)
-                    HStack(spacing: 0) {
-                        MiniBotCanvasView(task: task)
-                            .frame(width: 22 / 0.6, height: 22 / 0.6)
-                            .frame(width: 22, height: 22, alignment: .center)
-                            .padding(.leading, 8)
-                        Spacer()
-                    }
-                    Text(displayName)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(isHovered
-                                         ? Color(hex: effectiveColor).lighter(by: 0.3)
-                                         : Color(hex: "#6B7079"))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 28)
-                .shadow(color: Color(hex: effectiveColor).opacity(isHovered ? 0.35 : 0), radius: 10, x: 0, y: 2)
-
-                // Alert badge (approval / finished / error)
-                if let badge = task.pillBadge {
-                    PillBadgeView(badge: badge, taskColor: effectiveColor)
-                        .offset(x: 3, y: -3)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(isHovered ? 1.04 : 1.0)
-        .brightness(isHovered ? 0.06 : 0)
-        .onHover { newHover in
-            guard !swapping else { return }
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { isHovered = newHover }
-        }
-    }
-}
-
 // MARK: - Active Claude Code sessions (overview right card)
 
 // One pill per running Claude Code process. Mirrors `AgentPill`'s visual language
@@ -1936,6 +1833,7 @@ struct AgentPill: View {
 // short cwd and the app the session is locked into.
 struct ClaudeSessionPill: View {
     let session: ClaudeSession
+    @ObservedObject var state: AppState
     let onTap: () -> Void
     @State private var isHovered = false
 
@@ -2036,6 +1934,17 @@ struct ClaudeSessionPill: View {
         .onHover { newHover in
             withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { isHovered = newHover }
         }
+        // Right-click opens the wardrobe for this session. The wardrobe's
+        // current outfit is bound to `state.overviewSession.outfit`, so
+        // editing there — or swiping back and right-clicking another pill —
+        // always lands on the same value.
+        .contextMenu {
+            Button {
+                state.view = .wardrobe
+            } label: {
+                Label("Change outfit…", systemImage: "tshirt")
+            }
+        }
     }
 }
 
@@ -2058,8 +1967,10 @@ struct ClaudeSessionsListView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             if live.isEmpty {
-                // Idle / no Claude running: fall back to the user's toggled-on integrations.
-                AgentPillsView(state: state)
+                // No active Claude session — leave the right card empty.
+                // The previous fallback to AgentPillsView (Cursor / Codex /
+                // Gemini / …) is gone: this view only renders Claude work.
+                EmptyView()
             } else {
                 // Two columns, scrollable so 4+ sessions don't get crushed by
                 // the island's fixed height. No border / indicator — the right
@@ -2070,7 +1981,7 @@ struct ClaudeSessionsListView: View {
                               alignment: .leading,
                               spacing: 4) {
                         ForEach(live) { s in
-                            ClaudeSessionPill(session: s) { tap(s) }
+                            ClaudeSessionPill(session: s, state: state) { tap(s) }
                                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
                         }
                     }
@@ -2172,6 +2083,13 @@ struct WardrobeView: View {
 
     private let columns = Array(repeating: GridItem(.fixed(30), spacing: 5), count: 14)
 
+    /// The outfit currently displayed on the right pill / main Mochi.
+    /// Driven by the active `overviewSession` so editing here and right-clicking
+    /// a pill on the right card both edit the same value.
+    private var currentOutfit: Outfit {
+        state.overviewSession?.outfit ?? .none
+    }
+
     private var headerRight: String {
         // Hover takes priority: show hovered outfit name
         if let h = hoveredOutfit {
@@ -2182,9 +2100,9 @@ struct WardrobeView: View {
             }
             return h.displayName
         }
-        // Fall back to current selection
-        let sel = state.mochiOutfitSelection
-        if sel == .auto {
+        // Fall back to the session's current outfit
+        let sel = currentOutfit
+        if sel == .none {
             let seasonal = Outfit.seasonal(for: Date(), calendar: .current)
             let name = seasonal == .none ? "None" : seasonal.displayName
             return "Auto · \(name)"
@@ -2216,7 +2134,7 @@ struct WardrobeView: View {
                     ForEach(withAuto, id: \.rawValue) { outfit in
                         OutfitPillView(
                             outfit: outfit,
-                            isSelected: state.mochiOutfitSelection == outfit,
+                            isSelected: (outfit == .auto ? .none : outfit) == currentOutfit,
                             isHovered: hoveredOutfit == outfit,
                             onHover: { h in
                                 hoveredOutfit = h ? outfit : nil
@@ -2231,8 +2149,12 @@ struct WardrobeView: View {
                                 }
                             },
                             onTap: {
-                                guard state.mochiOutfitSelection != outfit else { return }
-                                state.mochiOutfitSelection = outfit
+                                // `.auto` → outfit `.none` (falls back to seasonal in BotCanvasView).
+                                let target: Outfit = outfit == .auto ? .none : outfit
+                                guard target != currentOutfit else { return }
+                                if let s = state.overviewSession {
+                                    state.setSessionOutfit(s.sessionId, target)
+                                }
                                 SoundEngine.shared.play("pop")
                                 NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
                             },

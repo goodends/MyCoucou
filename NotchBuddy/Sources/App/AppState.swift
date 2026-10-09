@@ -454,6 +454,15 @@ final class AppState: ObservableObject {
         claudeSessions.removeById(sessionId)
     }
 
+    /// Set the outfit (hat / glasses / scarf / …) for a Claude session.
+    /// Drives both the right-side pill avatar and the main Mochi when this
+    /// session is the active `overviewSession`. Lets the user dress each
+    /// session individually from the overview's right card.
+    func setSessionOutfit(_ sessionId: String, _ outfit: Outfit) {
+        guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
+        claudeSessions[idx].outfit = outfit
+    }
+
     func setFocus(_ id: String) {
         guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }
         focusId = id
