@@ -2050,6 +2050,12 @@ struct ClaudeSessionPill: View {
             } label: {
                 Label("Change outfit…", systemImage: "tshirt")
             }
+            Divider()
+            Button(role: .destructive) {
+                state.hideClaudeSession(session.sessionId)
+            } label: {
+                Label(String(localized: "Stop monitoring"), systemImage: "eye.slash")
+            }
         }
     }
 }
@@ -2060,6 +2066,7 @@ struct ClaudeSessionPill: View {
 struct ClaudeSessionsListView: View {
     @ObservedObject var state: AppState
     @State private var swapping = false
+    @State private var showHidden = false
 
     /// 30-min idle threshold for zombie sessions (killed Claude process with no SessionEnd).
     private static let idleCutoff: TimeInterval = 30 * 60
@@ -2069,18 +2076,28 @@ struct ClaudeSessionsListView: View {
         return state.claudeSessions.filter { $0.lastEventAt >= cutoff }
     }
 
+    /// Sessions the user has hidden via "Stop monitoring" but the process is
+    /// still firing hooks (i.e. hiddenClaudeSessionIds is non-empty AND the
+    /// 30-min idle cutoff hasn't dropped the live list to empty). The list of
+    /// ids is enough — we don't need a full ClaudeSession because hidden
+    /// entries never made it into `claudeSessions` to begin with.
+    private var hiddenCount: Int { state.hiddenClaudeSessionIds.count }
+
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
+        // ZStack so the hidden chip stays visible at the bottom even when
+        // the ScrollView is full of session pills (VStack would push it
+        // out of the card's clipped area).
+        ZStack(alignment: .bottom) {
             if live.isEmpty {
                 // No active Claude session — leave the right card empty.
                 // The previous fallback to AgentPillsView (Cursor / Codex /
                 // Gemini / …) is gone: this view only renders Claude work.
-                EmptyView()
+                Color.clear
             } else {
                 // Two columns, scrollable so 4+ sessions don't get crushed by
                 // the island's fixed height. No border / indicator — the right
-                // card already sits inside its own CardBackground.
+                // card already sits inside its own CardBackground. Bottom
+                // padding leaves room for the hidden chip overlay.
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 4),
                                         GridItem(.flexible(), spacing: 4)],
@@ -2093,12 +2110,75 @@ struct ClaudeSessionsListView: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
+                    // Reserve room so the last pill isn't hidden under the chip.
+                    .padding(.bottom, hiddenCount > 0 ? 32 : 0)
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.78), value: live.count)
             }
-            Spacer(minLength: 0)
+            if hiddenCount > 0 {
+                hiddenSection
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// "Hidden: N" chip + a popover with one row per hidden session, each
+    /// with a Resume button. Lets the user undo "Stop monitoring" without
+    /// restarting the app or hand-editing UserDefaults.
+    @ViewBuilder
+    private var hiddenSection: some View {
+        Button {
+            showHidden.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 9))
+                Text(String(format: String(localized: "Hidden · %d"), hiddenCount))
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .foregroundColor(Color(hex: "#7B8089"))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.white.opacity(0.05))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 6)
+        .popover(isPresented: $showHidden, arrowEdge: .bottom) {
+            hiddenPopover
+        }
+    }
+
+    private var hiddenPopover: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(String(localized: "Hidden sessions"))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color(hex: "#F5F6F8"))
+            Text(String(localized: "These sessions are not shown in the list. Resume to re-monitor them."))
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#7B8089"))
+                .fixedSize(horizontal: false, vertical: true)
+            Divider().background(Color(hex: "#2A2C30"))
+            ForEach(Array(state.hiddenClaudeSessionIds).sorted(), id: \.self) { sid in
+                HStack(spacing: 6) {
+                    Text(sid)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(Color(hex: "#A0A6AE"))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    Button(String(localized: "Resume")) {
+                        state.unhideClaudeSession(sid)
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(Color(hex: "#5F8AFA"))
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 280)
+        .background(Color(hex: "#141518"))
     }
 
     private func tap(_ s: ClaudeSession) {
