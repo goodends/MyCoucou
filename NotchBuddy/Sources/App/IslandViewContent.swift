@@ -2061,19 +2061,22 @@ struct ClaudeSessionsListView: View {
                 // Idle / no Claude running: fall back to the user's toggled-on integrations.
                 AgentPillsView(state: state)
             } else {
-                LazyVStack(spacing: 4) {
-                    ForEach(Array(live.prefix(4))) { s in
-                        ClaudeSessionPill(session: s) { tap(s) }
-                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                // Two columns, scrollable so 4+ sessions don't get crushed by
+                // the island's fixed height. No border / indicator — the right
+                // card already sits inside its own CardBackground.
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 4),
+                                        GridItem(.flexible(), spacing: 4)],
+                              alignment: .leading,
+                              spacing: 4) {
+                        ForEach(live) { s in
+                            ClaudeSessionPill(session: s) { tap(s) }
+                                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        }
                     }
-                    if live.count > 4 {
-                        Text("+ \(live.count - 4) more")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color(hex: "#5F646D"))
-                            .padding(.top, 1)
-                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
                 }
-                .padding(.horizontal, 8)
                 .animation(.spring(response: 0.4, dampingFraction: 0.78), value: live.count)
             }
             Spacer(minLength: 0)

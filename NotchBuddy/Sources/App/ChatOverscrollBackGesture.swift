@@ -208,6 +208,19 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
             // Only meaningful while the island is expanded.
             guard state.mode == .expanded else { return }
 
+            // The overview's right card is a ScrollView (active Claude
+            // sessions). Scrolling inside it should never collapse the
+            // island — the scroll wheel belongs to the list, not the
+            // collapse gesture. The right card sits in the right half of
+            // the island window; ignore any wheel event that lands there.
+            // `event.locationInWindow` is window-local (origin at the
+            // window's bottom-left); compare against the window's own width.
+            if let win = state.islandWindow,
+               event.locationInWindow.x > win.frame.width / 2 {
+                accumulated = 0
+                return
+            }
+
             // Pick the gesture axis: vertical only. We only handle up-swipe
             // for now (matching BoringNotch's `.up` panGesture close path).
             let absDX = abs(event.scrollingDeltaX)
