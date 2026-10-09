@@ -459,11 +459,10 @@ final class HookServer: @unchecked Sendable {
         case "SessionStart":
             activeSessionId = sessionId
             if isClaudeSession { updateClaudeSession(phase: .spawning, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
-            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId) }
+            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId, sessionId: sessionId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                 state.tasks[idx].finalLine = nil
                 state.tasks[idx].history = []
-                state.tasks[idx].sessionId = sessionId
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             nbLog("SessionStart \(isExternalAgent ? agentId : projectName) (\(sessionId.prefix(8)))")
@@ -479,7 +478,7 @@ final class HookServer: @unchecked Sendable {
         case "UserPromptSubmit":
             activeSessionId = sessionId
             if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
-            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId) }
+            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId, sessionId: sessionId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
             state.updateTask(id: agentId, state: .thinking)
             if let prompt = payload["prompt"] as? String, !prompt.isEmpty {
@@ -499,7 +498,7 @@ final class HookServer: @unchecked Sendable {
             // AskUserQuestion is handled via the dedicated --ask hook.
             // Skip state/step update here to avoid flickering over the question card.
             guard tool != "AskUserQuestion" else { break }
-            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId) }
+            if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId, sessionId: sessionId) }
             state.updateTask(id: agentId, state: .working)
             let input = payload["tool_input"] as? [String: Any] ?? [:]
             let step = localizedStep(tool: tool, input: input)
@@ -1021,13 +1020,14 @@ final class HookServer: @unchecked Sendable {
     /// If the task already exists (persistent), just updates name/cwd.
     /// If missing (transient), creates it and inserts after the main pill.
     @MainActor
-    private func upsertWorkspaceTask(id: String, projectName: String, cwd: String = "", hostApp: String? = nil, bundleId: String = "") {
+    private func upsertWorkspaceTask(id: String, projectName: String, cwd: String = "", hostApp: String? = nil, bundleId: String = "", sessionId: String = "") {
         let state = AppState.shared
         if let idx = state.tasks.firstIndex(where: { $0.id == id }) {
             state.tasks[idx].name = projectName
             if !cwd.isEmpty { state.tasks[idx].sessionCwd = cwd }
             if id == "integration_claude" { state.tasks[idx].hostApp = hostApp }
             if !bundleId.isEmpty { state.tasks[idx].sessionBundleId = bundleId }
+            if !sessionId.isEmpty, sessionId != "unknown" { state.tasks[idx].sessionId = sessionId }
             return
         }
         // Transient: create and insert after the main pill
@@ -1038,6 +1038,7 @@ final class HookServer: @unchecked Sendable {
                              state: .idle, steps: [], source: source, isIntegration: true)
         if id == "integration_claude" { task.hostApp = hostApp }
         if !bundleId.isEmpty { task.sessionBundleId = bundleId }
+        if !sessionId.isEmpty, sessionId != "unknown" { task.sessionId = sessionId }
         if let mainIdx = state.tasks.firstIndex(where: { $0.id == state.mainPillId }) {
             state.tasks.insert(task, at: mainIdx + 1)
         } else {
@@ -1093,6 +1094,22 @@ final class HookServer: @unchecked Sendable {
         state.tasks[idx].steps.append(step)
         if state.tasks[idx].steps.count > 20 { state.tasks[idx].steps.removeFirst() }
         state.tasks[idx].stepIndex = state.tasks[idx].steps.count - 1
+        // Mirror into per-session log so the overview's left ticker — fed by a
+        // synthetic task for whichever session is most-recent — also sees the step.
+        // Match any Claude Code pill (VS Code, Claude Desktop, Orca-launched …) by
+        // checking the pill's source rather than a hard-coded id.
+        let isClaude = PillCatalog.definition(for: id)?.source == .claudeCode
+        let taskSid = state.tasks[idx].sessionId ?? ""
+        if isClaude, !taskSid.isEmpty {
+            var dict = state.claudeSessionSteps
+            var steps = dict[taskSid] ?? []
+            steps.append(step)
+            if steps.count > 20 { steps.removeFirst() }
+            dict[taskSid] = steps
+            // Replace the whole dictionary so SwiftUI's @Published setter fires —
+            // mutating an element in place doesn't trigger a view refresh.
+            state.claudeSessionSteps = dict
+        }
     }
 
     @MainActor

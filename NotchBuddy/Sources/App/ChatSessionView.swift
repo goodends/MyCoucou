@@ -8,13 +8,21 @@ struct ChatSessionView: View {
     @State private var lines: [ChatLine] = []
     @State private var lastLoadedURL: String = ""
     @State private var loadError: String? = nil
+    /// Once we've opened the chat for a session, jump straight to the bottom
+    /// without animating — no "scroll from top to bottom" reveal.
+    @State private var hasOpenedOnce: Bool = false
+
+    /// Parsed-JSONL cache, shared across ChatSessionView instances so re-opening
+    /// the chat for a session we've already seen skips the parse step. Keyed by
+    /// JSONL filename (the session id).
+    private static var parsedCache: [String: [ChatLine]] = [:]
 
     private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
                     if let err = loadError {
                         Text(err)
                             .font(.system(size: 11, design: .monospaced))
@@ -26,24 +34,43 @@ struct ChatSessionView: View {
                         ChatBubble(message: ChatMessage(parsedLineRole: line.role.rawValue, content: line.content))
                             .id(line.id)
                     }
+                    // Spacer so the bottom-anchored scroll leaves breathing room
+                    // before the PromptView's input box instead of clipping the
+                    // last message.
+                    Color.clear.frame(height: 12)
                 }
                 .padding(.vertical, 2)
             }
-            .onChange(of: lines.count) { _, _ in
+            // Default anchor at the bottom. Eager VStack means the view has full
+            // height before scrollTo runs, so re-opening a session always lands
+            // on the last message — no scroll-up animation.
+            .defaultScrollAnchor(.bottom)
+            .onAppear {
+                reload()
+                hasOpenedOnce = true
                 if let last = lines.last {
-                    withAnimation(.easeOut(duration: 0.15)) {
+                    proxy.scrollTo(last.id, anchor: .bottom)
+                }
+            }
+            .onChange(of: lines.count) { _, _ in
+                if hasOpenedOnce, let last = lines.last {
+                    proxy.scrollTo(last.id, anchor: .bottom)
+                }
+            }
+            .onChange(of: state.focusedSessionId) { _, _ in
+                lastLoadedURL = ""  // force a reload even when the URL didn't change
+                hasOpenedOnce = false
+                reload()
+                if let last = lines.last {
+                    // Defer to next runloop so the new content is laid out first.
+                    DispatchQueue.main.async {
                         proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
             }
         }
-        .onAppear { reload() }
         .onReceive(timer) { _ in reload() }
         .onChange(of: state.focusId) { _, _ in reload() }
-        .onChange(of: state.focusedSessionId) { _, _ in
-            lastLoadedURL = ""  // force a reload even when the URL didn't change
-            reload()
-        }
     }
 
     // MARK: - Rendering
@@ -140,12 +167,21 @@ struct ChatSessionView: View {
         }
         // Skip if we're already showing this file. (Future: mtime-based dirty check.)
         if url.lastPathComponent == lastLoadedURL { return }
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-            loadError = "could not read \(url.lastPathComponent)"
+        let key = url.lastPathComponent
+        if let cached = Self.parsedCache[key] {
+            lines = cached
+            lastLoadedURL = key
+            loadError = nil
             return
         }
-        lines = parseJSONL(text)
-        lastLoadedURL = url.lastPathComponent
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            loadError = "could not read \(key)"
+            return
+        }
+        let parsed = parseJSONL(text)
+        Self.parsedCache[key] = parsed
+        lines = parsed
+        lastLoadedURL = key
         loadError = nil
     }
 

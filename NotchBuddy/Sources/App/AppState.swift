@@ -20,6 +20,11 @@ final class AppState: ObservableObject {
     // HookServer maintains order. Not persisted — SessionStart re-fires on process launch.
     @Published var claudeSessions: [ClaudeSession] = []
 
+    /// Per-session step log (rolling window of ~20). Populated by HookServer so the
+    /// overview's left ticker can show real-time activity even when the focus task
+    /// is shared across concurrent Claude sessions.
+    @Published var claudeSessionSteps: [String: [String]] = [:]
+
     /// When set, ChatSessionView reads the JSONL for this Claude session instead of
     /// `focusTask`. Set when the user taps a Claude-session pill on the overview.
     /// Cleared when that session ends.
@@ -29,6 +34,43 @@ final class AppState: ObservableObject {
     var focusedClaudeSession: ClaudeSession? {
         guard let id = focusedSessionId else { return nil }
         return claudeSessions.first { $0.sessionId == id }
+    }
+
+    /// The Claude session that should drive the OverviewView's left card:
+    /// either the user-tapped one, or the most-recently-active session when none
+    /// was explicitly chosen. Keeps the home view in sync with what the user is
+    /// actually working on, regardless of which task the focus pill points at.
+    var overviewSession: ClaudeSession? {
+        if let s = focusedClaudeSession { return s }
+        return claudeSessions.first
+    }
+
+    /// Synthesise an `AgentTask` for a Claude session so we can feed existing
+    /// ticker / pill views that take an AgentTask. Source is always `.claudeCode`;
+    /// `id` carries the sessionId so list lookups still work.
+    func overviewTask(for session: ClaudeSession) -> AgentTask {
+        let color = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
+        let botState: BotState
+        switch session.state {
+        case .spawning: botState = .thinking
+        case .working:  botState = .working
+        case .finished: botState = .finished
+        case .stopped:  botState = .idle
+        }
+        let steps = claudeSessionSteps[session.sessionId] ?? []
+        return AgentTask(
+            id: "claude:\(session.sessionId)",
+            name: session.projectName,
+            color: color,
+            state: botState,
+            stepIndex: max(0, steps.count - 1),
+            steps: steps,
+            source: .claudeCode,
+            sessionCwd: session.cwd,
+            sessionId: session.sessionId,
+            sessionBundleId: session.sessionBundleId,
+            hostApp: session.hostApp
+        )
     }
 
     // Bot state override

@@ -38,7 +38,13 @@ struct OverviewView: View {
     @State private var showingN8nDetail = false
     @State private var activeDiffId: Int? = nil
 
-    var agent: AgentTask? { state.focusTask }
+    /// Left card shows the most-recently-active Claude session when there is
+    /// one. Falls back to the focus task for the no-Claude-session case so
+    /// service-pill defaults / hand-picked agents still render correctly.
+    var agent: AgentTask? {
+        if let s = state.overviewSession { return state.overviewTask(for: s) }
+        return state.focusTask
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1254,6 +1260,7 @@ struct PromptView: View {
                     // history instead of the focus task's in-memory log.
                     ChatSessionView(state: state)
                         .frame(maxHeight: .infinity)
+                        .padding(.bottom, 4)  // breathing room before the input box
                 } else if !historyBinding.isEmpty {
                     ScrollViewReader { proxy in
                         ScrollView(.vertical) {
