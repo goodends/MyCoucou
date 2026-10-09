@@ -19,6 +19,23 @@ struct ChatSessionView: View {
 
     private let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
+    /// Default cap on the rendered window so very long sessions don't burn CPU
+/// materialising hundreds of ChatBubbles (and their parsed Markdown) on every
+/// open. User can override via the "Load all" chip.
+    private let defaultMaxRenderedLines = 80
+
+    /// Whether the user opted in to render the entire session (no cap).
+    @State private var showAllLines: Bool = false
+
+    /// Lines actually drawn. Always the tail of `lines` so the bottom stays
+    /// current; the rest are summarised at the top with a fold-back chip.
+    private var visibleLines: [ChatLine] {
+        showAllLines ? lines : lines.suffix(defaultMaxRenderedLines)
+    }
+    private var hiddenCount: Int {
+        max(0, lines.count - visibleLines.count)
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -30,7 +47,25 @@ struct ChatSessionView: View {
                             .padding(.horizontal, 12)
                             .padding(.top, 12)
                     }
-                    ForEach(lines) { line in
+                    if hiddenCount > 0 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 9))
+                            Text("\(hiddenCount) earlier messages hidden")
+                                .font(.system(size: 10))
+                            Spacer()
+                            Button(showAllLines ? "Hide history" : "Load all") {
+                                showAllLines.toggle()
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "#5F8AFA"))
+                        }
+                        .foregroundColor(Color(hex: "#5F646D"))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                    }
+                    ForEach(visibleLines) { line in
                         ChatBubble(message: ChatMessage(parsedLineRole: line.role.rawValue, content: line.content))
                             .id(line.id)
                     }
@@ -48,20 +83,21 @@ struct ChatSessionView: View {
             .onAppear {
                 reload()
                 hasOpenedOnce = true
-                if let last = lines.last {
+                if let last = visibleLines.last {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 }
             }
-            .onChange(of: lines.count) { _, _ in
-                if hasOpenedOnce, let last = lines.last {
+            .onChange(of: visibleLines.count) { _, _ in
+                if hasOpenedOnce, let last = visibleLines.last {
                     proxy.scrollTo(last.id, anchor: .bottom)
                 }
             }
             .onChange(of: state.focusedSessionId) { _, _ in
                 lastLoadedURL = ""  // force a reload even when the URL didn't change
                 hasOpenedOnce = false
+                showAllLines = false  // reset window for the new session
                 reload()
-                if let last = lines.last {
+                if let last = visibleLines.last {
                     // Defer to next runloop so the new content is laid out first.
                     DispatchQueue.main.async {
                         proxy.scrollTo(last.id, anchor: .bottom)
