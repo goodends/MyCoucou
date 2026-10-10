@@ -48,7 +48,6 @@ final class HookServer: @unchecked Sendable {
     /// True when a real nb-hook connection is holding the question fd open.
     @MainActor var hasRealPendingQuestion: Bool { pendingQuestionFD >= 0 }
     private var questionPillId: String = ""           // pill that owns the pending question
-    private var questionSessionId: String = ""        // sessionId for the pending question (recap tracking)
     private var focusBeforeQuestion: String? = nil    // saved focus to restore after question
     private var activeSessionId: String? = nil        // current Claude Code session
     private var focusBeforeApproval: String? = nil    // saved focus to restore after approval
@@ -134,8 +133,6 @@ final class HookServer: @unchecked Sendable {
         pendingQuestionFD = -1
         let source = questionFDSource
         questionFDSource = nil
-        let sid = questionSessionId
-        questionSessionId = ""
         if fd >= 0, let data = try? JSONSerialization.data(withJSONObject: ["permissionDecision": "answer", "answers": answers], options: .withoutEscapingSlashes),
            let json = String(data: data, encoding: .utf8) {
             Task.detached { [weak self] in
@@ -145,7 +142,6 @@ final class HookServer: @unchecked Sendable {
         } else {
             source?.cancel()
         }
-        if !sid.isEmpty { RecapStore.shared.recordQuestionAnswered(sessionId: sid) }
         dismissQuestionCard(note: "")
     }
 
@@ -404,11 +400,6 @@ final class HookServer: @unchecked Sendable {
             state.orcaHandleBySession[sessionId] = handle
             nbLog("Orca bind session=\(sessionId.prefix(8)) handle=\(handle.prefix(24))…")
         }
-        // For sessions that carry no id, derive a unique key from pill + cwd so that
-        // concurrent anonymous sessions are tracked independently in RecapStore.
-        let recapSessionId = (sessionId == "unknown" || sessionId.isEmpty)
-            ? "\(agentId)+\(cwd)"
-            : sessionId
 
         // While a permission request is pending, dismiss when the resolving event arrives,
         // then continue normal processing. Only skip normal processing when unresolved.
@@ -458,7 +449,6 @@ final class HookServer: @unchecked Sendable {
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             nbLog("SessionStart \(isExternalAgent ? agentId : projectName) (\(sessionId.prefix(8)))")
-            NotificationCenter.default.post(name: .checkMondayRecap, object: nil)
             if state.isPresent { expandIfNeeded(to: .overview) }
             SoundEngine.shared.play("work")
             if agentId == "agent_hermes", let platform = payload["platform"] as? String,
@@ -478,15 +468,12 @@ final class HookServer: @unchecked Sendable {
                 appendHistory(id: agentId, role: .user, content: prompt)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
-            RecapStore.shared.userPromptSubmit(sessionId: recapSessionId, pillId: agentId, project: projectName)
-            NotificationCenter.default.post(name: .checkMondayRecap, object: nil)
             if state.isPresent { expandIfNeeded(to: .overview) }
 
         case "PreToolUse":
             activeSessionId = sessionId
             let tool = payload["tool_name"] as? String ?? "Tool"
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
-            RecapStore.shared.preToolUse(sessionId: recapSessionId, tool: tool)
             // AskUserQuestion is handled via the dedicated --ask hook.
             // Skip state/step update here to avoid flickering over the question card.
             guard tool != "AskUserQuestion" else { break }
@@ -507,7 +494,6 @@ final class HookServer: @unchecked Sendable {
                 let idx = state.appendSessionDiff(diff, for: agentId)
                 let step = String.makeDiffStep(filename: diff.name, added: diff.added, removed: diff.removed, diffId: idx)
                 appendStep(id: agentId, step: step, sessionId: sessionId)
-                RecapStore.shared.recordFileDiff(sessionId: recapSessionId, path: diff.name, added: diff.added, removed: diff.removed)
             }
             if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
 
@@ -548,7 +534,6 @@ final class HookServer: @unchecked Sendable {
                 updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
-            RecapStore.shared.stop(sessionId: recapSessionId)
             SoundEngine.shared.play("finish")
             if focused {
                 expandIfNeeded(to: .finished)
@@ -565,7 +550,6 @@ final class HookServer: @unchecked Sendable {
             }
 
         case "StopFailure":
-            RecapStore.shared.stop(sessionId: recapSessionId)
             state.updateTask(id: agentId, state: .error)
             SoundEngine.shared.play("error")
             if focused {
@@ -577,7 +561,6 @@ final class HookServer: @unchecked Sendable {
 
         case "Interrupt":
             // Codex: user stopped the turn
-            RecapStore.shared.stop(sessionId: recapSessionId)
             activeSessionId = nil
             state.updateTask(id: agentId, state: .idle)
             clearPillBadge(id: agentId)
@@ -607,7 +590,6 @@ final class HookServer: @unchecked Sendable {
             // Don't drop the focus pill while other live Claude Code sessions exist.
             let otherLive = !endedSid.isEmpty && state.claudeSessions.contains { $0.sessionId != endedSid }
             if !otherLive { state.removeTask(id: agentId) }
-            RecapStore.shared.sessionEnd(sessionId: recapSessionId)
 
         case "SubagentStart":
             appendStep(id: agentId, step: "+ subagent", sessionId: sessionId)
@@ -880,7 +862,6 @@ final class HookServer: @unchecked Sendable {
         let pillId = state.pendingApproval?.pillId ?? "integration_claude"
         state.pendingApproval = nil
         state.isPinned = false
-        RecapStore.shared.recordDecision(pillId: pillId, decision: decision)
         state.updateTask(id: pillId, state: .working)
         clearPillBadge(id: pillId)
         // Restore focus to the pill that was focused before the approval card appeared.
@@ -950,9 +931,6 @@ final class HookServer: @unchecked Sendable {
         pendingQuestionFD = fd
         activeSessionId = sessionId
         questionPillId = pillId
-        questionSessionId = (sessionId == "unknown" || sessionId.isEmpty)
-            ? "\(pillId)+\(cwd)"
-            : sessionId
 
         upsertWorkspaceTask(id: pillId, projectName: projectName, cwd: cwd, hostApp: terminalHost?.bundleId, bundleId: bundleId)
         state.updateTask(id: pillId, state: .question)

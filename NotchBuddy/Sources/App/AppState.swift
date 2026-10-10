@@ -252,14 +252,6 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
     }
 
-    // Weekly recap — persisted
-    @Published var recapEnabled: Bool = (UserDefaults.standard.object(forKey: "recapEnabled") as? Bool) ?? true {
-        didSet { UserDefaults.standard.set(recapEnabled, forKey: "recapEnabled") }
-    }
-    @Published var recapHideProjects: Bool = UserDefaults.standard.bool(forKey: "recapHideProjects") {
-        didSet { UserDefaults.standard.set(recapHideProjects, forKey: "recapHideProjects") }
-    }
-
     // Mochi outfit selection — persisted
     @Published var mochiOutfitSelection: Outfit = .auto {
         didSet { Outfit.stored = mochiOutfitSelection }

@@ -21,7 +21,6 @@ struct IslandViewContent: View {
         case .note:      NoteView(state: state)
         case .greeting:  EmptyView()  // GreetingCanvasView overlaid in IslandRootView
         case .wardrobe:  WardrobeView(state: state)
-        case .recap:     WeeklyRecapCardView(state: state)
         }
     }
 }
