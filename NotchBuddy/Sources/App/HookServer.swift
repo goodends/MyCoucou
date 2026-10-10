@@ -485,7 +485,7 @@ final class HookServer: @unchecked Sendable {
             if agentId == "agent_hermes", let platform = payload["platform"] as? String,
                !platform.isEmpty, platform != "cli" {
                 let capitalized = platform.prefix(1).uppercased() + platform.dropFirst()
-                appendStep(id: agentId, step: String(capitalized))
+                appendStep(id: agentId, step: String(capitalized), sessionId: sessionId)
             }
 
         case "UserPromptSubmit":
@@ -495,7 +495,7 @@ final class HookServer: @unchecked Sendable {
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
             state.updateTask(id: agentId, state: .thinking)
             if let prompt = payload["prompt"] as? String, !prompt.isEmpty {
-                appendStep(id: agentId, step: String(prompt.prefix(60)))
+                appendStep(id: agentId, step: String(prompt.prefix(60)), sessionId: sessionId)
                 appendHistory(id: agentId, role: .user, content: prompt)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
@@ -515,7 +515,7 @@ final class HookServer: @unchecked Sendable {
             state.updateTask(id: agentId, state: .working)
             let input = payload["tool_input"] as? [String: Any] ?? [:]
             let step = localizedStep(tool: tool, input: input)
-            appendStep(id: agentId, step: step)
+            appendStep(id: agentId, step: step, sessionId: sessionId)
             if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
             nbLog("PreToolUse \(tool)")
 
@@ -527,14 +527,14 @@ final class HookServer: @unchecked Sendable {
             if let diff = buildFileDiff(tool: diffTool, input: diffInput, pillId: agentId) {
                 let idx = state.appendSessionDiff(diff, for: agentId)
                 let step = String.makeDiffStep(filename: diff.name, added: diff.added, removed: diff.removed, diffId: idx)
-                appendStep(id: agentId, step: step)
+                appendStep(id: agentId, step: step, sessionId: sessionId)
                 RecapStore.shared.recordFileDiff(sessionId: recapSessionId, path: diff.name, added: diff.added, removed: diff.removed)
             }
             if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
 
         case "PostToolUseFailure":
             state.updateTask(id: agentId, state: .working)
-            appendStep(id: agentId, step: "⚠ failed")
+            appendStep(id: agentId, step: "⚠ failed", sessionId: sessionId)
             if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
 
         case "Notification":
@@ -545,7 +545,7 @@ final class HookServer: @unchecked Sendable {
                 SoundEngine.shared.play("rate")
             } else if message.hasSuffix("?") {
                 state.updateTask(id: agentId, state: .question)
-                appendStep(id: agentId, step: message)
+                appendStep(id: agentId, step: message, sessionId: sessionId)
             }
 
         case "Stop":
@@ -554,7 +554,7 @@ final class HookServer: @unchecked Sendable {
                 ?? (payload["message"] as? String) ?? ""
             let finalText = DiffEngine.toOneLine(rawFinal)
             if !finalText.isEmpty {
-                appendStep(id: agentId, step: finalText)
+                appendStep(id: agentId, step: finalText, sessionId: sessionId)
                 if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                     state.tasks[idx].finalLine = finalText
                 }
@@ -631,10 +631,10 @@ final class HookServer: @unchecked Sendable {
             RecapStore.shared.sessionEnd(sessionId: recapSessionId)
 
         case "SubagentStart":
-            appendStep(id: agentId, step: "+ subagent")
+            appendStep(id: agentId, step: "+ subagent", sessionId: sessionId)
 
         case "SubagentStop":
-            appendStep(id: agentId, step: "• subagent done")
+            appendStep(id: agentId, step: "• subagent done", sessionId: sessionId)
 
         default:
             break
@@ -1108,7 +1108,7 @@ final class HookServer: @unchecked Sendable {
     }
 
     @MainActor
-    private func appendStep(id: String, step: String) {
+    private func appendStep(id: String, step: String, sessionId: String) {
         let state = AppState.shared
         guard let idx = state.tasks.firstIndex(where: { $0.id == id }) else { return }
         state.tasks[idx].steps.append(step)
@@ -1119,13 +1119,19 @@ final class HookServer: @unchecked Sendable {
         // Match any Claude Code pill (VS Code, Claude Desktop, Orca-launched …) by
         // checking the pill's source rather than a hard-coded id.
         let isClaude = PillCatalog.definition(for: id)?.source == .claudeCode
-        let taskSid = state.tasks[idx].sessionId ?? ""
-        if isClaude, !taskSid.isEmpty {
+        // Key by the hook's own session, not the pill's: one pill serves every
+        // Claude session of its agent, so `tasks[idx].sessionId` is merely
+        // whichever session touched it last. Two sessions interleaving would
+        // otherwise drop one's step into the other's ticker.
+        let sid = sessionId.isEmpty || sessionId == "unknown"
+            ? (state.tasks[idx].sessionId ?? "")
+            : sessionId
+        if isClaude, !sid.isEmpty {
             var dict = state.claudeSessionSteps
-            var steps = dict[taskSid] ?? []
+            var steps = dict[sid] ?? []
             steps.append(step)
             if steps.count > 20 { steps.removeFirst() }
-            dict[taskSid] = steps
+            dict[sid] = steps
             // Replace the whole dictionary so SwiftUI's @Published setter fires —
             // mutating an element in place doesn't trigger a view refresh.
             state.claudeSessionSteps = dict
