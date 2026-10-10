@@ -215,7 +215,14 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
             // the island window; ignore any wheel event that lands there.
             // `event.locationInWindow` is window-local (origin at the
             // window's bottom-left); compare against the window's own width.
-            if let win = state.islandWindow,
+            //
+            // Only on the overview: in the chat the island *is* the thread.
+            // Gating that view too meant a swipe that started on the right —
+            // where the pill you clicked to get here sits — was dropped
+            // outright, while the same swipe worked when the chat had been
+            // opened from the left card.
+            if state.view == .overview,
+               let win = state.islandWindow,
                event.locationInWindow.x > win.frame.width / 2 {
                 accumulated = 0
                 return
