@@ -67,8 +67,6 @@ final class RecapStore {
     static let shared = RecapStore()
 
     private var data = RecapData()
-    /// Set by DemoEngine to inject a fake summary without touching disk.
-    var demoSummaryOverride: WeeklySummary? = nil
     /// Keyed by sessionId so concurrent sessions from the same agent are tracked separately.
     private var drafts: [String: TurnDraft] = [:]
 
@@ -155,7 +153,6 @@ final class RecapStore {
     /// Returns a summary for the last completed week (Mon–Sun, ISO 8601).
     /// Pass a custom `weekStart` (Monday 00:00 local) to query a different week.
     func weeklySummary(for weekStart: Date? = nil) -> WeeklySummary? {
-        if let demo = demoSummaryOverride { return demo }
         // ISO 8601 calendar: weeks start on Monday regardless of locale.
         let cal = Calendar(identifier: .iso8601)
         let start: Date

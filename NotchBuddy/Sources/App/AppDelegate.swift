@@ -5,10 +5,8 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     private(set) var islandController: IslandWindowController?
-    private var demoMenuItem: NSMenuItem?
 
     func applicationWillTerminate(_ notification: Notification) {
-        DemoEngine.shared.stop()
         HotKeyCenter.shared.unregisterAll()
     }
 
@@ -45,11 +43,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         button.image?.isTemplate = true
 
         let menu = NSMenu()
-        menu.delegate = self
-        let demoItem = NSMenuItem(title: NSLocalizedString("Demo mode", comment: ""), action: #selector(toggleDemoMode), keyEquivalent: "")
-        demoMenuItem = demoItem
-        menu.addItem(demoItem)
-        menu.addItem(.separator())
         menu.addItem(withTitle: NSLocalizedString("Open Coucou", comment: ""), action: #selector(openIsland), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: NSLocalizedString("Weekly recap", comment: ""), action: #selector(openWeeklyRecap), keyEquivalent: "")
@@ -61,11 +54,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Actions
-
-    @objc private func toggleDemoMode() {
-        if DemoEngine.shared.isActive { DemoEngine.shared.stop() }
-        else { DemoEngine.shared.start() }
-    }
 
     @objc private func openIsland() {
         islandController?.fsm.openedExternally()
@@ -201,15 +189,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: .checkMondayRecap, object: nil, queue: .main) { [weak self] _ in
             self?.checkMondayRecap()
         }
-    }
-}
-
-// MARK: - NSMenuDelegate
-
-extension AppDelegate: NSMenuDelegate {
-    func menuWillOpen(_ menu: NSMenu) {
-        demoMenuItem?.title = DemoEngine.shared.isActive
-            ? NSLocalizedString("demo.stop", comment: "")
-            : NSLocalizedString("Demo mode", comment: "")
     }
 }

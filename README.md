@@ -89,12 +89,6 @@ macOS releases are published as `v*` tags. See [CHANGELOG.md](CHANGELOG.md) for 
 
 > **Note:** the repo ships the macOS app only. Earlier `windows-v*`, `linux-v*` and an iPhone App Store / TestFlight track were part of the project history and are no longer maintained.
 
-## Demo mode
-
-No API key, no Claude Code, no setup — open **Settings → General → Demo**, click **Try demo mode**, and Coucou walks through a scripted session: a Claude Code session with live steps and a diff you can read, a permission request, an AskUserQuestion, a parallel Codex session, the GitHub, Stripe, Vercel and other integration pills loaded with sample data, the chat with a streamed response, the weekly recap with a share image you can actually save.
-
-Nothing is written to disk during the demo — no Keychain entries, no hook files, no recap history. Your real sessions and keys are saved and restored exactly as they were when you stop.
-
 ## Install
 
 ### App Store

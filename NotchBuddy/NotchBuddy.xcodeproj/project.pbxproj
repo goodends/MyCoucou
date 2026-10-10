@@ -81,7 +81,6 @@
 		A7733EE60694EA3E2A86C37A /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0365DDE3C554F5E8570055F4 /* IslandTypes.swift */; };
 		A885B7E6DC43231BECE36E3D /* MochiWardrobe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */; };
 		ADBB9C15DDA4044625B325BE /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
-		B0CE5AC8B579866A14BD61D0 /* DemoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF5BD66B00BB64BB80AF38C /* DemoEngine.swift */; };
 		B2D86BE268D6F4C86BD0C446 /* ChatMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = D797CC384B5BC70D34F121BC /* ChatMarkdown.swift */; };
 		B314F09AD7924387D0E04B45 /* BotEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E6F5FC81429871B6F766A8 /* BotEngine.swift */; };
 		B3EC9CF3C8BD629C3530E8F1 /* sounds in Resources */ = {isa = PBXBuildFile; fileRef = C066E2B991AA4F56B2724263 /* sounds */; };
@@ -112,7 +111,6 @@
 		ED5D9A334DE08C0EB81DE322 /* AskQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB84A66045EB20CAC93A8A6 /* AskQuestion.swift */; };
 		EE3AB10544113500486A9684 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACB4350729C6513824D1ADF /* ColorHex.swift */; };
 		F06EE0A97CB77096A337AA8B /* sounds in Resources */ = {isa = PBXBuildFile; fileRef = C066E2B991AA4F56B2724263 /* sounds */; };
-		F157D7A9BF878DB2B286B1F7 /* DemoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF5BD66B00BB64BB80AF38C /* DemoEngine.swift */; };
 		F6D57EEBD7E937EFD2B715CF /* ClaudeHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */; };
 		F8F95EAD88F70E0A147D1662 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
 		FB58020A389126865363C342 /* WeeklyRecapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888B3E1420BCB6292BDC8117 /* WeeklyRecapView.swift */; };
@@ -156,7 +154,6 @@
 		9F6D7015D6A77AA59323C0E7 /* AppLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLog.swift; sourceTree = "<group>"; };
 		A14A61070D293AB4BBA303F7 /* NotchBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A29F4C0B02BE91654D02AA0C /* BotCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotCanvasView.swift; sourceTree = "<group>"; };
-		AEF5BD66B00BB64BB80AF38C /* DemoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoEngine.swift; sourceTree = "<group>"; };
 		B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopMochi.swift; sourceTree = "<group>"; };
 		B2AA83D80260660475FAB052 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeWebURL.swift; sourceTree = "<group>"; };
@@ -202,7 +199,6 @@
 				444604C7E2C530B664849EF9 /* ClaudeResponseText.swift */,
 				3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */,
 				73FA4DF1BE5246CCFFB72E5C /* CodexPlanGauge.swift */,
-				AEF5BD66B00BB64BB80AF38C /* DemoEngine.swift */,
 				B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */,
 				C086E1932F86B9C2B559BE03 /* DesktopMochiLogic.swift */,
 				168A9A73B519018FAB0AA465 /* GitHubActivity.swift */,
@@ -410,7 +406,6 @@
 				88C3F0A4F3AE29DBED8710A0 /* ClaudeSettingsFile.swift in Sources */,
 				9AD370335A3ECC9C82375F93 /* CodexPlanGauge.swift in Sources */,
 				EE3AB10544113500486A9684 /* ColorHex.swift in Sources */,
-				B0CE5AC8B579866A14BD61D0 /* DemoEngine.swift in Sources */,
 				BEC5DDB55B3DA67C61CA8470 /* DesktopMochi.swift in Sources */,
 				BA65FC4A40F7227837C26214 /* DesktopMochiLogic.swift in Sources */,
 				077ECE0906D8E820BD5FA764 /* DiffEngine.swift in Sources */,
@@ -470,7 +465,6 @@
 				D9EEB1079ACBCEEF74439C44 /* ClaudeSettingsFile.swift in Sources */,
 				EB1D9680D3DB0F0707D4A043 /* CodexPlanGauge.swift in Sources */,
 				9ECEE890D4486B6E83BD5B7F /* ColorHex.swift in Sources */,
-				F157D7A9BF878DB2B286B1F7 /* DemoEngine.swift in Sources */,
 				273FC0FA14AAF6CE62FD14AE /* DesktopMochi.swift in Sources */,
 				C93BA975D35B8CD7473CF995 /* DesktopMochiLogic.swift in Sources */,
 				4D958F2DDCE9504490FDA357 /* DiffEngine.swift in Sources */,
