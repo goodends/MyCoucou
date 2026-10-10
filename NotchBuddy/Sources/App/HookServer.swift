@@ -407,6 +407,19 @@ final class HookServer: @unchecked Sendable {
         // external-agent branch with a different pill id.
         let isClaudeSession = PillCatalog.definition(for: agentId)?.source == .claudeCode
         if isClaudeSession { lastClaudeSessionId = sessionId }
+        // Orca injects `ORCA_TERMINAL_HANDLE` (the runtime-issued `handle`
+        // for the pane hosting this Claude session) into every Claude
+        // process's environment, and nb-hook forwards it on every event.
+        // Bind sessionId → handle here, on every event, so "Open terminal"
+        // is exact even when the app started after the session did —
+        // SessionStart is too narrow (it fires once, at launch).
+        if hostApp == "com.stablyai.orca", isClaudeSession,
+           !sessionId.isEmpty, sessionId != "unknown",
+           let handle = payload["orca_terminal_handle"] as? String,
+           !handle.isEmpty {
+            state.orcaHandleBySession[sessionId] = handle
+            nbLog("Orca bind session=\(sessionId.prefix(8)) handle=\(handle.prefix(24))…")
+        }
         // For sessions that carry no id, derive a unique key from pill + cwd so that
         // concurrent anonymous sessions are tracked independently in RecapStore.
         let recapSessionId = (sessionId == "unknown" || sessionId.isEmpty)
@@ -3307,6 +3320,10 @@ def main():
         payload.setdefault('iterm_session_id', env.get('ITERM_SESSION_ID', ''))
         payload.setdefault('term_session_id', env.get('TERM_SESSION_ID', ''))
         payload.setdefault('bundle_id', env.get('__CFBundleIdentifier', ''))
+        # Orca injects the runtime-issued terminal handle for the pane hosting
+        # this Claude session. Forwarded on every event so the app can bind
+        # sessionId -> handle even when the app started after the session.
+        payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
         if 'cwd' not in payload or not payload['cwd']:
             paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
             if isinstance(paths, list) and paths:
@@ -3374,6 +3391,10 @@ def main():
     payload.setdefault('iterm_session_id', env.get('ITERM_SESSION_ID', ''))
     payload.setdefault('term_session_id', env.get('TERM_SESSION_ID', ''))
     payload.setdefault('bundle_id', env.get('__CFBundleIdentifier', ''))
+    # Orca injects the runtime-issued terminal handle for the pane hosting
+    # this Claude session. Forwarded on every event so the app can bind
+    # sessionId -> handle even when the app started after the session.
+    payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
     if 'cwd' not in payload or not payload['cwd']:
         paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
         if isinstance(paths, list) and paths:
@@ -3614,6 +3635,10 @@ def main():
         payload.setdefault('iterm_session_id', env.get('ITERM_SESSION_ID', ''))
         payload.setdefault('term_session_id', env.get('TERM_SESSION_ID', ''))
         payload.setdefault('bundle_id', env.get('__CFBundleIdentifier', ''))
+        # Orca injects the runtime-issued terminal handle for the pane hosting
+        # this Claude session. Forwarded on every event so the app can bind
+        # sessionId -> handle even when the app started after the session.
+        payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
         if 'cwd' not in payload or not payload['cwd']:
             paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
             if isinstance(paths, list) and paths:
@@ -3680,6 +3705,10 @@ def main():
     payload.setdefault('iterm_session_id', env.get('ITERM_SESSION_ID', ''))
     payload.setdefault('term_session_id', env.get('TERM_SESSION_ID', ''))
     payload.setdefault('bundle_id', env.get('__CFBundleIdentifier', ''))
+    # Orca injects the runtime-issued terminal handle for the pane hosting
+    # this Claude session. Forwarded on every event so the app can bind
+    # sessionId -> handle even when the app started after the session.
+    payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
     if 'cwd' not in payload or not payload['cwd']:
         paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
         if isinstance(paths, list) and paths:

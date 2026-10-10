@@ -75,7 +75,22 @@ final class AppState: ObservableObject {
     func jumpToOrcaTerminal() async -> Bool {
         guard OrcaCLIBridge.isInstalled else { return false }
         guard let cwd = terminalLookupCwd else { return false }
-        guard let handle = await OrcaCLIBridge.shared.handle(forCwd: cwd) else { return false }
+        // Prefer the SessionStart binding — it's the only way to tell two
+        // Claude sessions in the same cwd apart. Fall back to the cwd +
+        // lastOutputAt heuristic when no SessionStart has fired for the
+        // focused session yet (e.g. user jumped before any hook arrived),
+        // and cache the result so the next jump hits the fast path.
+        var handle: String?
+        let sid = focusedSessionId
+        if let sid, !sid.isEmpty, let bound = orcaHandleBySession[sid] {
+            handle = bound
+        } else {
+            handle = await OrcaCLIBridge.shared.handle(forCwd: cwd)
+            if let handle, let sid, !sid.isEmpty {
+                orcaHandleBySession[sid] = handle
+            }
+        }
+        guard let handle else { return false }
         // Raise the Orca window first — `orca terminal switch` only changes
         // the selected tab inside the app, it doesn't bring the window
         // forward on macOS. Then give the activation a moment to settle:
