@@ -62,37 +62,85 @@ actor OrcaCLIBridge {
     /// Run `orca <args> --json` and return the raw stdout bytes. Returning
     /// `Data` (rather than a decoded dictionary) keeps the value Sendable so
     /// it can cross the actor boundary under strict concurrency.
+    ///
+    /// We don't wait for the Orca CLI process to exit. The CLI holds the
+    /// process alive for ~8 s after the receipt is already on stdout (likely
+    /// polling for `turn_started` or doing IPC cleanup), and the data we
+    /// need is fully written as soon as the receipt is ready. We read
+    /// stdout, return the first complete JSON object (terminated by `\n`),
+    /// then SIGTERM the process so it stops blocking the caller.
     private nonisolated func runRaw(_ args: [String], timeout: TimeInterval = 20) async throws -> Data {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
-            Task.detached(priority: .userInitiated) {
-                let proc = Process()
-                proc.executableURL = Self.cliURL
-                proc.arguments = args + ["--json"]
-                let stdout = Pipe()
-                proc.standardOutput = stdout
-                proc.standardError = Pipe()
-                proc.environment = ProcessInfo.processInfo.environment
+            let state = RunState()
+            let proc = Process()
+            proc.executableURL = Self.cliURL
+            proc.arguments = args + ["--json"]
+            let stdout = Pipe()
+            proc.standardOutput = stdout
+            proc.standardError = Pipe()
+            proc.environment = ProcessInfo.processInfo.environment
 
-                do {
-                    try proc.run()
-                } catch {
-                    cont.resume(throwing: error)
-                    return
-                }
-                proc.terminationHandler = { p in
-                    let data = (try? stdout.fileHandleForReading.readToEnd()) ?? Data()
-                    if p.terminationStatus != 0 {
-                        let err = String(data: data, encoding: .utf8) ?? ""
-                        cont.resume(throwing: OrcaCLIError.exited(code: p.terminationStatus, stderr: err))
-                    } else if data.isEmpty {
-                        cont.resume(throwing: OrcaCLIError.emptyOutput)
-                    } else {
-                        cont.resume(returning: data)
-                    }
-                }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+            stdout.fileHandleForReading.readabilityHandler = { fh in
+                let chunk = fh.availableData
+                if chunk.isEmpty { return }
+                state.append(chunk)
+                if state.takeIfComplete() {
+                    stdout.fileHandleForReading.readabilityHandler = nil
+                    let data = state.drain()
                     if proc.isRunning { proc.terminate() }
+                    cont.resume(returning: data)
                 }
+            }
+            proc.terminationHandler = { p in
+                stdout.fileHandleForReading.readabilityHandler = nil
+                if state.alreadyResumed { return }
+                let data = (try? stdout.fileHandleForReading.readToEnd()) ?? state.drain()
+                if p.terminationStatus != 0, data.isEmpty {
+                    let err = String(data: data, encoding: .utf8) ?? ""
+                    cont.resume(throwing: OrcaCLIError.exited(code: p.terminationStatus, stderr: err))
+                } else if data.isEmpty {
+                    cont.resume(throwing: OrcaCLIError.emptyOutput)
+                } else {
+                    cont.resume(returning: data)
+                }
+            }
+            do {
+                try proc.run()
+            } catch {
+                stdout.fileHandleForReading.readabilityHandler = nil
+                cont.resume(throwing: error)
+                return
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                if proc.isRunning { proc.terminate() }
+            }
+        }
+    }
+
+    /// Thread-safe buffer for runRaw's stdout reader. Orca CLI emits one
+    /// newline-terminated JSON object per invocation, so "complete" is just
+    /// "we have at least one \\n".
+    private final class RunState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var buffer = Data()
+        private var resumed = false
+        var alreadyResumed: Bool { lock.withLock { resumed } }
+        func append(_ data: Data) { lock.withLock { buffer.append(data) } }
+        /// Returns true the first time a complete line is in the buffer and
+        /// marks resumed so subsequent calls / the termination handler know
+        /// to stay quiet.
+        func takeIfComplete() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if resumed { return false }
+            guard buffer.contains(0x0A) else { return false }
+            resumed = true
+            return true
+        }
+        func drain() -> Data {
+            lock.withLock {
+                let copy = buffer
+                buffer.removeAll(keepingCapacity: false)
+                return copy
             }
         }
     }
