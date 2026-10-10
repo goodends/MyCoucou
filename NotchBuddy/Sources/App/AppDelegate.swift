@@ -27,9 +27,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         debugMenuItem.submenu = debugMenu
         NSApp.mainMenu?.addItem(debugMenuItem)
         #endif
-        #if PHONE_LINK
-        CloudProbe.shared.startIfEnabled()
-        #endif
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

@@ -84,11 +84,6 @@ struct SettingsView: View {
     @AppStorage("settingsSection") private var selectedSection: String = "general"
     // Active pills: the pill whose colour palette is open, if any
     @State private var colorPalettePill: String? = nil
-    #if PHONE_LINK
-    @AppStorage("iPhoneSyncEnabled") private var iPhoneSyncEnabled = false
-    @AppStorage("iPhoneLiveActivityEnabled") private var iPhoneLiveActivityEnabled = false
-    @AppStorage("iPhoneInstructionsEnabled") private var iPhoneInstructionsEnabled = false
-    #endif
     @AppStorage(ClaudeHost.terminalCardsKey) private var terminalCardsEnabled = false
     @State private var customSoundCount = SoundEngine.shared.customized.count
 
@@ -383,36 +378,7 @@ struct SettingsView: View {
             .padding(6)
         }
 
-        #if PHONE_LINK
-        GroupBox("iPhone") {
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle(String(localized: "iphone.sync.toggle"), isOn: $iPhoneSyncEnabled)
-                    .onChange(of: iPhoneSyncEnabled) { _, on in CloudProbe.shared.setEnabled(on) }
-                Text(String(localized: "iphone.sync.description"))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Toggle(String(localized: "iphone.live-activity.toggle"), isOn: $iPhoneLiveActivityEnabled)
-                    .disabled(!iPhoneSyncEnabled)
-                    .onChange(of: iPhoneLiveActivityEnabled) { _, on in LiveActivityRelay.shared.setEnabled(on) }
-                Text(String(localized: "iphone.live-activity.description"))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                #if !APPSTORE
-                Toggle(String(localized: "iphone.instruction.toggle"), isOn: $iPhoneInstructionsEnabled)
-                    .disabled(!iPhoneSyncEnabled)
-                    .onChange(of: iPhoneInstructionsEnabled) { _, on in InstructionRunner.shared.setEnabled(on) }
-                Text(String(localized: "iphone.instruction.description"))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                #endif
-            }
-            .padding(6)
         }
-        #endif
-    }
 
     private func refreshConnectedScreens() {
         connectedScreens = NSScreen.screens.compactMap { screen in

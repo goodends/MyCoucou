@@ -24,34 +24,6 @@ Configure your tool to call the Coucou relay with `--agent <your-name>` after th
 
 The shell wrapper passes `"$@"` to the Python relay, which extracts the agent name and injects it into the payload before forwarding to Coucou.
 
-## Hook command (Windows)
-
-Same pattern with the Windows relay:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      { "type": "command", "command": "C:\\path\\to\\coucou-hook.exe --agent my-tool" }
-    ]
-  }
-}
-```
-
-## Hook command (Linux)
-
-Same pattern with the Linux relay. Coucou copies the relay to `~/.local/share/coucou/bin/coucou-hook` at startup.
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      { "type": "command", "command": "/path/to/coucou-hook --agent my-tool" }
-    ]
-  }
-}
-```
-
 ## Payload format
 
 The relay adds `coucou_agent` to the JSON it forwards. You can also add it yourself if you talk to the socket directly:
@@ -225,23 +197,9 @@ Every event is fire-and-forget: if the app is closed or unreachable, nothing is 
 
 ### Any other tool
 
-Follow the generic pattern: call `nb-hook --agent <your-name> <EventName>` (macOS),
-`coucou-hook.exe --agent <your-name> <EventName>` (Windows)
-or `~/.local/share/coucou/bin/coucou-hook --agent <your-name> <EventName>` (Linux)
-and let the relay forward the event.
+Follow the generic pattern: call `nb-hook --agent <your-name> <EventName>` (macOS) and let the relay forward the event.
 
-## Quick test (Linux)
-
-With Coucou running:
-
-```sh
-echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","coucou_agent":"demo"}' \
-  | ~/.local/share/coucou/bin/coucou-hook --agent demo
-```
-
-A "demo" pill should appear in the island.
-
-## Quick test (macOS)
+## Quick test
 
 With Coucou running:
 

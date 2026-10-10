@@ -426,11 +426,6 @@ final class HookServer: @unchecked Sendable {
             ? "\(agentId)+\(cwd)"
             : sessionId
 
-        #if PHONE_LINK
-        // The iPhone's "last turn" (prompt, actions, diffs, answer).
-        if !isExternalAgent { TurnRecorder.shared.record(event: name, payload: payload, pillId: agentId) }
-        #endif
-
         // While a permission request is pending, dismiss when the resolving event arrives,
         // then continue normal processing. Only skip normal processing when unresolved.
         if let pending = state.pendingApproval, agentId == pending.pillId,

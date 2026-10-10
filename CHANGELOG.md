@@ -1,5 +1,11 @@
 # Changelog
 
+## Mac only — Unreleased
+
+- Drop the iPhone App (Coucou on iPhone, widgets, notification content extension, Mac `PhoneLink` iCloud sync). The Mac no longer publishes sessions, turns or services through CloudKit, and the Live Activity relay is gone.
+- Drop the Windows and Linux (Tauri) app.
+- This codebase now ships Mac only.
+
 ## Windows and Linux 0.3.0 — October 9, 2026
 
 The first Linux release since 0.1.1, so on Linux it also brings everything in Windows and Linux 0.2.0 below.

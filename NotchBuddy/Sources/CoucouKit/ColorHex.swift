@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreGraphics
 
-// Hex color helpers shared by the Mac app and the iPhone app.
+// Hex color helpers.
 
 // MARK: - Color from hex string
 
