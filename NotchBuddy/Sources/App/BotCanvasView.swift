@@ -238,6 +238,9 @@ struct MiniBotCanvasView: View {
                 // Outfit draws after the body so hats / glasses layer on top.
                 engine.drawOutfitBehind(context: ctx, size: size)
                 engine.drawOutfitFront(context: ctx, size: size)
+                // Badge on the head, like the main Mochi: dots while working,
+                // a dot when finished, a bang for approval, etc.
+                engine.drawHandsAndExtras(context: ctx, size: size)
             }
         }
         .onChange(of: task.state) { _, newState in

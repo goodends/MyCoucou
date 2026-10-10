@@ -1978,16 +1978,12 @@ struct ClaudeSessionPill: View {
         }
     }
 
-    private var showsTypingDots: Bool {
-        switch botTask.state {
-        case .working, .thinking: return true
-        default: return false
-        }
-    }
-
     var body: some View {
         Button(action: { onTap() }) {
-            ZStack(alignment: .topTrailing) {
+            // The state dot sits at Mochi's lower-left: his head now carries
+            // the state badge (MiniBotCanvasView draws it), so the top-right
+            // corner no longer needs the dot or the typing dots.
+            ZStack(alignment: .bottomLeading) {
                 ZStack {
                     Capsule()
                         .fill(isHovered
@@ -2031,13 +2027,8 @@ struct ClaudeSessionPill: View {
                 Circle()
                     .fill(Color(hex: stateDotColor))
                     .frame(width: 6, height: 6)
-                    .offset(x: -6, y: 4)
+                    .offset(x: 10, y: -4)
                     .allowsHitTesting(false)
-                if showsTypingDots {
-                    TypingDotsView()
-                        .offset(x: -22, y: 0)
-                        .allowsHitTesting(false)
-                }
             }
         }
         .buttonStyle(.plain)

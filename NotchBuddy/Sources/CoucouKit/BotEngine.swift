@@ -1421,15 +1421,22 @@ final class BotEngine: ObservableObject {
         switch badge {
         case .dots(let col):
             if isMini {
-                // Mini: animated pulsing dot
-                let phase = (now * 2.4).truncatingRemainder(dividingBy: 1)
-                let dotR = R * 0.22 * (1 + 0.25 * sin(phase * .pi * 2))
-                var outer = Path()
-                outer.addEllipse(in: CGRect(x: -R*0.2, y: -R*0.2, width: R*0.4, height: R*0.4))
-                ctx.fill(outer, with: .color(.black))
-                var dot = Path()
-                dot.addEllipse(in: CGRect(x: -dotR, y: -dotR, width: dotR*2, height: dotR*2))
-                ctx.fill(dot, with: .color(Color(cgColor: col)))
+                // Mini: pill badge with three pulsing dots (ellipsis animation).
+                // Proportions slightly larger than the full-size version so the
+                // dots stay readable at small canvases (R ≈ 8–11 px).
+                let pw: CGFloat = R * 0.9
+                let ph: CGFloat = R * 0.45
+                var pill = Path()
+                pill.addRoundedRect(in: CGRect(x: -pw/2, y: -ph/2, width: pw, height: ph),
+                                    cornerSize: CGSize(width: ph/2, height: ph/2))
+                ctx.fill(pill, with: .color(Color(cgColor: col)))
+                for i in 0..<3 {
+                    let phase = ((now * 2.4 - CGFloat(i) * 0.22).truncatingRemainder(dividingBy: 1) + 1).truncatingRemainder(dividingBy: 1)
+                    let dotR = R * 0.1 * (1 + 0.4 * max(0, sin(phase * .pi * 2)))
+                    var dot = Path()
+                    dot.addEllipse(in: CGRect(x: (CGFloat(i)-1)*R*0.22 - dotR, y: -dotR, width: dotR*2, height: dotR*2))
+                    ctx.fill(dot, with: .color(.white))
+                }
             } else {
                 // Pill badge with animated dots (prototype style)
                 let pw: CGFloat = R * 0.72
