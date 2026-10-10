@@ -126,11 +126,15 @@ actor OrcaCLIBridge {
     /// pressed Enter). Blocks up to `waitSubmit` seconds for Orca to observe
     /// the agent accept the prompt.
     ///
-    /// Returns true only when the receipt reaches `submission_observed` or
-    /// `turn_started` — bytes written is necessary but not sufficient (an
-    /// idle or exited agent gets the bytes and does nothing).
+    /// Returns true on `submission_observed` / `turn_started` (agent took
+    /// the prompt) or `input_accepted` (bytes reached the PTY and the
+    /// Claude process read them). An idle session's `turn_started` often
+    /// arrives well after the prompt is already accepted, and the wall
+    /// clock is dominated by Orca CLI's own startup/teardown (~7–8 s),
+    /// not by `waitSubmit` — so defaulting to 2 s trades a slightly higher
+    /// "input_accepted only" rate for a noticeably snappier send.
     @discardableResult
-    func send(handle: String, text: String, waitSubmit: Int = 5) async throws -> Bool {
+    func send(handle: String, text: String, waitSubmit: Int = 2) async throws -> Bool {
         let resp = try await run([
             "terminal", "send",
             "--terminal", handle,
@@ -144,8 +148,8 @@ actor OrcaCLIBridge {
               let data = try? JSONSerialization.data(withJSONObject: sendDict),
               let receipt = try? JSONDecoder().decode(OrcaSendReceipt.self, from: data)
         else { throw OrcaCLIError.badShape("send returned no receipt: \(resp)") }
-        let stages = receipt.prompt?.stages ?? []
-        return stages.contains("submission_observed") || stages.contains("turn_started")
+        let stages = Set(receipt.prompt?.stages ?? [])
+        return !stages.isDisjoint(with: ["submission_observed", "turn_started", "input_accepted"])
     }
 
     /// Resolve `cwd` to the Orca terminal hosting that session. Picks the
