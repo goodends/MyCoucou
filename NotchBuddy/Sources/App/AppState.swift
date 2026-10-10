@@ -152,6 +152,17 @@ final class AppState: ObservableObject {
     /// so the caller can show its "not sent" hint.
     @discardableResult
     func sendToOrcaTerminal(_ text: String) async -> Bool {
+        // Non-Orca sessions (Warp, Terminal.app, iTerm2, Ghostty, …) have
+        // no Orca handle — `handle(forCwd:)` would match on cwd alone and
+        // land on the wrong tab when an Orca session happens to share the
+        // worktree, sending the message to an unrelated agent. Bail out so
+        // the caller can show its "not sent" hint instead of misrouting.
+        if let key = focusedSessionId ?? focusTask?.id, !key.isEmpty,
+           let session = claudeSessions.first(where: { $0.sessionId == key }),
+           let host = session.hostApp, !host.isEmpty,
+           host != "com.stablyai.orca" {
+            return false
+        }
         guard OrcaCLIBridge.isInstalled else { return false }
         guard let key = focusedSessionId ?? focusTask?.id, !key.isEmpty else { return false }
 
