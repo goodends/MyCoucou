@@ -96,7 +96,7 @@ private func greetPose(_ t: Double, compact: IslandRestingLayout) -> GreetPose {
     // Island size (reference for clip / warp spread)
     let gx = gSeg(t, 0, 0.5)
     let g  = sin(.pi*gx/2) + 0.04*sin(.pi*gx)*gx
-    let iw = gLerp(Double(compact.width - 160), 640, g)
+    let iw = gLerp(Double(compact.width - 80), 640, g)
     let ih = gLerp(Double(compact.height), 150, g)
 
     let GH = Double(GHB)   // 58
@@ -645,7 +645,7 @@ struct GreetingCanvasView: View {
             Canvas { context, size in
                 context.withCGContext { cgCtx in
                     drawGreeting(cgCtx, size: size, t: t, tc: tc,
-                                 compact: IslandRestingLayout(width: state.notchWidth + 160,
+                                 compact: IslandRestingLayout(width: state.notchWidth + 80,
                                                               height: state.notchHeight))
                 }
             }
