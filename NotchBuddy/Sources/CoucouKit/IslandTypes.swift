@@ -116,6 +116,7 @@ struct ClaudeSession: Identifiable, Equatable {
     /// visible against the dark pill background. One is picked at random when
     /// a session first appears; the wardrobe lets the user pick another.
     static let palette: [MochiColor] = [
+        MochiColor(hex: "#F5F6F8", name: "White"),
         MochiColor(hex: "#F5A524", name: "Orange"),
         MochiColor(hex: "#5EEAD4", name: "Teal"),
         MochiColor(hex: "#EC4899", name: "Pink"),
