@@ -33,6 +33,62 @@ struct IslandViewContent: View {
 
 // MARK: - Overview
 
+/// Navigating to where an agent actually runs: Orca's exact terminal tab when
+/// Orca hosts the session, otherwise raising the host app (VS Code, Cursor, a
+/// terminal…). Shared by the overview card's ↗ button and each session pill's.
+@MainActor
+enum AgentLauncher {
+    static func open(_ task: AgentTask?, state: AppState) {
+        guard let task else { return }
+        // Orca first: if Orca hosts this session, switch to its exact
+        // terminal tab instead of merely raising the app.
+        Task { @MainActor in
+            if await state.jumpToOrcaTerminal(sessionId: task.sessionId) { return }
+            activateHostApp(for: task)
+        }
+    }
+
+    /// Fallback for when Orca doesn't host the session: raise the app that
+    /// runs it (VS Code, Cursor, a terminal, …).
+    private static func activateHostApp(for task: AgentTask) {
+        switch task.id {
+        case "integration_claude":
+            if ClaudeHost.activate(task.hostApp) { return }
+            let vscodeBundleId = "com.microsoft.VSCode"
+            if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == vscodeBundleId }) {
+                app.activate(options: .activateIgnoringOtherApps)
+            } else {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Visual Studio Code.app"))
+            }
+        case "agent_cursor":
+            #if !APPSTORE
+            if let url = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: "com.todesktop.230313mzl4w4u92") {
+                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
+            }
+            #endif
+        case "agent_codex":
+            #if !APPSTORE
+            if let url = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: "com.openai.codex") {
+                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
+            }
+            #endif
+        case "agent_claude-desktop":
+            openClaudeDesktopApp()
+        case "agent_gemini", "agent_antigravity",
+             "agent_copilot", "agent_muse", "agent_opencode", "agent_amp":
+            #if !APPSTORE
+            TerminalTarget.activate(sessionBundleId: nil)
+            #endif
+        default:
+            #if !APPSTORE
+            TerminalTarget.activate(sessionBundleId: task.sessionBundleId)
+            #endif
+        }
+    }
+}
+
 struct OverviewView: View {
     @ObservedObject var state: AppState
     @State private var activeDiffId: Int? = nil
@@ -129,7 +185,7 @@ struct OverviewView: View {
                 let hideJumpButton = activeDiffId != nil
                 #endif
                 if !hideJumpButton {
-                    Button(action: { openAgentTarget(agent) }) {
+                    Button(action: { AgentLauncher.open(agent, state: state) }) {
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 8, weight: .medium))
                             .foregroundColor(Color(hex: "#5F646D"))
@@ -184,56 +240,6 @@ struct OverviewView: View {
                       let last = state.sessionDiffs[task.id]?.last {
                 withAnimation(.easeIn(duration: 0.16)) { activeDiffId = last.id }
             }
-        }
-    }
-
-    private func openAgentTarget(_ task: AgentTask?) {
-        guard let task else { return }
-        // Orca first: if Orca hosts this session, switch to its exact
-        // terminal tab instead of merely raising the app.
-        Task { @MainActor in
-            if await state.jumpToOrcaTerminal() { return }
-            activateHostApp(for: task)
-        }
-    }
-
-    /// Fallback for when Orca doesn't host the session: raise the app that
-    /// runs it (VS Code, Cursor, a terminal, …).
-    private func activateHostApp(for task: AgentTask) {
-        switch task.id {
-        case "integration_claude":
-            if ClaudeHost.activate(task.hostApp) { return }
-            let vscodeBundleId = "com.microsoft.VSCode"
-            if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == vscodeBundleId }) {
-                app.activate(options: .activateIgnoringOtherApps)
-            } else {
-                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Visual Studio Code.app"))
-            }
-        case "agent_cursor":
-            #if !APPSTORE
-            if let url = NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.todesktop.230313mzl4w4u92") {
-                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-            }
-            #endif
-        case "agent_codex":
-            #if !APPSTORE
-            if let url = NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.openai.codex") {
-                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-            }
-            #endif
-        case "agent_claude-desktop":
-            openClaudeDesktopApp()
-        case "agent_gemini", "agent_antigravity",
-             "agent_copilot", "agent_muse", "agent_opencode", "agent_amp":
-            #if !APPSTORE
-            TerminalTarget.activate(sessionBundleId: nil)
-            #endif
-        default:
-            #if !APPSTORE
-            TerminalTarget.activate(sessionBundleId: task.sessionBundleId)
-            #endif
         }
     }
 }
@@ -1979,10 +1985,14 @@ struct ClaudeSessionPill: View {
     }
 
     var body: some View {
-        Button(action: { onTap() }) {
+        // A plain ZStack + tap gesture, not a Button: the ↗ jump button lives
+        // inside the same view that owns the hover, so moving onto it can't
+        // bounce the hover state (a Button nested in a Button did exactly that
+        // and spun the render loop).
+        ZStack {
             // The state dot sits at Mochi's lower-left: his head now carries
             // the state badge (MiniBotCanvasView draws it), so the top-right
-            // corner no longer needs the dot or the typing dots.
+            // corner holds the ↗ instead.
             ZStack(alignment: .bottomLeading) {
                 ZStack {
                     Capsule()
@@ -2017,12 +2027,32 @@ struct ClaudeSessionPill: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.leading, 34)
-                    .padding(.trailing, 18)
+                    .padding(.trailing, 24)
                     .allowsHitTesting(false)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 32)
                 .shadow(color: Color(hex: Self.claudeColor).opacity(isHovered ? 0.35 : 0), radius: 10, x: 0, y: 2)
+                // ↗ revealed on hover: jump to where this session runs (Orca's
+                // exact tab, else the host terminal). Always in the hierarchy —
+                // only its opacity changes — so the hover can't flicker.
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        AgentLauncher.open(state.overviewTask(for: session), state: state)
+                    } label: {
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(Color(hex: "#5F646D"))
+                            .frame(width: 16, height: 16)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(isHovered ? 1 : 0)
+                    .allowsHitTesting(isHovered)
+                    .padding(.top, 2)
+                    .padding(.trailing, 4)
+                }
 
                 Circle()
                     .fill(Color(hex: stateDotColor))
@@ -2031,7 +2061,8 @@ struct ClaudeSessionPill: View {
                     .allowsHitTesting(false)
             }
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .brightness(isHovered ? 0.06 : 0)
         .onHover { newHover in
