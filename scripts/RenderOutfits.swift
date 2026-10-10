@@ -78,17 +78,16 @@ struct MochiCell: View {
                 roll: roll, morph: morph, isMini: false, presence: presence
             )
 
-            // 2. Body (replicate BotEngine.drawBody for idle / pumpkin state)
+            // 2. Body (replicate BotEngine.drawBody for idle state)
             var bCtx = context
             bCtx.translateBy(x: cx, y: cy)
             if tilt != 0 { bCtx.rotate(by: .radians(tilt)) }
             bCtx.scaleBy(x: sx, y: sy)
             let body = mochiOutfitPath(rx, ry)
 
-            // Base gradient (pumpkin-aware)
-            let pumpkin = outfit == .pumpkin
-            let cTop: Color = pumpkin ? Color(hex: "#FFA94D") : Color(red: 0.929, green: 0.929, blue: 0.937)
-            let cBot: Color = pumpkin ? Color(hex: "#E8590C") : Color(red: 0.769, green: 0.773, blue: 0.792)
+            // Base gradient
+            let cTop: Color = Color(red: 0.929, green: 0.929, blue: 0.937)
+            let cBot: Color = Color(red: 0.769, green: 0.773, blue: 0.792)
             bCtx.fill(body, with: .linearGradient(
                 Gradient(colors: [cTop, cBot]),
                 startPoint: CGPoint(x: rx * 0.7, y: -ry * 0.85),
@@ -146,7 +145,7 @@ struct MochiCell: View {
 // Outfit order matching sheet.html
 private let targetOutfits: [Outfit] = [
     .none, .beanie, .santaHat, .partyHat, .crown, .witchHat,
-    .sunglasses, .roundGlasses, .scarf, .pumpkin, .bow,
+    .sunglasses, .roundGlasses, .scarf, .bow,
 ]
 
 private struct PoseSpec {
@@ -214,7 +213,7 @@ struct OutfitGrid: View {
 
 private let rollOutfits: [Outfit] = [
     .none, .beanie, .santaHat, .witchHat, .crown,
-    .sunglasses, .roundGlasses, .scarf, .bow, .pumpkin, .bunnyEars
+    .sunglasses, .roundGlasses, .scarf, .bow, .bunnyEars
 ]
 
 private let rollValues: [CGFloat] = [0, CGFloat.pi/3, CGFloat.pi*2/3, CGFloat.pi, CGFloat.pi*4/3, CGFloat.pi*5/3]

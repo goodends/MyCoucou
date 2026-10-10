@@ -2328,9 +2328,8 @@ private func drawOutfitIcon(context: GraphicsContext, size: CGSize, outfit: Outf
         // Draw body
         var ctx = context
         ctx.translateBy(x: cx, y: iconCY)
-        let pumpkin = outfit == .pumpkin
-        let top = pumpkin ? Color(hex: "#FFA94D") : Color(red: 0.929, green: 0.929, blue: 0.937)
-        let bot = pumpkin ? Color(hex: "#E8590C") : Color(red: 0.769, green: 0.773, blue: 0.792)
+        let top = Color(red: 0.929, green: 0.929, blue: 0.937)
+        let bot = Color(red: 0.769, green: 0.773, blue: 0.792)
         ctx.fill(bodyPath, with: .linearGradient(
             Gradient(colors: [top, bot]),
             startPoint: CGPoint(x: rx * 0.7, y: -ry * 0.85),

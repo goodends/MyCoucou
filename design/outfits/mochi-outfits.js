@@ -547,41 +547,6 @@ OUTFITS.scarf = {
   }
 };
 
-// --- Pumpkin: body recolour + soft ribs following meridians + curly stem & leaf
-OUTFITS.pumpkin = {
-  bodyColors: ['#FFA94D', '#E8590C'],
-  front(ctx, H, path) {
-    ctx.save(); ctx.clip(path);
-    for (const lon of [-1.15, -0.55, 0.0, 0.55, 1.15]) {
-      const pts = [];
-      for (let i = 0; i <= 30; i++) { const y = -0.98 + 1.96 * i / 30; const q = proj(H, surf(y, lon, 1)); if (q.z > 0) pts.push(q); }
-      if (pts.length < 2) continue;
-      ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y));
-      const zz = pts[Math.floor(pts.length / 2)].z;
-      ctx.strokeStyle = `rgba(150,50,0,${0.22 * zz})`; ctx.lineWidth = H.R * 0.12; ctx.lineCap = 'round'; ctx.stroke();
-      ctx.strokeStyle = `rgba(255,220,170,${0.18 * zz})`; ctx.lineWidth = H.R * 0.04; ctx.save(); ctx.translate(H.R * 0.07, 0); ctx.stroke(); ctx.restore();
-    }
-    ctx.restore();
-    const t = proj(H, [0.02, 1.0, 0]);
-    // stem
-    ctx.beginPath(); ctx.moveTo(t.x - H.R * 0.09, t.y + H.R * 0.04);
-    ctx.quadraticCurveTo(t.x - H.R * 0.08, t.y - H.R * 0.22, t.x + H.R * 0.08, t.y - H.R * 0.3);
-    ctx.lineTo(t.x + H.R * 0.13, t.y - H.R * 0.22);
-    ctx.quadraticCurveTo(t.x + H.R * 0.04, t.y - H.R * 0.15, t.x + H.R * 0.08, t.y + H.R * 0.04); ctx.closePath();
-    ctx.fillStyle = lin(ctx, t.x - H.R * 0.1, 0, t.x + H.R * 0.1, 0, [[0, '#65A30D'], [1, '#3F6212']]); ctx.fill();
-    // leaf
-    ctx.save(); ctx.translate(t.x - H.R * 0.06, t.y - H.R * 0.02); ctx.rotate(-0.5);
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-H.R * 0.18, -H.R * 0.2, -H.R * 0.38, -H.R * 0.02); ctx.quadraticCurveTo(-H.R * 0.18, H.R * 0.1, 0, 0);
-    ctx.fillStyle = lin(ctx, 0, -H.R * 0.15, -H.R * 0.3, 0, [[0, '#84CC16'], [1, '#4D7C0F']]); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-H.R * 0.02, -H.R * 0.01); ctx.quadraticCurveTo(-H.R * 0.18, -H.R * 0.08, -H.R * 0.32, -H.R * 0.03); ctx.strokeStyle = 'rgba(30,60,0,0.4)'; ctx.lineWidth = H.R * 0.02; ctx.stroke();
-    ctx.restore();
-    // curly tendril
-    ctx.beginPath(); ctx.moveTo(t.x + H.R * 0.1, t.y - H.R * 0.12);
-    ctx.bezierCurveTo(t.x + H.R * 0.3, t.y - H.R * 0.25, t.x + H.R * 0.35, t.y - H.R * 0.02, t.x + H.R * 0.22, t.y - H.R * 0.06);
-    ctx.strokeStyle = '#4D7C0F'; ctx.lineWidth = H.R * 0.03; ctx.lineCap = 'round'; ctx.stroke();
-  }
-};
-
 // --- Bow (kept, now anchored in 3D so it turns with the head)
 OUTFITS.bow = {
   front(ctx, H, path) {

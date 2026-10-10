@@ -88,12 +88,11 @@ enum MochiWardrobeTests {
         check("bow rawValue",          Outfit.bow.rawValue          == "bow")
         check("scarf rawValue",        Outfit.scarf.rawValue        == "scarf")
         check("witchHat rawValue",     Outfit.witchHat.rawValue     == "witchHat")
-        check("pumpkin rawValue",      Outfit.pumpkin.rawValue      == "pumpkin")
         check("santaHat rawValue",     Outfit.santaHat.rawValue     == "santaHat")
         check("bunnyEars rawValue",    Outfit.bunnyEars.rawValue    == "bunnyEars")
 
         print("Outfit.stored — removed rawValues → auto")
-        for removed in ["topHat", "cap", "heartsHeadband", "strawHat"] {
+        for removed in ["topHat", "cap", "heartsHeadband", "strawHat", "pumpkin"] {
             UserDefaults.standard.set(removed, forKey: "mochiOutfit")
             check("'\(removed)' stored → .auto", Outfit.stored == .auto)
         }

@@ -907,8 +907,7 @@ final class BotEngine: ObservableObject {
         let bodyPath = mochiPath(rx: rx, ry: ry, morph: morph, R: R)
 
         // Body fill
-        drawBody(ctx: &ctx, path: bodyPath, R: R, rx: rx, ry: ry,
-                 pumpkinColors: outfit == .pumpkin && !isMini)
+        drawBody(ctx: &ctx, path: bodyPath, R: R, rx: rx, ry: ry)
 
         // Blush — always shows a floor proportional to tint (prototype behaviour)
         let blushVal = max(blush, tint * 0.5) * (1 - morph)
@@ -1121,7 +1120,7 @@ final class BotEngine: ObservableObject {
 
     var outfitFollowsRoll: Bool {
         switch outfit {
-        case .sunglasses, .roundGlasses, .bow, .scarf, .pumpkin: return true
+        case .sunglasses, .roundGlasses, .bow, .scarf: return true
         default: return false
         }
     }
@@ -1198,15 +1197,14 @@ final class BotEngine: ObservableObject {
         return CGPoint(x: kx * W, y: ky * H)
     }
 
-    private func drawBody(ctx: inout GraphicsContext, path: Path, R: CGFloat, rx: CGFloat, ry: CGFloat,
-                          pumpkinColors: Bool = false) {
-        if let bc = bodyColor, !pumpkinColors {
+    private func drawBody(ctx: inout GraphicsContext, path: Path, R: CGFloat, rx: CGFloat, ry: CGFloat) {
+        if let bc = bodyColor {
             // Mini bots: flat solid fill — no gradient, no reflection, no highlight
             ctx.fill(path, with: .color(Color(cgColor: bc)))
         } else {
             // Main bot: linear gradient body
-            let top: Color = pumpkinColors ? Color(hex: "#FFA94D") : Color(red: 0.929, green: 0.929, blue: 0.937)
-            let bot: Color = pumpkinColors ? Color(hex: "#E8590C") : Color(red: 0.769, green: 0.773, blue: 0.792)
+            let top: Color = Color(red: 0.929, green: 0.929, blue: 0.937)
+            let bot: Color = Color(red: 0.769, green: 0.773, blue: 0.792)
             ctx.fill(path, with: .linearGradient(
                 Gradient(colors: [top, bot]),
                 startPoint: CGPoint(x: rx*0.7, y: -ry*0.85),

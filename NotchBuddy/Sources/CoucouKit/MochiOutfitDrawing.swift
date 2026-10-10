@@ -298,10 +298,10 @@ func drawOutfitFrontStatic(
     let morphFade = 1 - min(1, max(0, (morph - 0.3) / 0.2))
     guard morphFade > 0.01 else { return }
 
-    // Roll-following (glasses, bow, scarf, pumpkin): skip front pass when z < 0 → behind pass handles it.
+    // Roll-following (glasses, bow, scarf): skip front pass when z < 0 → behind pass handles it.
     // bunnyEars: always in behind pass; not in this set.
     switch outfit {
-    case .sunglasses, .roundGlasses, .bow, .scarf, .pumpkin:
+    case .sunglasses, .roundGlasses, .bow, .scarf:
         if mProjRoll(H, (0, 0, 1)).z < 0 { return }
     default: break
     }
@@ -408,10 +408,6 @@ func drawOutfitFrontStatic(
         c.translateBy(x: 0, y: (1 - p) * 0.3 * H.ry)
         c.drawLayer { lCtx in var l = lCtx; drawScarfFront(ctx: &l, H: H) }
 
-    case .pumpkin:
-        var c = baseCtx; c.opacity = layerOpacity
-        c.drawLayer { lCtx in var l = lCtx; drawPumpkinFront(ctx: &l, H: H, bodyPath: bodyPath, simplified: simplified) }
-
     case .bow:
         var c = baseCtx; c.opacity = layerOpacity
         c.scaleBy(x: max(0.001, posP), y: max(0.001, posP))
@@ -442,9 +438,9 @@ func drawOutfitBehindStatic(
     var ctx = outfitBodyTransform(context: context, cx: cx, cy: cy, tilt: tilt, sx: sx, sy: sy)
     let bodyPath = mochiOutfitPath(H.rx, H.ry)
 
-    // Roll-following accessories (glasses, bow, scarf, pumpkin — not bunnyEars): behind when z < 0
+    // Roll-following accessories (glasses, bow, scarf — not bunnyEars): behind when z < 0
     switch outfit {
-    case .sunglasses, .roundGlasses, .bow, .scarf, .pumpkin:
+    case .sunglasses, .roundGlasses, .bow, .scarf:
         guard mProjRoll(H, (0, 0, 1)).z < 0 else { return }
         ctx.opacity = layerOpacity
         ctx.drawLayer { lCtx in
@@ -453,7 +449,6 @@ func drawOutfitBehindStatic(
             case .sunglasses:   drawSunglassesFront(ctx: &l, H: H, bodyPath: bodyPath)
             case .roundGlasses: drawRoundGlassesFront(ctx: &l, H: H, bodyPath: bodyPath)
             case .scarf:        drawScarfFront(ctx: &l, H: H)
-            case .pumpkin:      drawPumpkinFront(ctx: &l, H: H, bodyPath: bodyPath, simplified: simplified)
             case .bow:          drawBowFront(ctx: &l, H: H, bodyPath: bodyPath)
             default: break
             }
@@ -1304,104 +1299,6 @@ private func drawScarfFront(ctx: inout GraphicsContext, H: MochiH) {
             center: CGPoint(x: -H.R * 0.05, y: -H.R * 0.05),
             startRadius: 0, endRadius: H.R * 0.2
         ))
-    }
-}
-
-// MARK: - Pumpkin
-
-private func drawPumpkinFront(ctx: inout GraphicsContext, H: MochiH, bodyPath: Path, simplified: Bool = false) {
-    // ribs only — body recolor is done in BotEngine.drawBody(pumpkinColors:)
-    if !simplified {
-        var g = ctx
-        g.clip(to: bodyPath)
-        for lon: CGFloat in [-1.15, -0.55, 0.0, 0.55, 1.15] {
-            var pts: [P3] = []
-            for i in 0...30 {
-                let y = -0.98 + 1.96 * CGFloat(i) / 30
-                let q = mProjRoll(H, mSurf(y, lon, 1))
-                if q.z > 0 { pts.append(q) }
-            }
-            guard pts.count >= 2 else { continue }
-            var rib = Path()
-            rib.move(to: CGPoint(x: pts[0].x, y: pts[0].y))
-            for pt in pts.dropFirst() { rib.addLine(to: CGPoint(x: pt.x, y: pt.y)) }
-            let zz = pts[pts.count / 2].z
-            g.stroke(rib, with: .color(Color(red: 150/255, green: 50/255, blue: 0, opacity: 0.22 * zz)),
-                     style: StrokeStyle(lineWidth: H.R * 0.12, lineCap: .round))
-            // highlight offset stripe
-            var hi = Path()
-            hi.move(to: CGPoint(x: pts[0].x + H.R * 0.07, y: pts[0].y))
-            for pt in pts.dropFirst() { hi.addLine(to: CGPoint(x: pt.x + H.R * 0.07, y: pt.y)) }
-            g.stroke(hi, with: .color(Color(red: 1, green: 220/255, blue: 170/255, opacity: 0.18 * zz)),
-                     style: StrokeStyle(lineWidth: H.R * 0.04, lineCap: .round))
-        }
-    }
-
-    let t = mProjRoll(H, (0.02, 1.0, 0))
-    // stem
-    var stem = Path()
-    stem.move(to: CGPoint(x: t.x - H.R * 0.09, y: t.y + H.R * 0.04))
-    stem.addQuadCurve(
-        to:      CGPoint(x: t.x + H.R * 0.08, y: t.y - H.R * 0.3),
-        control: CGPoint(x: t.x - H.R * 0.08, y: t.y - H.R * 0.22)
-    )
-    stem.addLine(to: CGPoint(x: t.x + H.R * 0.13, y: t.y - H.R * 0.22))
-    stem.addQuadCurve(
-        to:      CGPoint(x: t.x + H.R * 0.08, y: t.y + H.R * 0.04),
-        control: CGPoint(x: t.x + H.R * 0.04, y: t.y - H.R * 0.15)
-    )
-    stem.closeSubpath()
-    ctx.fill(stem, with: .linearGradient(
-        Gradient(stops: [
-            .init(color: Color(hex: "#65A30D"), location: 0),
-            .init(color: Color(hex: "#3F6212"), location: 1)
-        ]),
-        startPoint: CGPoint(x: t.x - H.R * 0.1, y: 0),
-        endPoint:   CGPoint(x: t.x + H.R * 0.1, y: 0)
-    ))
-
-    // leaf
-    var leafCtx = ctx
-    leafCtx.translateBy(x: t.x - H.R * 0.06, y: t.y - H.R * 0.02)
-    leafCtx.rotate(by: .radians(-0.5))
-    var leaf = Path()
-    leaf.move(to: .zero)
-    leaf.addQuadCurve(
-        to:      CGPoint(x: -H.R * 0.38, y: -H.R * 0.02),
-        control: CGPoint(x: -H.R * 0.18, y: -H.R * 0.2)
-    )
-    leaf.addQuadCurve(
-        to:      .zero,
-        control: CGPoint(x: -H.R * 0.18, y: H.R * 0.1)
-    )
-    leafCtx.fill(leaf, with: .linearGradient(
-        Gradient(stops: [
-            .init(color: Color(hex: "#84CC16"), location: 0),
-            .init(color: Color(hex: "#4D7C0F"), location: 1)
-        ]),
-        startPoint: CGPoint(x: 0, y: -H.R * 0.15),
-        endPoint:   CGPoint(x: -H.R * 0.3, y: 0)
-    ))
-    var vein = Path()
-    vein.move(to: CGPoint(x: -H.R * 0.02, y: -H.R * 0.01))
-    vein.addQuadCurve(
-        to:      CGPoint(x: -H.R * 0.32, y: -H.R * 0.03),
-        control: CGPoint(x: -H.R * 0.18, y: -H.R * 0.08)
-    )
-    leafCtx.stroke(vein, with: .color(Color(red: 30/255, green: 60/255, blue: 0, opacity: 0.4)),
-                   style: StrokeStyle(lineWidth: H.R * 0.02, lineCap: .round))
-
-    // tendril (skip when simplified)
-    if !simplified {
-        var tendril = Path()
-        tendril.move(to: CGPoint(x: t.x + H.R * 0.1, y: t.y - H.R * 0.12))
-        tendril.addCurve(
-            to:       CGPoint(x: t.x + H.R * 0.22, y: t.y - H.R * 0.06),
-            control1: CGPoint(x: t.x + H.R * 0.3,  y: t.y - H.R * 0.25),
-            control2: CGPoint(x: t.x + H.R * 0.35, y: t.y - H.R * 0.02)
-        )
-        ctx.stroke(tendril, with: .color(Color(hex: "#4D7C0F")),
-                   style: StrokeStyle(lineWidth: H.R * 0.03, lineCap: .round))
     }
 }
 

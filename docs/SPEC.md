@@ -273,7 +273,7 @@ Grille de pastilles 30 pt, coins 7 pt, fond blanc 6 %, bord blanc 8 % (sélectio
 - 21 juin – 31 août : Sunglasses
 
 **Identifiants stables** (UserDefaults key `mochiOutfit`) :
-`auto`, `none`, `partyHat`, `beanie`, `crown`, `witchHat`, `santaHat`, `bunnyEars`, `bow`, `sunglasses`, `roundGlasses`, `scarf`, `pumpkin`
+`auto`, `none`, `partyHat`, `beanie`, `crown`, `witchHat`, `santaHat`, `bunnyEars`, `bow`, `sunglasses`, `roundGlasses`, `scarf`
 
 Les valeurs supprimées (`topHat`, `cap`, `heartsHeadband`, `strawHat`) sont migrées vers `auto` à la lecture.
 
