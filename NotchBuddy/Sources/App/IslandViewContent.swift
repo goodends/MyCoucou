@@ -150,21 +150,6 @@ struct OverviewView: View {
                     .padding(.top, 4)
                 }
 
-                // Plan detail overlays on top of normal content (GitHub build, home view only)
-                #if !APPSTORE
-                if state.showingPlanDetail {
-                    CardBackground(wash: nil)
-                    Group {
-                        if state.planDetailIsCodex {
-                            CodexPlanCardView(usage: state.codexPlanUsage)
-                        } else {
-                            ClaudePlanCardView(usage: state.claudePlanUsage)
-                        }
-                    }
-                    .transition(.opacity)
-                }
-                #endif
-
                 // Diff overlay — replaces ticker when a diff step is tapped
                 if let diffId = activeDiffId,
                    let task = agent,
@@ -175,11 +160,7 @@ struct OverviewView: View {
                 }
 
                 // ↗ jump button — last in ZStack so it renders on top; hidden while any detail is open
-                #if !APPSTORE
-                let hideJumpButton = state.showingPlanDetail || activeDiffId != nil
-                #else
                 let hideJumpButton = activeDiffId != nil
-                #endif
                 if !hideJumpButton {
                     Button(action: { AgentLauncher.open(agent, state: state) }) {
                         Image(systemName: "arrow.up.right")
@@ -214,19 +195,12 @@ struct OverviewView: View {
         }
         .onChange(of: state.focusId) { _, _ in
             activeDiffId = nil
-            #if !APPSTORE
-            withAnimation(.easeIn(duration: 0.16)) { state.showingPlanDetail = false }
-            #endif
         }
-        #if !APPSTORE
         .onChange(of: state.view) { _, v in
-            if v != .overview { state.showingPlanDetail = false; activeDiffId = nil }
+            if v != .overview { activeDiffId = nil }
         }
-        #endif
         .onChange(of: state.mode) { _, m in
-            #if !APPSTORE
-            if m != .expanded { state.showingPlanDetail = false; activeDiffId = nil }
-            #endif
+            if m != .expanded { activeDiffId = nil }
         }
         .onReceive(NotificationCenter.default.publisher(for: .islandToggleDiff)) { _ in
             if let id = activeDiffId {

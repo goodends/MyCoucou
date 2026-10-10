@@ -405,15 +405,6 @@ struct IslandContentView: View {
 struct IslandHeader: View {
     @ObservedObject var state: AppState
 
-    // Claude + Codex pills together: tighten the right side so it clears the notch
-    private var bothPlans: Bool {
-        #if !APPSTORE
-        return state.view == .overview && state.showPlanInNotch && state.planRelayInstalled && state.showCodexPlanInNotch
-        #else
-        return false
-        #endif
-    }
-
     var body: some View {
         HStack(spacing: 0) {
             // Left: tab capsules
@@ -425,17 +416,9 @@ struct IslandHeader: View {
 
             Spacer()
 
-            // Right: plan pill (GitHub build, home view only) + action icons
-            HStack(spacing: bothPlans ? 5 : 8) {
-                #if !APPSTORE
-                if state.view == .overview && state.showPlanInNotch && state.planRelayInstalled {
-                    ClaudePlanHeaderPill(state: state)
-                }
-                if state.view == .overview && state.showCodexPlanInNotch {
-                    ClaudePlanHeaderPill(state: state, codex: true)
-                }
-                #endif
-                HStack(spacing: bothPlans ? 10 : 14) {
+            // Right: action icons
+            HStack(spacing: 8) {
+                HStack(spacing: 14) {
                     Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             state.view = .settings
@@ -455,7 +438,7 @@ struct IslandHeader: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.trailing, bothPlans ? 8 : 16)
+            .padding(.trailing, 16)
         }
         .frame(maxHeight: .infinity)
     }
@@ -494,70 +477,4 @@ struct TabButton: View {
         .onHover { isHovered = $0 }
     }
 }
-
-// MARK: - Claude Plan header pill (GitHub build only)
-
-#if !APPSTORE
-struct ClaudePlanHeaderPill: View {
-    @ObservedObject var state: AppState
-    var codex: Bool = false
-    @State private var isHovered = false
-
-    private var effectiveColor: String {
-        if codex { return CodexPlanGauge.color(state.codexPlanUsage) }
-        return ClaudePlanGauge.color(for: state.claudePlanUsage.flatMap { ClaudePlanGauge.dominantPct($0) })
-    }
-
-    private var label: String {
-        if codex { return CodexPlanGauge.pillLabel(state.codexPlanUsage) }
-        guard let usage = state.claudePlanUsage,
-              let pct = ClaudePlanGauge.dominantPct(usage) else { return "Claude —" }
-        return "Claude \(Int(pct.rounded()))%"
-    }
-
-    private var isOpen: Bool { state.showingPlanDetail && state.planDetailIsCodex == codex }
-    private var isActive: Bool { isOpen || isHovered }
-
-    var body: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                let open = isOpen
-                state.planDetailIsCodex = codex
-                state.showingPlanDetail = !open
-            }
-            if codex { state.refreshCodexPlanUsage() }
-        }) {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color(hex: effectiveColor))
-                    .frame(width: 6, height: 6)
-                Text(label)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(isActive
-                                     ? Color(hex: effectiveColor).lighter(by: 0.3)
-                                     : Color(hex: "#6B7079"))
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(isActive
-                          ? Color(hex: effectiveColor).opacity(0.18)
-                          : Color(hex: "#0E0F11"))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color(hex: effectiveColor).opacity(isActive ? 0.55 : 0.14), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .onHover { h in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { isHovered = h }
-        }
-        .onAppear { if codex { state.refreshCodexPlanUsage() } }
-    }
-}
-#endif
 

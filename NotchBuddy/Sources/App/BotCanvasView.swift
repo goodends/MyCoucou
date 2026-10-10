@@ -31,20 +31,6 @@ struct BotCanvasView: View {
                 // that *just completed* — otherwise the user sees the focused
                 // session's Mochi on a card describing someone else's finish.
                 let colorSession = (state.view == .finished) ? state.finishingSession : state.overviewSession
-                #if !APPSTORE
-                if state.showingPlanDetail {
-                    let hex = state.planDetailIsCodex
-                        ? CodexPlanGauge.color(state.codexPlanUsage)
-                        : ClaudePlanGauge.color(for: state.claudePlanUsage.flatMap { ClaudePlanGauge.dominantPct($0) })
-                    engine.bodyColor = cgColorFromHex(hex)
-                } else if let session = colorSession {
-                    engine.bodyColor = cgColorFromHex(session.bodyColor)
-                } else {
-                    engine.bodyColor = (state.focusTask?.isIntegration == true)
-                        ? cgColorFromHex(state.focusTask!.color)
-                        : nil
-                }
-                #else
                 if let session = colorSession {
                     engine.bodyColor = cgColorFromHex(session.bodyColor)
                 } else {
@@ -52,7 +38,6 @@ struct BotCanvasView: View {
                         ? cgColorFromHex(state.focusTask!.color)
                         : nil
                 }
-                #endif
 
                 // Mochi no longer reacts to music services (Spotify/Music removed).
                 let dancing = false

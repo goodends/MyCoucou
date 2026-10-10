@@ -10,11 +10,6 @@ struct SettingsView: View {
     @State private var hookNeedsUpdate: Bool = HookServer.hooksNeedUpdate()
 
     #if !APPSTORE
-    @State private var showStatusLineDiff: Bool = false
-    @State private var pendingStatusLineJSON: String = ""
-    @State private var statusLinePendingInstall: Bool = true
-    @State private var planTogglePending: Bool = false
-
     @State private var geminiHooksInstalled: Bool = HookServer.geminiHooksInstalled()
     @State private var showGeminiDiff: Bool = false
     @State private var pendingGeminiJSON: String = ""
@@ -157,9 +152,6 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            #if !APPSTORE
-            state.refreshPlanRelayState()
-            #endif
         }
     }
 
@@ -752,76 +744,6 @@ struct SettingsView: View {
             await MainActor.run { hermesSupportsApprovals = result }
         }
         #endif
-
-        GroupBox(String(localized: "plan.title")) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(String(localized: "plan.description"))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Toggle(String(localized: "plan.show-in-notch"), isOn: Binding(
-                    get: { state.showPlanInNotch || planTogglePending },
-                    set: { on in
-                        if on {
-                            if state.planRelayInstalled {
-                                state.showPlanInNotch = true
-                            } else {
-                                planTogglePending = true
-                                installStatusLine()
-                            }
-                        } else {
-                            state.showPlanInNotch = false
-                            planTogglePending = false
-                        }
-                    }
-                ))
-                HStack(spacing: 10) {
-                    if state.planRelayInstalled {
-                        Text(String(localized: "plan.relay.installed"))
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                        Button(String(localized: "plan.relay.uninstall")) { uninstallStatusLine() }
-                            .buttonStyle(.bordered)
-                    } else {
-                        Text(String(localized: "plan.relay.not-installed"))
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                        Button(String(localized: "plan.relay.install")) { installStatusLine() }
-                            .buttonStyle(.borderedProminent)
-                    }
-                }
-                if showStatusLineDiff {
-                    ScrollView {
-                        Text(pendingStatusLineJSON)
-                            .font(.system(size: 10, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(height: 100)
-                    .background(Color(NSColor.textBackgroundColor))
-                    .cornerRadius(6)
-                    HStack {
-                        Button(String(localized: "hooks.confirm-write")) { confirmStatusLine() }
-                            .buttonStyle(.borderedProminent)
-                        Button(String(localized: "Cancel")) {
-                            showStatusLineDiff = false
-                            pendingStatusLineJSON = ""
-                            planTogglePending = false
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                Divider()
-                Text("Shows your Codex plan usage (weekly limit and free resets left) in the notch header. Coucou asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Toggle("Show Codex plan in the notch", isOn: Binding(
-                    get: { state.showCodexPlanInNotch },
-                    set: { state.showCodexPlanInNotch = $0 }
-                ))
-            }
-            .padding(6)
-        }
         #endif
     }
 
@@ -1165,50 +1087,6 @@ struct SettingsView: View {
             showHermesConfigDiff = false
             pendingHermesConfigContent = ""
         } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
-    }
-
-    private func installStatusLine() {
-        do {
-            pendingStatusLineJSON = try HookServer.shared.previewStatusLine(install: true)
-            showStatusLineDiff = true
-            statusLinePendingInstall = true
-            statusMessage = String(localized: "hooks.review-json")
-        } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
-    }
-
-    private func uninstallStatusLine() {
-        do {
-            pendingStatusLineJSON = try HookServer.shared.previewStatusLine(install: false)
-            showStatusLineDiff = true
-            statusLinePendingInstall = false
-            statusMessage = String(localized: "hooks.review-json")
-        } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
-    }
-
-    private func confirmStatusLine() {
-        do {
-            try HookServer.shared.writeStatusLine()
-            showStatusLineDiff = false
-            pendingStatusLineJSON = ""
-            state.refreshPlanRelayState()
-            if planTogglePending {
-                state.showPlanInNotch = true
-                planTogglePending = false
-            }
-            if !statusLinePendingInstall {
-                state.showPlanInNotch = false
-            }
-            statusMessage = statusLinePendingInstall
-                ? String(localized: "status.statusline-installed")
-                : String(localized: "status.statusline-removed")
-        } catch {
-            planTogglePending = false
             statusMessage = "❌ \(error.localizedDescription)"
         }
     }

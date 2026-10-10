@@ -417,45 +417,6 @@ final class AppState: ObservableObject {
         sessionDiffTimers[pillId] = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 3600, execute: work)
     }
-    // Claude plan gauge (from statusline hook)
-    @Published var claudePlanUsage: PlanUsage? = nil {
-        didSet {
-            if let u = claudePlanUsage,
-               let data = try? JSONEncoder().encode(u) {
-                UserDefaults.standard.set(data, forKey: "claudePlanUsage")
-            }
-        }
-    }
-
-    // Plan gauge: show pill in notch header — persisted
-    #if !APPSTORE
-    @Published var showPlanInNotch: Bool = false {
-        didSet { UserDefaults.standard.set(showPlanInNotch, forKey: "showPlanInNotch") }
-    }
-    // Cached relay-installed state — updated at launch, after install/uninstall, on Settings open
-    @Published var planRelayInstalled: Bool = false
-    // Transient — reset when island closes or view changes
-    @Published var showingPlanDetail: Bool = false
-
-    // Codex plan gauge (from `codex app-server`) — fetched when the pill shows
-    @Published var showCodexPlanInNotch: Bool = false {
-        didSet { UserDefaults.standard.set(showCodexPlanInNotch, forKey: "showCodexPlanInNotch") }
-    }
-    @Published var codexPlanUsage: CodexPlanUsage? = nil
-    // Which card showingPlanDetail opens
-    @Published var planDetailIsCodex: Bool = false
-
-    func refreshCodexPlanUsage() {
-        if let u = codexPlanUsage, Date().timeIntervalSince(u.updatedAt) < 60 { return }
-        Task {
-            if let u = await CodexPlanGauge.fetch() { codexPlanUsage = u }
-        }
-    }
-
-    func refreshPlanRelayState() {
-        planRelayInstalled = HookServer.statusLineInstalled()
-    }
-    #endif
 
     // MARK: - Init (loads persisted settings)
 
@@ -481,13 +442,6 @@ final class AppState: ObservableObject {
            PillCatalog.available.contains(where: { $0.id == v && $0.category == .workspace && !$0.comingSoon }) {
             mainPillId = v
         }
-        if let d = ud.data(forKey: "claudePlanUsage"),
-           let u = try? JSONDecoder().decode(PlanUsage.self, from: d) { claudePlanUsage = u }
-        #if !APPSTORE
-        if let v = ud.object(forKey: "showPlanInNotch") as? Bool { showPlanInNotch = v }
-        if let v = ud.object(forKey: "showCodexPlanInNotch") as? Bool { showCodexPlanInNotch = v }
-        planRelayInstalled = HookServer.statusLineInstalled()
-        #endif
 
         // Sync SoundEngine volume on launch
         SoundEngine.shared.volume = Float(soundVolume)

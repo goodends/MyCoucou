@@ -291,14 +291,6 @@ final class HookServer: @unchecked Sendable {
 
         let coucouKind = payload["coucou_kind"] as? String ?? ""
 
-        // statusline payloads are handled separately — no session, no reveal, no sound
-        if coucouKind == "statusline" {
-            Task { @MainActor in self.processStatusLine(payload: payload) }
-            sendLine(fd: fd, text: #"{"ok":true}"#)
-            close(fd)
-            return
-        }
-
         // AskUserQuestion via --ask PreToolUse hook — hold fd open like PermissionRequest
         if coucouKind == "ask_user_question" {
             let toolInput = payload["tool_input"] as? [String: Any] ?? [:]
@@ -693,15 +685,6 @@ final class HookServer: @unchecked Sendable {
             NotificationCenter.default.post(name: .hookReveal, object: nil)
         }
         // Already compact and non-alert: Mochi state update is enough, no expand
-    }
-
-    // MARK: - Status line (plan gauge)
-
-    @MainActor
-    private func processStatusLine(payload: [String: Any]) {
-        if let usage = ClaudePlanGauge.parse(payload: payload) {
-            AppState.shared.claudePlanUsage = usage
-        }
     }
 
     // MARK: - Permission request (blocking — Claude Code waits for decision)
@@ -1428,136 +1411,6 @@ final class HookServer: @unchecked Sendable {
         settings["hooks"] = hooks
         let newData = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys])
         try ClaudeSettingsFile.write(newData, to: settingsURL, expecting: snapshot.bytes)
-    }
-
-    // MARK: - Claude plan status line installer
-
-    private var statusLinePreviousURL: URL {
-        Self.supportDir.appendingPathComponent("statusline-previous.json")
-    }
-
-    /// Returns true if our statusLine command is installed in ~/.claude/settings.json.
-    static func statusLineInstalled() -> Bool {
-        let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
-        guard let data = try? Data(contentsOf: url),
-              let settings = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              let sl = settings["statusLine"] as? [String: Any],
-              let cmd = sl["command"] as? String else { return false }
-        return cmd.contains("nb-hook")
-    }
-
-    private var _pendingStatusLineData: Data?
-    /// The bytes of settings.json the pending preview was computed from.
-    private var _pendingStatusLineOriginal: Data?
-    private var _pendingPreviousData: Data?
-    private var _pendingDeletePrevious: Bool = false
-
-    /// Returns a diff string (only the statusLine key: before → after) without writing anything.
-    func previewStatusLine(install: Bool) throws -> String {
-        let settingsURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
-        // Unreadable or invalid settings must stop here, never count as empty.
-        let snapshot = try ClaudeSettingsFile.read(at: settingsURL)
-        let settings = snapshot.object
-        let hookPath = Self.hookScriptPath
-        let quotedPath = hookPath.replacingOccurrences(of: "\"", with: "\\\"")
-        let quotedCmd = "\"\(quotedPath)\" --statusline"
-
-        // Reset pending side-effects
-        _pendingPreviousData = nil
-        _pendingDeletePrevious = false
-
-        let oldSL = settings["statusLine"] as? [String: Any]
-        let newSL: [String: Any]?
-
-        if install {
-            // Check that Python 3 is available (requires Command Line Tools)
-            let clCheck = Process()
-            clCheck.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
-            clCheck.arguments = ["-p"]
-            clCheck.standardOutput = FileHandle.nullDevice
-            clCheck.standardError = FileHandle.nullDevice
-            try? clCheck.run()
-            clCheck.waitUntilExit()
-            if clCheck.terminationStatus != 0 {
-                throw NSError(domain: "Coucou", code: 1,
-                              userInfo: [NSLocalizedDescriptionKey:
-                                  "Command Line Tools are required but not installed. Run: xcode-select --install"])
-            }
-
-            if let existing = oldSL,
-               let cmd = existing["command"] as? String, !cmd.contains("nb-hook") {
-                // Keep existing object but swap command; save old for later restoration
-                var updated = existing
-                updated["command"] = quotedCmd
-                newSL = updated
-                _pendingPreviousData = try? JSONSerialization.data(withJSONObject: existing,
-                                                                   options: [.prettyPrinted, .sortedKeys])
-            } else if let existing = oldSL,
-                      let cmd = existing["command"] as? String, cmd.contains("nb-hook") {
-                // Already installed — rebuild to update path if needed, keep other fields
-                var updated = existing
-                updated["command"] = quotedCmd
-                newSL = updated
-            } else {
-                newSL = ["type": "command", "command": quotedCmd]
-            }
-        } else {
-            // Uninstall: only if it's ours
-            if let cur = oldSL, let cmd = cur["command"] as? String, cmd.contains("nb-hook") {
-                if let prevData = try? Data(contentsOf: statusLinePreviousURL),
-                   let prevObj = (try? JSONSerialization.jsonObject(with: prevData)) as? [String: Any] {
-                    newSL = prevObj
-                    _pendingDeletePrevious = true
-                } else {
-                    newSL = nil
-                }
-            } else {
-                newSL = oldSL  // not ours — leave unchanged
-            }
-        }
-
-        // Build the full settings.json with the new statusLine
-        var newSettings = settings
-        if let sl = newSL {
-            newSettings["statusLine"] = sl
-        } else {
-            newSettings.removeValue(forKey: "statusLine")
-        }
-        let data = try JSONSerialization.data(withJSONObject: newSettings,
-                                              options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
-        _pendingStatusLineData = data
-        _pendingStatusLineOriginal = snapshot.bytes
-
-        // Build a compact diff: show only the statusLine key before → after
-        func slJSON(_ val: [String: Any]?) throws -> String {
-            guard let v = val else { return "(none)" }
-            let d = try JSONSerialization.data(withJSONObject: v, options: [.prettyPrinted, .sortedKeys])
-            return String(data: d, encoding: .utf8) ?? "(none)"
-        }
-        let before = try slJSON(oldSL)
-        let after  = try slJSON(newSL)
-        return "statusLine\nBefore:\n\(before)\n\nAfter:\n\(after)"
-    }
-
-    /// Writes settings.json and commits side effects (call after user confirms).
-    func writeStatusLine() throws {
-        guard let data = _pendingStatusLineData else { return }
-        let settingsURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
-        try ClaudeSettingsFile.write(data, to: settingsURL, expecting: _pendingStatusLineOriginal)
-        // Commit side effects only after successful write
-        if let prevData = _pendingPreviousData {
-            try? prevData.write(to: statusLinePreviousURL, options: .atomic)
-        }
-        if _pendingDeletePrevious {
-            try? FileManager.default.removeItem(at: statusLinePreviousURL)
-        }
-        _pendingStatusLineData = nil
-        _pendingStatusLineOriginal = nil
-        _pendingPreviousData = nil
-        _pendingDeletePrevious = false
     }
 
     // MARK: - App Store: hooks via security-scoped bookmark
@@ -3250,49 +3103,14 @@ def main():
     try:
         raw = sys.stdin.buffer.read()
         if not raw:
-            if '--statusline' not in sys.argv[1:]:
-                return
-        else:
-            payload = json.loads(raw)
-    except Exception:
-        if '--statusline' not in sys.argv[1:]:
             return
+        payload = json.loads(raw)
+    except Exception:
+        return
 
     socket_path = os.path.expanduser(
         '~/Library/Application Support/NotchBuddy/nb.sock'
     )
-
-    # --statusline mode: relay rate_limits to Coucou, then delegate to saved previous
-    if '--statusline' in sys.argv[1:]:
-        relay = {
-            'coucou_kind': 'statusline',
-            'session_id': payload.get('session_id', ''),
-            'rate_limits': payload.get('rate_limits', {}),
-        }
-        try:
-            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(0.3)
-            s.connect(socket_path)
-            s.sendall((json.dumps(relay) + '\\n').encode())
-            s.close()
-        except Exception:
-            pass
-        prev_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'statusline-previous.json')
-        if os.path.exists(prev_file):
-            try:
-                import subprocess
-                with open(prev_file) as f:
-                    prev = json.load(f)
-                cmd = prev.get('command', '')
-                if cmd:
-                    result = subprocess.run(['/bin/sh', '-c', cmd], input=raw,
-                                             capture_output=True, timeout=10)
-                    if result.stdout:
-                        sys.stdout.buffer.write(result.stdout)
-                        sys.stdout.buffer.flush()
-            except Exception:
-                pass
-        return
 
     # --ask mode: dedicated hook for AskUserQuestion via PreToolUse (Claude Code 2.1.85+)
     if '--ask' in sys.argv[1:]:
@@ -3565,49 +3383,14 @@ def main():
     try:
         raw = sys.stdin.buffer.read()
         if not raw:
-            if '--statusline' not in sys.argv[1:]:
-                return
-        else:
-            payload = json.loads(raw)
-    except Exception:
-        if '--statusline' not in sys.argv[1:]:
             return
+        payload = json.loads(raw)
+    except Exception:
+        return
 
     socket_path = os.path.expanduser(
         '~/Library/Containers/fr.louisraille.Coucou/Data/nb.sock'
     )
-
-    # --statusline mode: relay rate_limits to Coucou, then delegate to saved previous
-    if '--statusline' in sys.argv[1:]:
-        relay = {
-            'coucou_kind': 'statusline',
-            'session_id': payload.get('session_id', ''),
-            'rate_limits': payload.get('rate_limits', {}),
-        }
-        try:
-            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(0.3)
-            s.connect(socket_path)
-            s.sendall((json.dumps(relay) + '\\n').encode())
-            s.close()
-        except Exception:
-            pass
-        prev_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'statusline-previous.json')
-        if os.path.exists(prev_file):
-            try:
-                import subprocess
-                with open(prev_file) as f:
-                    prev = json.load(f)
-                cmd = prev.get('command', '')
-                if cmd:
-                    result = subprocess.run(['/bin/sh', '-c', cmd], input=raw,
-                                             capture_output=True, timeout=10)
-                    if result.stdout:
-                        sys.stdout.buffer.write(result.stdout)
-                        sys.stdout.buffer.flush()
-            except Exception:
-                pass
-        return
 
     # --ask mode: dedicated hook for AskUserQuestion via PreToolUse (Claude Code 2.1.85+)
     if '--ask' in sys.argv[1:]:

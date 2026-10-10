@@ -18,7 +18,6 @@
 		096A24F49B86496EFA53DAA3 /* ChatOverscrollBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9CCB64C0031DBA1E2A2BD8 /* ChatOverscrollBackGesture.swift */; };
 		11F14DB97C93CF84DF9D5C43 /* TerminalTarget+AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244A7909EEDA4BFF4C2EA9B5 /* TerminalTarget+AppKit.swift */; };
 		13663D98590927AF71C17628 /* PillCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C64C4C5D705CE486221B74 /* PillCatalog.swift */; };
-		18D47AE663EB96BE5638D5F7 /* ClaudePlanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4263B550838CC5614569D13 /* ClaudePlanCardView.swift */; };
 		1D23613B270FE8B11C5E27A7 /* IslandDisplayChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09E73F1E58019EF6EA2A62 /* IslandDisplayChoice.swift */; };
 		1D4CE0CCD2B5A0FFE50C7F06 /* TerminalTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AF6F7A027AB1D46309DD49 /* TerminalTarget.swift */; };
 		1DAB0704A136FF8E6FB34191 /* ClaudeResponseText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444604C7E2C530B664849EF9 /* ClaudeResponseText.swift */; };
@@ -71,8 +70,6 @@
 		8FC5907E9506DC79EB1DDC3C /* ChatMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = D797CC384B5BC70D34F121BC /* ChatMarkdown.swift */; };
 		908043F62E2C31F5FBC0A0C4 /* ShortcutsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62CF42AE7611EF212CA0458F /* ShortcutsSettingsView.swift */; };
 		91B8AAADB623A12FF6769755 /* ClaudeHookDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA7D927F6BB2667D37AA963 /* ClaudeHookDetection.swift */; };
-		94E0849D13762C6EC8548FEF /* ClaudePlanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4263B550838CC5614569D13 /* ClaudePlanCardView.swift */; };
-		9AD370335A3ECC9C82375F93 /* CodexPlanGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FA4DF1BE5246CCFFB72E5C /* CodexPlanGauge.swift */; };
 		9DD56C95ECABDDCE23652D50 /* HookServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */; };
 		9E0C661BAF06C2B630365F7B /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 052B968EC5729189F6652FA9 /* KeychainStore.swift */; };
 		9E34044A001B01C3A514D20A /* IslandDisplayChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09E73F1E58019EF6EA2A62 /* IslandDisplayChoice.swift */; };
@@ -100,14 +97,11 @@
 		CA3321C14A11FED94E48B3E3 /* IslandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15A1A8206F73376F4CAF2057 /* IslandRootView.swift */; };
 		CD8DECA66B9E09C97E469DB9 /* BotCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A29F4C0B02BE91654D02AA0C /* BotCanvasView.swift */; };
 		CDD36B01BF50F64A2A3180EF /* IslandScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */; };
-		D861479F6E7EAD07A6AC2105 /* ClaudePlanGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BF22817EC70748F2D1FB2E7 /* ClaudePlanGauge.swift */; };
 		D9EEB1079ACBCEEF74439C44 /* ClaudeSettingsFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */; };
 		D9FF132804EB458F6FA69116 /* GitHubActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168A9A73B519018FAB0AA465 /* GitHubActivity.swift */; };
 		DCAC390FF9EC65B945A15B24 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 506824380E9C80B9BC6DCE72 /* Assets.xcassets */; };
 		DD2EEF113DB5EAA35CD88312 /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
 		DE05D09A32117582AC93A24A /* NotchBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BD8F3CAA60CF37640759E1 /* NotchBuddyApp.swift */; };
-		E9C21D11BCB72C392436D19E /* ClaudePlanGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BF22817EC70748F2D1FB2E7 /* ClaudePlanGauge.swift */; };
-		EB1D9680D3DB0F0707D4A043 /* CodexPlanGauge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FA4DF1BE5246CCFFB72E5C /* CodexPlanGauge.swift */; };
 		ED5D9A334DE08C0EB81DE322 /* AskQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB84A66045EB20CAC93A8A6 /* AskQuestion.swift */; };
 		EE3AB10544113500486A9684 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACB4350729C6513824D1ADF /* ColorHex.swift */; };
 		F06EE0A97CB77096A337AA8B /* sounds in Resources */ = {isa = PBXBuildFile; fileRef = C066E2B991AA4F56B2724263 /* sounds */; };
@@ -139,7 +133,6 @@
 		62CF42AE7611EF212CA0458F /* ShortcutsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsSettingsView.swift; sourceTree = "<group>"; };
 		6544ED02D945CF9F00647AD1 /* MacDictation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDictation.swift; sourceTree = "<group>"; };
 		66E6F5FC81429871B6F766A8 /* BotEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotEngine.swift; sourceTree = "<group>"; };
-		73FA4DF1BE5246CCFFB72E5C /* CodexPlanGauge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexPlanGauge.swift; sourceTree = "<group>"; };
 		78FB882D49084DEA6A10DB4D /* RecapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapStore.swift; sourceTree = "<group>"; };
 		79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiWardrobe.swift; sourceTree = "<group>"; };
 		79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookServer.swift; sourceTree = "<group>"; };
@@ -148,7 +141,6 @@
 		87AF6F7A027AB1D46309DD49 /* TerminalTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalTarget.swift; sourceTree = "<group>"; };
 		888B3E1420BCB6292BDC8117 /* WeeklyRecapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyRecapView.swift; sourceTree = "<group>"; };
 		8ACB4350729C6513824D1ADF /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
-		8BF22817EC70748F2D1FB2E7 /* ClaudePlanGauge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePlanGauge.swift; sourceTree = "<group>"; };
 		9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandScreenGeometry.swift; sourceTree = "<group>"; };
 		96C64C4C5D705CE486221B74 /* PillCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillCatalog.swift; sourceTree = "<group>"; };
 		9F6D7015D6A77AA59323C0E7 /* AppLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLog.swift; sourceTree = "<group>"; };
@@ -172,7 +164,6 @@
 		EC9F8AC746870E16805A6D63 /* OrcaCLIBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrcaCLIBridge.swift; sourceTree = "<group>"; };
 		EF9CCB64C0031DBA1E2A2BD8 /* ChatOverscrollBackGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatOverscrollBackGesture.swift; sourceTree = "<group>"; };
 		F1BD8F3CAA60CF37640759E1 /* NotchBuddyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchBuddyApp.swift; sourceTree = "<group>"; };
-		F4263B550838CC5614569D13 /* ClaudePlanCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePlanCardView.swift; sourceTree = "<group>"; };
 		F4A13AEE6E06F46CEC9D908C /* UserIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIdentity.swift; sourceTree = "<group>"; };
 		F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubPulse.swift; sourceTree = "<group>"; };
 		FA02B08886939FF6FE0475DD /* IslandViewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandViewContent.swift; sourceTree = "<group>"; };
@@ -194,11 +185,8 @@
 				577172A312C32D92A20134C7 /* ChatSessionView.swift */,
 				1EA7D927F6BB2667D37AA963 /* ClaudeHookDetection.swift */,
 				D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */,
-				F4263B550838CC5614569D13 /* ClaudePlanCardView.swift */,
-				8BF22817EC70748F2D1FB2E7 /* ClaudePlanGauge.swift */,
 				444604C7E2C530B664849EF9 /* ClaudeResponseText.swift */,
 				3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */,
-				73FA4DF1BE5246CCFFB72E5C /* CodexPlanGauge.swift */,
 				B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */,
 				C086E1932F86B9C2B559BE03 /* DesktopMochiLogic.swift */,
 				168A9A73B519018FAB0AA465 /* GitHubActivity.swift */,
@@ -400,11 +388,8 @@
 				5A2F7DA9CCF741D7BE2DBBB8 /* ChatSessionView.swift in Sources */,
 				1DCF28998358810CDBC93F91 /* ClaudeHookDetection.swift in Sources */,
 				88A88E8704759E7F1F9D52BA /* ClaudeHost.swift in Sources */,
-				94E0849D13762C6EC8548FEF /* ClaudePlanCardView.swift in Sources */,
-				D861479F6E7EAD07A6AC2105 /* ClaudePlanGauge.swift in Sources */,
 				1DAB0704A136FF8E6FB34191 /* ClaudeResponseText.swift in Sources */,
 				88C3F0A4F3AE29DBED8710A0 /* ClaudeSettingsFile.swift in Sources */,
-				9AD370335A3ECC9C82375F93 /* CodexPlanGauge.swift in Sources */,
 				EE3AB10544113500486A9684 /* ColorHex.swift in Sources */,
 				BEC5DDB55B3DA67C61CA8470 /* DesktopMochi.swift in Sources */,
 				BA65FC4A40F7227837C26214 /* DesktopMochiLogic.swift in Sources */,
@@ -459,11 +444,8 @@
 				FF4FA7B1804A28675EC5F225 /* ChatSessionView.swift in Sources */,
 				91B8AAADB623A12FF6769755 /* ClaudeHookDetection.swift in Sources */,
 				F6D57EEBD7E937EFD2B715CF /* ClaudeHost.swift in Sources */,
-				18D47AE663EB96BE5638D5F7 /* ClaudePlanCardView.swift in Sources */,
-				E9C21D11BCB72C392436D19E /* ClaudePlanGauge.swift in Sources */,
 				0099C844CFD9424CEAA5CA77 /* ClaudeResponseText.swift in Sources */,
 				D9EEB1079ACBCEEF74439C44 /* ClaudeSettingsFile.swift in Sources */,
-				EB1D9680D3DB0F0707D4A043 /* CodexPlanGauge.swift in Sources */,
 				9ECEE890D4486B6E83BD5B7F /* ColorHex.swift in Sources */,
 				273FC0FA14AAF6CE62FD14AE /* DesktopMochi.swift in Sources */,
 				C93BA975D35B8CD7473CF995 /* DesktopMochiLogic.swift in Sources */,
