@@ -2075,12 +2075,13 @@ struct ClaudeSessionPill: View {
         .onHover { newHover in
             withAnimation(.spring(response: 0.2, dampingFraction: 0.7)) { isHovered = newHover }
         }
-        // Right-click opens the wardrobe for this session. The wardrobe's
-        // current outfit is bound to `state.overviewSession.outfit`, so
-        // editing there — or swiping back and right-clicking another pill —
-        // always lands on the same value.
+        // Right-click opens the wardrobe for *this* pill's session. The
+        // wardrobe reads `state.overviewSession`, which follows
+        // `focusedSessionId`, so focus this session first — without it the
+        // wardrobe dressed whichever session the left card happened to show.
         .contextMenu {
             Button {
+                state.focusedSessionId = session.sessionId
                 state.view = .wardrobe
             } label: {
                 Label("Change outfit…", systemImage: "tshirt")
