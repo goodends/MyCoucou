@@ -419,23 +419,30 @@ struct IslandHeader: View {
             // Right: action icons
             HStack(spacing: 8) {
                 HStack(spacing: 14) {
+                    // Settings now pops up as a separate window — the in-island
+                    // settings page (sound toggle, auto-close picker, Claude
+                    // hook badge) is gone.
                     Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            state.view = .settings
-                        }
+                        NotificationCenter.default.post(name: .openFullSettings, object: nil)
                     }) {
-                        Image(systemName: state.view == .settings ? "gearshape.fill" : "gearshape")
-                            .font(.system(size: 14))
-                            .foregroundColor(state.view == .settings ? Color(hex: "#F5F6F8") : Color(hex: "#8E939C"))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: { state.soundEnabled.toggle() }) {
-                        Image(systemName: state.soundEnabled ? "speaker.wave.2" : "speaker.slash")
+                        Image(systemName: "gearshape")
                             .font(.system(size: 14))
                             .foregroundColor(Color(hex: "#8E939C"))
                     }
                     .buttonStyle(.plain)
+                    .help(String(localized: "Settings…"))
+
+                    // Hide the island entirely. Routes through the FSM so
+                    // expanded → collapse → hiddenExternally is clean.
+                    Button(action: {
+                        NotificationCenter.default.post(name: .islandHide, object: nil)
+                    }) {
+                        Image(systemName: "eye.slash")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "#8E939C"))
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "Hide island"))
                 }
             }
             .padding(.trailing, 16)

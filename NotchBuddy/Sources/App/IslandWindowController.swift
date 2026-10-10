@@ -665,6 +665,15 @@ final class IslandWindowController: NSWindowController {
             self?.collapse()
         }
 
+        // Manual hide from the header hide button. Collapse to compact first
+        // (no-op when already compact) so the FSM is in .petit before
+        // hiddenExternally runs, then transition into .hidden.
+        NotificationCenter.default.addObserver(forName: .islandHide, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.collapse()
+            self.fsm.hiddenExternally()
+        }
+
         // Wardrobe open/close from desktop Mochi right-click (does NOT post .hookExpand)
         NotificationCenter.default.addObserver(forName: .openWardrobeFromDesktop, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
@@ -1196,6 +1205,7 @@ extension Notification.Name {
     static let botMorphTo       = Notification.Name("notchBuddy.botMorphTo")
     static let islandAction     = Notification.Name("notchBuddy.islandAction")
     static let islandCollapse      = Notification.Name("notchBuddy.islandCollapse")
+    static let islandHide          = Notification.Name("notchBuddy.islandHide")
     static let islandSendMessage   = Notification.Name("notchBuddy.islandSendMessage")
     static let islandNewConversation = Notification.Name("notchBuddy.islandNewConversation")
     static let islandToggleDiff           = Notification.Name("notchBuddy.islandToggleDiff")
