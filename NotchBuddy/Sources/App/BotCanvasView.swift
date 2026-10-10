@@ -21,14 +21,6 @@ struct BotCanvasView: View {
                 engine.lookX = lookX(state: state, size: size)
                 engine.lookY = lookY(state: state, size: size)
                 engine.particleOverhang = particleOverhang
-                // Widen slot when file is hovering over the mailbox (morph > 0.5)
-                // Open mouth (hover=0.20R) when file dragged over box; close when not
-                if engine.morph > 0.3 {
-                    engine.slotHTarget = state.fileDragOver ? 0.20 : 0
-                } else {
-                    engine.slotHTarget = 0
-                    if engine.morph < 0.05 { engine.slotH = 0; engine.slotHVel = 0 }
-                }
                 // Integration pills have a fixed brand color → use it as bodyColor.
                 // Active Claude Code session (overviewSession) drives the main Mochi's
                 // body color and outfit while it's the most-recent thing the user
@@ -107,15 +99,6 @@ struct BotCanvasView: View {
         .onChange(of: state.mainMochiState) { _, newState in
             engine.setState(newState)
         }
-        .onChange(of: state.view) { _, newView in
-            // Morph up when upload view is active
-            if state.mode == .expanded && newView == .upload {
-                engine.anim("morph", keys: [TweenKey(target: 1, duration: 550, ease: Ease.inOut)])
-            } else if newView != .upload && newView != .uploading && engine.morph > 0.01 {
-                // Any other view (not mid-gulp): morph back
-                engine.anim("morph", keys: [TweenKey(target: 0, duration: 550, ease: Ease.inOut)])
-            }
-        }
         .onChange(of: state.mode) { _, newMode in
             // Hard-reset morph when island collapses
             if newMode != .expanded {
@@ -166,11 +149,9 @@ struct BotCanvasView: View {
             return tanh((state.mousePosition.x - origin.x) / 260)
         }
         let (islandW, islandH) = islandSize(mode: state.mode, view: state.view,
-                                             progress: state.uploadProgress,
                                              nw: state.notchWidth, nh: state.notchHeight)
         let (botCx, botCy, _, _) = botPosition(mode: state.mode, view: state.view,
-                                                islandW: islandW, islandH: islandH,
-                                                uploadProgress: state.uploadProgress)
+                                                islandW: islandW, islandH: islandH)
         let bot = islandBotPoint(islandW: islandW, botCx: botCx, botCy: botCy)
         return tanh((state.mousePosition.x - bot.x) / 260)
     }
@@ -189,14 +170,12 @@ struct BotCanvasView: View {
             return -tanh((state.mousePosition.y - origin.y) / 200)
         }
         let (islandW, islandH) = islandSize(mode: state.mode, view: state.view,
-                                             progress: state.uploadProgress,
                                              nw: state.notchWidth, nh: state.notchHeight)
         let actualH: CGFloat = (state.mode == .expanded && state.view == .prompt)
             ? min(500, 240 + CGFloat(state.focusTask?.history.count ?? 0) * 40)
             : islandH
         let (botCx, botCy, _, _) = botPosition(mode: state.mode, view: state.view,
-                                                islandW: islandW, islandH: actualH,
-                                                uploadProgress: state.uploadProgress)
+                                                islandW: islandW, islandH: actualH)
         let bot = islandBotPoint(islandW: islandW, botCx: botCx, botCy: botCy)
         return -tanh((state.mousePosition.y - bot.y) / 200)
     }

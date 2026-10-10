@@ -115,43 +115,7 @@ final class IslandWindowController: NSWindowController {
         hosting.frame = NSRect(origin: .zero, size: contentSize)
         hosting.autoresizingMask = [.width, .height]
 
-        // FileDropNSView sits below the hosting view (hitTest returns nil → no mouse interference).
-        // AppKit routes NSDraggingDestination events to registered views independently of hitTest.
-        let dropView = FileDropNSView(frame: NSRect(origin: .zero, size: contentSize))
-        dropView.autoresizingMask = [.width, .height]
-        dropView.onDragEntered = { [weak self] loc in
-            Task { @MainActor in
-                let iLoc = self?.windowToIsland(loc) ?? CGPoint(x: 320, y: 88)
-                AppState.shared.fileDragOver = true
-                // enterZone sets isActive=true BEFORE hookExpand triggers re-render,
-                // so IslandContainer sees isActive=true when state.view becomes .upload.
-                UploadSequenceEngine.shared.enterZone(x: iLoc.x, y: iLoc.y)
-                NotificationCenter.default.post(name: .hookExpand, object: IslandView.upload)
-                NotificationCenter.default.post(name: .botMorphTo, object: CGFloat(1))
-            }
-        }
-        dropView.onDragUpdated = { [weak self] loc in
-            Task { @MainActor in
-                let iLoc = self?.windowToIsland(loc) ?? CGPoint(x: 320, y: 88)
-                UploadSequenceEngine.shared.updateCursor(x: iLoc.x, y: iLoc.y)
-            }
-        }
-        dropView.onDragExited = {
-            Task { @MainActor in
-                AppState.shared.fileDragOver = false
-                // Do NOT collapse — drag session still active; island stays open.
-                NotificationCenter.default.post(name: .botMorphTo, object: CGFloat(0))
-                UploadSequenceEngine.shared.exitZone()
-            }
-        }
-        dropView.onFilesDropped = { urls in
-            Task { @MainActor in
-                await FileDropHandler.handle(urls: urls, state: AppState.shared)
-            }
-        }
-
-        container.addSubview(hosting)    // z-bottom: SwiftUI + mouse events
-        container.addSubview(dropView)   // z-top: drag only (hitTest→nil, transparent to mouse)
+        container.addSubview(hosting)
         panel.contentView = container
 
         startPolling()
@@ -1094,7 +1058,7 @@ final class IslandWindowController: NSWindowController {
         let panelH = window?.frame.height ?? 320
         let panelW = window?.frame.width  ?? 720
         let (islandW, fixedH) = islandSize(mode: s.mode, view: s.view,
-                                            progress: s.uploadProgress, nw: notchW, nh: notchH)
+                                            nw: notchW, nh: notchH)
         // Chat view uses a fixed height — must match IslandRootView.chatPromptHeight
         let islandH: CGFloat
         if s.mode == .expanded && s.view == .prompt {
@@ -1105,7 +1069,7 @@ final class IslandWindowController: NSWindowController {
         let islandMinX = (panelW - islandW) / 2
         let (cx, cy, diameter, _) = botPosition(mode: s.mode, view: s.view,
                                                   islandW: islandW, islandH: islandH,
-                                                  uploadProgress: s.uploadProgress, hasNotch: s.hasNotch)
+                                                  hasNotch: s.hasNotch)
         let radius = (diameter / 0.6) / 2
         // botPosition cy is from island TOP; panel AppKit coords have y=0 at bottom
         // island top in AppKit coords = panelH (island glued to top of panel/screen)
@@ -1190,7 +1154,7 @@ final class IslandPanel: NSPanel {
     func currentIslandFrame(nw: CGFloat, nh: CGFloat) -> CGRect {
         let s = AppState.shared
         let (w, fixedH) = islandSize(mode: s.mode, view: s.view,
-                                      progress: s.uploadProgress, nw: nw, nh: nh)
+                                      nw: nw, nh: nh)
         let h: CGFloat
         if s.mode == .expanded && s.view == .prompt {
             h = 500
@@ -1252,7 +1216,6 @@ extension Notification.Name {
 // MARK: - islandSize (takes real notch dimensions)
 
 func islandSize(mode: IslandMode, view: IslandView,
-                progress: Double = 0,
                 nw: CGFloat = IslandConst.notchWidth,
                 nh: CGFloat = IslandConst.notchHeight) -> (CGFloat, CGFloat) {
     switch mode {

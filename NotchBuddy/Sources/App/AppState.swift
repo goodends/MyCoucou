@@ -247,16 +247,6 @@ final class AppState: ObservableObject {
     // Number of navigable items in the card currently on screen (0 = no list)
     @Published var cardItemCount: Int = 0
 
-    // Upload progress (0-1) — set to 1.0 only at completion; animation is time-based
-    @Published var uploadProgress: Double = 0
-
-    // Upload animation timing (non-published — TimelineViews read these directly)
-    var uploadStartTime: Date?
-    var uploadDuration: Double = 2.4
-
-    // File drag-over state (mailbox morph glow + mouth spring)
-    @Published var fileDragOver: Bool = false
-
     // Sound enabled — persisted
     @Published var soundEnabled: Bool = true {
         didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
@@ -336,9 +326,6 @@ final class AppState: ObservableObject {
 
     // Context for prompt (window attach / file)
     
-    // Dropped file (set during upload flow)
-    @Published var droppedFile: DroppedFile? = nil
-
     // Short note message (shown in NoteView)
     @Published var noteMessage: String? = nil
 
@@ -784,11 +771,6 @@ final class AppState: ObservableObject {
 
 }
 
-
-struct DroppedFile {
-    var url: URL
-    var name: String
-}
 
 struct SearchResult {
     var title: String
