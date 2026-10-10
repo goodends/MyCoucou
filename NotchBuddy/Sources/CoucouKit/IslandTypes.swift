@@ -105,6 +105,12 @@ struct ClaudeSession: Identifiable, Equatable {
     /// pill avatar and the main Mochi's appearance while this session is the
     /// active one (`overviewSession`).
     var outfit: Outfit = .none
+    /// The name typed in the wardrobe; empty = fall back to `projectName`.
+    var customName: String = ""
+
+    /// What the home view shows: the name the user chose, else the project
+    /// folder's name.
+    var displayName: String { customName.isEmpty ? projectName : customName }
 
     /// The curated body colours: warm + saturated so the character stays
     /// visible against the dark pill background. One is picked at random when

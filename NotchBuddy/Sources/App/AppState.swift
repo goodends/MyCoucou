@@ -202,7 +202,7 @@ final class AppState: ObservableObject {
         let steps = claudeSessionSteps[session.sessionId] ?? []
         return AgentTask(
             id: "claude:\(session.sessionId)",
-            name: session.projectName,
+            name: session.displayName,
             color: session.bodyColor,
             state: botState,
             stepIndex: max(0, steps.count - 1),
@@ -657,6 +657,13 @@ final class AppState: ObservableObject {
     func setSessionBodyColor(_ sessionId: String, _ hex: String) {
         guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
         claudeSessions[idx].bodyColor = hex
+    }
+
+    /// Set the name shown on the home view for a Claude session, from the
+    /// wardrobe. Empty restores the project folder's name.
+    func setSessionName(_ sessionId: String, _ name: String) {
+        guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
+        claudeSessions[idx].customName = name
     }
 
     func setFocus(_ id: String) {

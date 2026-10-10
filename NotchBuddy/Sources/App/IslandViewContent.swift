@@ -2020,7 +2020,7 @@ struct ClaudeSessionPill: View {
                     .allowsHitTesting(false)
 
                     VStack(spacing: 1) {
-                        Text(session.projectName)
+                        Text(session.displayName)
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(isHovered
                                              ? Color(hex: Self.claudeColor).lighter(by: 0.3)
@@ -2302,6 +2302,7 @@ struct WardrobeView: View {
     @ObservedObject var state: AppState
     @State private var hoveredOutfit: Outfit? = nil
     @State private var hoveredColor: String? = nil
+    @State private var nameHovered = false
 
     private let columns = Array(repeating: GridItem(.fixed(30), spacing: 5), count: 14)
 
@@ -2315,6 +2316,22 @@ struct WardrobeView: View {
     /// The body colour currently on the Mochi, same source as `currentOutfit`.
     private var currentBodyColor: String? {
         state.overviewSession?.bodyColor
+    }
+
+    /// Reads and writes the active session's name: same source as
+    /// `currentOutfit` / `currentBodyColor`, so right-clicking another pill
+    /// and coming back here edits that session.
+    private var nameBinding: Binding<String> {
+        Binding(
+            get: { state.overviewSession?.customName ?? "" },
+            set: { state.setSessionName(state.overviewSession?.sessionId ?? "", $0) }
+        )
+    }
+
+    /// The grey line shown while the field is empty: says what happens then.
+    /// It vanishes as soon as you type.
+    private var emptyNameHint: String {
+        String(localized: "Defaults to the project's name")
     }
 
     private var headerRight: String {
@@ -2408,25 +2425,58 @@ struct WardrobeView: View {
                 )
             )
 
-            // Colour row: the Mochi's own body colour. The outfit grid above
-            // scrolls; this strip stays put at the bottom.
+            // Bottom row: the name the home view shows, then the Mochi's own
+            // body colour. The outfit grid above scrolls; this strip stays put.
+            // An empty name falls back to the project folder's name.
             Divider().overlay(Color.white.opacity(0.08))
                 .padding(.top, 4)
-            HStack(spacing: 8) {
-                ForEach(ClaudeSession.palette) { option in
-                    ColorSwatchView(
-                        hex: option.hex,
-                        isSelected: option.hex == currentBodyColor,
-                        isHovered: hoveredColor == option.hex,
-                        onHover: { hoveredColor = $0 ? option.hex : nil },
-                        onTap: {
-                            guard let s = state.overviewSession, option.hex != currentBodyColor else { return }
-                            state.setSessionBodyColor(s.sessionId, option.hex)
-                            SoundEngine.shared.play("pop")
-                            NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
-                        })
+            HStack(spacing: 10) {
+                // The name reads as plain text until you point at it, when it
+                // gains a background and brightens. The TextField is always in
+                // the hierarchy — swapping a Text for a TextField on hover made
+                // the pointer bounce in and out of hover, the same trap the
+                // pill's jump button fell into.
+                ZStack(alignment: .leading) {
+                    // The hint is drawn by hand rather than left to the
+                    // TextField's own placeholder: that one takes its colour
+                    // from the system appearance, so on a black island in
+                    // light mode it comes out black — invisible.
+                    if (state.overviewSession?.customName ?? "").isEmpty {
+                        Text(emptyNameHint)
+                            .font(.system(size: 12.5))
+                            .foregroundColor(Color(hex: "#7B8089"))
+                            .lineLimit(1)
+                            .allowsHitTesting(false)
+                    }
+                    TextField("", text: nameBinding)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12.5))
+                        .foregroundColor(Color(hex: nameHovered ? "#F5F6F8" : "#8E939C"))
+                        .lineLimit(1)
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+                .background(Color.white.opacity(nameHovered ? 0.06 : 0),
+                            in: RoundedRectangle(cornerRadius: 8))
+                .frame(width: 180)
+                .onHover { nameHovered = $0 }
+                .help(emptyNameHint)
+                HStack(spacing: 8) {
+                    ForEach(ClaudeSession.palette) { option in
+                        ColorSwatchView(
+                            hex: option.hex,
+                            isSelected: option.hex == currentBodyColor,
+                            isHovered: hoveredColor == option.hex,
+                            onHover: { hoveredColor = $0 ? option.hex : nil },
+                            onTap: {
+                                guard let s = state.overviewSession, option.hex != currentBodyColor else { return }
+                                state.setSessionBodyColor(s.sessionId, option.hex)
+                                SoundEngine.shared.play("pop")
+                                NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
+                            })
+                    }
+                }
+                .fixedSize()
             }
             .padding(.horizontal, 8)
             .padding(.top, 5)
@@ -2439,6 +2489,7 @@ struct WardrobeView: View {
             state.wardrobePreviewOutfit = nil
             hoveredOutfit = nil
             hoveredColor = nil
+            nameHovered = false
         }
         .onExitCommand {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {

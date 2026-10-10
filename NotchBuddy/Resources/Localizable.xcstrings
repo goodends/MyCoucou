@@ -2433,6 +2433,22 @@
         }
       }
     },
+    "Defaults to the project's name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Defaults to the project's name"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名称为空，默认展示项目名"
+          }
+        }
+      }
+    },
     "Deny": {
       "localizations": {
         "ar": {
