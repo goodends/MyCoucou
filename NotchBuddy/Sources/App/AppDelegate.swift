@@ -74,9 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        // The island floats above every window; fold it away so it can't cover Settings.
-        if AppState.shared.mode == .expanded { islandController?.collapse() }
-
+        // Keep the island up — the user wants to see it while the settings
+        // window is open. placeBelowIsland() positions the window so the
+        // notch panel stays clear.
         if let w = settingsWindow, w.isVisible {
             placeBelowIsland(w)
             w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return
