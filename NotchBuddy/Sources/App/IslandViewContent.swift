@@ -1082,12 +1082,14 @@ struct PromptView: View {
     }
 
     #if !APPSTORE
-    /// Jump to the terminal hosting the focused session. Orca-prefer,
-    /// matching `performJumpToTerminal` (⌃⌥T) and the FinishedView's
-    /// "Open terminal" button.
+    /// Pop back to the home view first (snappy visual feedback), then
+    /// jump to the terminal hosting the focused session in the
+    /// background. Orca-prefer, matching `performJumpToTerminal`
+    /// (⌃⌥T) and the FinishedView's "Open terminal" button.
     private func openChatTerminal() {
         let task = state.focusTask
         Task { @MainActor in
+            switchToHome()
             // Orca hosts this session → jump to its exact tab.
             if await state.jumpToOrcaTerminal() { return }
             // Otherwise raise the app the session runs in (its terminal,
@@ -1096,6 +1098,14 @@ struct PromptView: View {
                !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
             }
+        }
+    }
+
+    /// Same animation as the chat→home overscroll gesture, so the two
+    /// exits out of the chat feel identical.
+    private func switchToHome() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            state.view = .overview
         }
     }
     #endif
