@@ -564,7 +564,10 @@ final class HookServer: @unchecked Sendable {
             // avatar / final-line / "Open terminal" — the focused task may
             // be a different session entirely.
             state.lastFinishedAgentId = agentId
-            if isClaudeSession { updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession {
+                state.lastFinishedSessionId = sessionId
+                updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName)
+            }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             RecapStore.shared.stop(sessionId: recapSessionId)
             SoundEngine.shared.play("finish")

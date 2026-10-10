@@ -603,9 +603,15 @@ struct FinishedView: View {
                         #if !APPSTORE
                         PrimaryButton("Open terminal") {
                             let task = finishingTask
+                            // Bind the jump to the session that *just finished* —
+                            // its sessionId is the one with a verified Orca handle
+                            // binding. Without this we fall through to the focused
+                            // session, which may be a different Claude session in
+                            // the same worktree and lands on the wrong Orca tab.
+                            let finishingSid = state.lastFinishedSessionId
                             Task { @MainActor in
                                 // Orca hosts this session → jump to its exact tab.
-                                if await state.jumpToOrcaTerminal() { return }
+                                if await state.jumpToOrcaTerminal(sessionId: finishingSid) { return }
                                 // Otherwise raise the app the session runs in
                                 // (its terminal, or VS Code), then any known terminal.
                                 if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),

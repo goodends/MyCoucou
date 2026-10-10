@@ -67,24 +67,37 @@ final class AppState: ObservableObject {
         return nil
     }
 
-    /// Jump to the terminal hosting the current focus task. Prefers Orca —
-    /// it focuses the exact terminal tab rather than just raising the app.
-    /// Returns false when Orca isn't installed/running or doesn't host this
-    /// session, so the caller falls back to its usual app activation.
+    /// Jump to the Orca terminal hosting `sessionId`, or the focused session
+    /// when `sessionId` is nil. Prefers Orca — it focuses the exact
+    /// terminal tab rather than just raising the app. Returns false when
+    /// Orca isn't installed/running or doesn't host this session, so the
+    /// caller falls back to its usual app activation.
     @discardableResult
-    func jumpToOrcaTerminal() async -> Bool {
+    func jumpToOrcaTerminal(sessionId: String? = nil) async -> Bool {
         guard OrcaCLIBridge.isInstalled else { return false }
-        guard let cwd = terminalLookupCwd else { return false }
-        // Prefer the SessionStart binding — it's the only way to tell two
-        // Claude sessions in the same cwd apart. Fall back to the cwd +
-        // lastOutputAt heuristic when no SessionStart has fired for the
-        // focused session yet (e.g. user jumped before any hook arrived),
-        // and cache the result so the next jump hits the fast path.
+        // Bind the requested session to a handle. The fast path is the
+        // ORCA_TERMINAL_HANDLE binding written by HookServer on every
+        // hook event — exact even when the cwd hosts multiple Claude
+        // sessions. Fall back to a cwd + lastOutputAt heuristic only when
+        // the binding hasn't been established yet (no event has fired for
+        // the session, e.g. the user jumped before any hook arrived) and
+        // cache the result for the next jump.
+        let sid = sessionId ?? focusedSessionId
         var handle: String?
-        let sid = focusedSessionId
         if let sid, !sid.isEmpty, let bound = orcaHandleBySession[sid] {
             handle = bound
         } else {
+            // Pick the cwd that matches the session we're jumping to, not
+            // the focused one. For Orca, lastOutputAt can't distinguish
+            // two sessions in the same worktree — it's only used as a
+            // last-ditch fallback when no exact binding exists.
+            let cwd: String?
+            if let sid, let s = claudeSessions.first(where: { $0.sessionId == sid }) {
+                cwd = s.cwd
+            } else {
+                cwd = terminalLookupCwd
+            }
+            guard let cwd, !cwd.isEmpty else { return false }
             handle = await OrcaCLIBridge.shared.handle(forCwd: cwd)
             if let handle, let sid, !sid.isEmpty {
                 orcaHandleBySession[sid] = handle
@@ -491,9 +504,14 @@ final class AppState: ObservableObject {
     /// on the right-side small avatar — instead of the global integration
     /// task, which goes "busy" whenever any session is working even if the
     /// user is currently looking at an idle one.
+    ///
+    /// On the finished card the avatar and state must follow the session
+    /// that *just completed* (not the focused one), so the main Mochi
+    /// reads as the same character that just finished its work.
     var mainMochiState: BotState {
         if let override = stateOverride { return override }
-        if let session = overviewSession {
+        let session = (view == .finished) ? finishingSession : overviewSession
+        if let session {
             switch session.state {
             case .spawning: return .thinking
             case .working:  return .working
@@ -509,6 +527,19 @@ final class AppState: ObservableObject {
     /// all reflect the session that *just completed* — not the user's
     /// currently focused task, which may be a different session entirely.
     @Published var lastFinishedAgentId: String? = nil
+    /// Session id of the same event. `lastFinishedAgentId` is the task id
+    /// (e.g. "integration_claude") and can't tell two Claude sessions apart;
+    /// the session uuid can. Needed by the finished card to show this
+    /// session's outfit and jump to this session's terminal.
+    @Published var lastFinishedSessionId: String? = nil
+
+    /// The ClaudeSession that *just completed*, looked up by its uuid. nil
+    /// if the session has already been removed or the event didn't carry
+    /// a session id. Drives the finished card's avatar and "Open terminal".
+    var finishingSession: ClaudeSession? {
+        guard let id = lastFinishedSessionId, !id.isEmpty else { return nil }
+        return claudeSessions.first { $0.sessionId == id }
+    }
 
     // MARK: - Task management
 

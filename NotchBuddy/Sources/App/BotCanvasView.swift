@@ -34,13 +34,18 @@ struct BotCanvasView: View {
                 // body color and outfit while it's the most-recent thing the user
                 // cares about — each session is randomly assigned a color + outfit
                 // on first appearance, and the main Mochi mirrors them.
+                //
+                // On the finished card, the avatar must reflect the session
+                // that *just completed* — otherwise the user sees the focused
+                // session's Mochi on a card describing someone else's finish.
+                let colorSession = (state.view == .finished) ? state.finishingSession : state.overviewSession
                 #if !APPSTORE
                 if state.showingPlanDetail {
                     let hex = state.planDetailIsCodex
                         ? CodexPlanGauge.color(state.codexPlanUsage)
                         : ClaudePlanGauge.color(for: state.claudePlanUsage.flatMap { ClaudePlanGauge.dominantPct($0) })
                     engine.bodyColor = cgColorFromHex(hex)
-                } else if let session = state.overviewSession {
+                } else if let session = colorSession {
                     engine.bodyColor = cgColorFromHex(session.bodyColor)
                 } else {
                     engine.bodyColor = (state.focusTask?.isIntegration == true)
@@ -48,7 +53,7 @@ struct BotCanvasView: View {
                         : nil
                 }
                 #else
-                if let session = state.overviewSession {
+                if let session = colorSession {
                     engine.bodyColor = cgColorFromHex(session.bodyColor)
                 } else {
                     engine.bodyColor = (state.focusTask?.isIntegration == true)
@@ -67,8 +72,10 @@ struct BotCanvasView: View {
                 // user's stored preference. The old `resolvedOutfit` fallback
                 // made the main Mochi show a seasonal pumpkin while the right
                 // pill showed the session's actual outfit, which is exactly
-                // the inconsistency the user reported.
-                engine.setOutfit(showOutfit ? (state.overviewSession?.outfit ?? .none) : .none,
+                // the inconsistency the user reported. On the finished card
+                // we mirror the finishing session, not the focused one.
+                let outfitSession = (state.view == .finished) ? state.finishingSession : state.overviewSession
+                engine.setOutfit(showOutfit ? (outfitSession?.outfit ?? .none) : .none,
                                  animated: state.view != .wardrobe)
 
                 engine.update(dt: dt)
