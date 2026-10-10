@@ -2034,8 +2034,10 @@ struct ClaudeSessionPill: View {
                 .frame(height: 32)
                 .shadow(color: Color(hex: Self.claudeColor).opacity(isHovered ? 0.35 : 0), radius: 10, x: 0, y: 2)
                 // ↗ revealed on hover: jump to where this session runs (Orca's
-                // exact tab, else the host terminal). Always in the hierarchy —
-                // only its opacity changes — so the hover can't flicker.
+                // exact tab, else the host terminal). Only the opacity changes —
+                // hit testing stays the same whatever the hover state, because
+                // flipping it re-runs hover detection and the pill then bounces
+                // in and out of hover on its own.
                 .overlay(alignment: .topTrailing) {
                     Button {
                         AgentLauncher.open(state.overviewTask(for: session), state: state)
@@ -2049,7 +2051,6 @@ struct ClaudeSessionPill: View {
                     }
                     .buttonStyle(.plain)
                     .opacity(isHovered ? 1 : 0)
-                    .allowsHitTesting(isHovered)
                     .padding(.top, 2)
                     .padding(.trailing, 4)
                 }
