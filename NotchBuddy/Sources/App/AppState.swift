@@ -651,6 +651,14 @@ final class AppState: ObservableObject {
         claudeSessions[idx].outfit = outfit
     }
 
+    /// Set the body colour for a Claude session's Mochi, from the wardrobe's
+    /// swatch row. Drives both the right-side pill avatar and the main Mochi
+    /// while this session is the active `overviewSession`.
+    func setSessionBodyColor(_ sessionId: String, _ hex: String) {
+        guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
+        claudeSessions[idx].bodyColor = hex
+    }
+
     func setFocus(_ id: String) {
         guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }
         focusId = id

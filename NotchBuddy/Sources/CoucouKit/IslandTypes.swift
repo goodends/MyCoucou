@@ -77,6 +77,13 @@ enum AgentSource: Equatable {
 
 // MARK: - Claude Code session (per-session tracking for the overview's active-session list)
 
+/// A curated body colour for a Mochi, with the name the wardrobe shows.
+struct MochiColor: Identifiable, Hashable, Sendable {
+    let hex: String
+    let name: String
+    var id: String { hex }
+}
+
 /// Per-session view of a running Claude Code process. One Claude Code window / terminal tab
 /// = one `ClaudeSession`. Distinct from `AgentTask`, which still represents the single
 /// `integration_claude` pill (one per project/host at most).
@@ -98,6 +105,18 @@ struct ClaudeSession: Identifiable, Equatable {
     /// pill avatar and the main Mochi's appearance while this session is the
     /// active one (`overviewSession`).
     var outfit: Outfit = .none
+
+    /// The curated body colours: warm + saturated so the character stays
+    /// visible against the dark pill background. One is picked at random when
+    /// a session first appears; the wardrobe lets the user pick another.
+    static let palette: [MochiColor] = [
+        MochiColor(hex: "#F5A524", name: "Orange"),
+        MochiColor(hex: "#5EEAD4", name: "Teal"),
+        MochiColor(hex: "#EC4899", name: "Pink"),
+        MochiColor(hex: "#A78BFA", name: "Purple"),
+        MochiColor(hex: "#60A5FA", name: "Blue"),
+        MochiColor(hex: "#F87171", name: "Red"),
+    ]
 }
 
 /// Visual phase of a session in the right-side list. Distinct from `BotState` so the
@@ -110,12 +129,6 @@ enum SessionPhase: String, Equatable {
 }
 
 extension Array where Element == ClaudeSession {
-    /// Curated body colours for each session's mini Mochi avatar. Warm +
-    /// saturated so the character stays visible against the dark pill
-    /// background.
-    private static let avatarColors = [
-        "#F5A524", "#5EEAD4", "#EC4899", "#A78BFA", "#60A5FA", "#F87171"
-    ]
     /// Every outfit except `.auto` (a picker sentinel) and `.none` (the default).
     private static var avatarOutfits: [Outfit] {
         Outfit.allCases.filter { $0 != .auto && $0 != .none }
@@ -146,7 +159,7 @@ extension Array where Element == ClaudeSession {
             remove(at: idx)
             insert(s, at: 0)
         } else {
-            let bodyColor = Self.avatarColors.randomElement() ?? "#F5F6F8"
+            let bodyColor = ClaudeSession.palette.randomElement()?.hex ?? "#F5F6F8"
             let outfit    = Self.avatarOutfits.randomElement() ?? .none
             insert(
                 ClaudeSession(

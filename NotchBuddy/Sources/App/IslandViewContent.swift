@@ -2263,6 +2263,7 @@ struct ColumnAgentsView: View {
 struct WardrobeView: View {
     @ObservedObject var state: AppState
     @State private var hoveredOutfit: Outfit? = nil
+    @State private var hoveredColor: String? = nil
 
     private let columns = Array(repeating: GridItem(.fixed(30), spacing: 5), count: 14)
 
@@ -2273,8 +2274,17 @@ struct WardrobeView: View {
         state.overviewSession?.outfit ?? .none
     }
 
+    /// The body colour currently on the Mochi, same source as `currentOutfit`.
+    private var currentBodyColor: String? {
+        state.overviewSession?.bodyColor
+    }
+
     private var headerRight: String {
-        // Hover takes priority: show hovered outfit name
+        // Hover takes priority: the colour pointed at, then the outfit.
+        if let hex = hoveredColor,
+           let name = ClaudeSession.palette.first(where: { $0.hex == hex })?.name {
+            return name
+        }
         if let h = hoveredOutfit {
             if h == .auto {
                 let seasonal = Outfit.seasonal(for: Date(), calendar: .current)
@@ -2359,6 +2369,30 @@ struct WardrobeView: View {
                     startPoint: .top, endPoint: .bottom
                 )
             )
+
+            // Colour row: the Mochi's own body colour. The outfit grid above
+            // scrolls; this strip stays put at the bottom.
+            Divider().overlay(Color.white.opacity(0.08))
+                .padding(.top, 4)
+            HStack(spacing: 8) {
+                ForEach(ClaudeSession.palette) { option in
+                    ColorSwatchView(
+                        hex: option.hex,
+                        isSelected: option.hex == currentBodyColor,
+                        isHovered: hoveredColor == option.hex,
+                        onHover: { hoveredColor = $0 ? option.hex : nil },
+                        onTap: {
+                            guard let s = state.overviewSession, option.hex != currentBodyColor else { return }
+                            state.setSessionBodyColor(s.sessionId, option.hex)
+                            SoundEngine.shared.play("pop")
+                            NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
+                        })
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 5)
+            .padding(.bottom, 4)
         }
         .padding(.leading, 108)
         .padding(.trailing, 12)
@@ -2366,12 +2400,39 @@ struct WardrobeView: View {
         .onDisappear {
             state.wardrobePreviewOutfit = nil
             hoveredOutfit = nil
+            hoveredColor = nil
         }
         .onExitCommand {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 state.view = .overview
             }
         }
+    }
+}
+
+/// A body colour in the wardrobe's colour row: a plain dot, smaller than the
+/// outfit tiles so the row stays short. Selected gets a ring just outside it.
+struct ColorSwatchView: View {
+    let hex: String
+    let isSelected: Bool
+    let isHovered: Bool
+    let onHover: (Bool) -> Void
+    let onTap: () -> Void
+
+    var body: some View {
+        Circle()
+            .fill(Color(hex: hex))
+            .frame(width: 18, height: 18)
+            .overlay {
+                Circle()
+                    .strokeBorder(Color.white.opacity(isSelected ? 0.9 : 0), lineWidth: 2)
+                    .padding(-3)
+            }
+            .scaleEffect(isHovered ? 1.15 : 1)
+            .frame(width: 24, height: 24)
+            .contentShape(Rectangle())
+            .onHover { onHover($0) }
+            .onTapGesture { onTap() }
     }
 }
 
