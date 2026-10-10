@@ -743,9 +743,9 @@ final class IslandWindowController: NSWindowController {
                     }
                     return
                 }
-                // In the chat view, three quick clicks on Mochi go back home —
+                // In the chat view, a quick double click on Mochi goes back home —
                 // single tap is too easy to hit by accident while typing, so we
-                // require a deliberate triple-tap within ~1 s.
+                // require a deliberate double-tap within ~1 s.
                 if self.state.mode == .expanded && self.state.view == .prompt {
                     let now = CACurrentMediaTime()
                     if now - self.lastBotClickTime < 1.0 {
@@ -754,7 +754,7 @@ final class IslandWindowController: NSWindowController {
                         self.botClickCount = 1
                     }
                     self.lastBotClickTime = now
-                    if self.botClickCount >= 3 {
+                    if self.botClickCount >= 2 {
                         self.state.view = .overview
                         self.botClickCount = 0
                     }

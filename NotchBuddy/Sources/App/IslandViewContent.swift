@@ -1157,6 +1157,7 @@ struct PromptView: View {
     @State private var text: String = ""
     @FocusState private var focused: Bool
     @State private var showNotWiredToast = false
+    @State private var chipHovered = false
 
     private var historyBinding: [HistoryEntry] {
         state.focusTask?.history ?? []
@@ -1252,18 +1253,25 @@ struct PromptView: View {
                     .buttonStyle(.plain)
                     .help(String(localized: "Open terminal"))
                     #endif
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(Color(hex: state.focusTask?.color ?? "#7B8089"))
-                            .frame(width: 6, height: 6)
-                        Text(focusTaskLabel)
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundColor(Color(hex: "#7B8089"))
+                    // The chip names where the session runs, so it doubles as
+                    // the jump — same action as the ↗ beside it.
+                    Button(action: { openChatTerminal() }) {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(Color(hex: state.focusTask?.color ?? "#7B8089"))
+                                .frame(width: 6, height: 6)
+                            Text(focusTaskLabel)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundColor(Color(hex: "#7B8089"))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(chipHovered ? 0.12 : 0.06))
+                        .clipShape(Capsule())
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
+                    .onHover { chipHovered = $0 }
+                    .help(String(localized: "Open terminal"))
                 }
                 .padding(.horizontal, 10)
 
