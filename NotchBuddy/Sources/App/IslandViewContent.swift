@@ -581,6 +581,19 @@ struct FinishedView: View {
         return state.focusTask
     }
 
+    /// Make the just-finished session drive the home view's left card so
+    /// the user lands on the session they were just notified about, not
+    /// whatever was previously focused. Called by both the "Open terminal"
+    /// and "OK" buttons before switching the view.
+    private func focusFinishedSession() {
+        if let sid = state.lastFinishedSessionId, !sid.isEmpty {
+            state.focusedSessionId = sid
+        }
+        if let task = finishingTask {
+            state.setFocus(task.id)
+        }
+    }
+
     var body: some View {
         ZStack {
             CardBackground(wash: .green)
@@ -611,10 +624,11 @@ struct FinishedView: View {
                             // session, which may be a different Claude session in
                             // the same worktree and lands on the wrong Orca tab.
                             let finishingSid = state.lastFinishedSessionId
-                            // Pop back to the home view first so the island
-                            // animation kicks in within the click, then launch
-                            // the terminal in the background — matches the chat
-                            // view's ↗ button.
+                            // Make the just-finished session drive the home
+                            // view's left card, then pop back to home (so the
+                            // island animation kicks in within the click) and
+                            // launch the terminal in the background.
+                            focusFinishedSession()
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                 state.view = .overview
                             }
@@ -632,8 +646,11 @@ struct FinishedView: View {
                         #endif
                     }
                     SecondaryButton("OK") {
-                        // Land back on the home view instead of collapsing the
-                        // whole island — the user just wants to acknowledge.
+                        // Make the just-finished session drive the home view's
+                        // left card, then land back on home instead of
+                        // collapsing the whole island — the user just wants
+                        // to acknowledge.
+                        focusFinishedSession()
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             state.view = .overview
                         }
