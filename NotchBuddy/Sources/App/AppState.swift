@@ -74,6 +74,17 @@ final class AppState: ObservableObject {
     /// caller falls back to its usual app activation.
     @discardableResult
     func jumpToOrcaTerminal(sessionId: String? = nil) async -> Bool {
+        // Non-Orca sessions (Warp, Terminal.app, iTerm2, Ghostty, …) live
+        // in a regular terminal — there's no Orca tab to switch to, and
+        // raising Orca here would put the wrong app in front of the user.
+        // Return false up front so the caller falls through to
+        // ClaudeHost.activate(hostApp) and raises the actual terminal.
+        if let lookupSid = sessionId ?? focusedSessionId, !lookupSid.isEmpty,
+           let session = claudeSessions.first(where: { $0.sessionId == lookupSid }),
+           let host = session.hostApp, !host.isEmpty,
+           host != "com.stablyai.orca" {
+            return false
+        }
         guard OrcaCLIBridge.isInstalled else { return false }
         // Bind the requested session to a handle. The fast path is the
         // ORCA_TERMINAL_HANDLE binding written by HookServer on every
