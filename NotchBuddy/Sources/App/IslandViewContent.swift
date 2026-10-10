@@ -838,6 +838,15 @@ struct PromptView: View {
         state.focusTask?.history ?? []
     }
 
+    /// Which session the chat is bound to. `displayName` resolves to the
+    /// user-set `customName` if they renamed the pill, otherwise the project
+    /// folder name — the same string the home view shows.
+    private var chatSessionName: String? {
+        guard let s = state.overviewSession else { return nil }
+        let name = s.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
+
     private var focusTaskLabel: String {
         // 1. The session the user explicitly tapped into (right-card pill tap, or
         //    a follow-up left-card tap after the first SessionStart has populated
@@ -874,6 +883,26 @@ struct PromptView: View {
             CardBackground(wash: .indigo)
 
             VStack(alignment: .leading, spacing: 6) {
+                // Project / session name for the session the chat is bound to.
+                // displayName = customName if the user renamed the pill, else the
+                // project folder name — the same string the home pill shows. Sits
+                // at the top of the chat card, above the (small) Mochi on the left.
+                if let name = chatSessionName {
+                    HStack(spacing: 5) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "#5F646D"))
+                        Text(name)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundColor(Color(hex: "#A8ADB5"))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 2)
+                    .help(name)
+                }
                 if state.focusedClaudeSession != nil {
                     // A Claude-session pill was tapped: render that session's JSONL
                     // history instead of the focus task's in-memory log.
