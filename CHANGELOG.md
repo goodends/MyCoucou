@@ -5,6 +5,7 @@
 - Drop the iPhone App (Coucou on iPhone, widgets, notification content extension, Mac `PhoneLink` iCloud sync). The Mac no longer publishes sessions, turns or services through CloudKit, and the Live Activity relay is gone.
 - Drop the Windows and Linux (Tauri) app.
 - This codebase now ships Mac only.
+- **Hide after** is entered in seconds, not minutes (minimum 1 s), and the value actually drives the island's petit → hidden delay.
 
 ## Windows and Linux 0.3.0 — October 9, 2026
 

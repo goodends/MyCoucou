@@ -63,11 +63,11 @@ struct SettingsView: View {
     // Startup
     @State private var launchAtStartup: Bool = (SMAppService.mainApp.status == .enabled)
 
-    // Bindings in minutes for the absence field
-    private var absenceMinutes: Binding<Double> {
+    // Bindings in seconds for the absence field
+    private var absenceSeconds: Binding<Double> {
         Binding(
-            get: { state.absenceInterval / 60 },
-            set: { state.absenceInterval = max(1, $0) * 60 }
+            get: { state.absenceInterval },
+            set: { state.absenceInterval = max(1, $0) }
         )
     }
 
@@ -224,10 +224,10 @@ struct SettingsView: View {
                 }
                 HStack(spacing: 8) {
                     Text("Hide after")
-                    TextField("3", value: absenceMinutes, format: .number)
+                    TextField("60", value: absenceSeconds, format: .number)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 48)
-                    Text("min without movement")
+                        .frame(width: 64)
+                    Text("s without movement")
                 }
             }
             .padding(6)

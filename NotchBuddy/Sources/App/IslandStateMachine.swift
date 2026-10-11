@@ -28,7 +28,7 @@ final class IslandStateMachine {
             scheduleHomeCollapse()
         }
     }
-    /// petit → hidden delay (seconds). Override for debug.
+    /// petit → hidden delay (seconds), kept in sync with the absence preference. Override for debug.
     var petitToHiddenDelay: TimeInterval = 60
     /// coucou → petit delay after greeting animation ends (no hover). ~0.6s syncs with canvas collapse.
     var greetAutoCollapseDelay: TimeInterval = 0.6

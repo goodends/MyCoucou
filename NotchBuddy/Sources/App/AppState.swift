@@ -330,8 +330,8 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(autoCloseInterval, forKey: "autoCloseInterval") }
     }
 
-    // Absence interval — persisted
-    var absenceInterval: TimeInterval = 3 * 60 {
+    // Absence interval — how long the island stays in petit before hiding, persisted (seconds)
+    @Published var absenceInterval: TimeInterval = 60 {
         didSet { UserDefaults.standard.set(absenceInterval, forKey: "absenceInterval") }
     }
 
