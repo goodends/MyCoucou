@@ -33,4 +33,4 @@ This fork ships Mochi, the icon and the sounds unchanged from upstream. Upstream
 
 ## Questions or permission requests
 
-Upstream asset questions go to [Louis Raillé](https://github.com/Louis-CFM/coucou/issues). Questions about this fork go to [suoyuanxi](https://github.com/suoyuanxi/MyCoucou/issues).
+Upstream asset questions go to [Louis Raillé](https://github.com/Louis-CFM/coucou/issues). Questions about this fork go to [goodends](https://github.com/goodends/MyCoucou/issues).

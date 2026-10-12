@@ -8,12 +8,12 @@
 
 Approve permissions, watch your agents work, drop a file, chat with Claude — all without leaving what you're doing.
 
-[![Version](https://img.shields.io/github/v/release/suoyuanxi/MyCoucou?filter=v*&label=version&color=0A84FF)](https://github.com/suoyuanxi/MyCoucou/releases)
+[![Version](https://img.shields.io/github/v/release/goodends/MyCoucou?filter=v*&label=version&color=0A84FF)](https://github.com/goodends/MyCoucou/releases)
 ![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)
 ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0A84FF)
 ![Code: MIT](https://img.shields.io/badge/code-MIT-green)
-![GitHub stars](https://img.shields.io/github/stars/suoyuanxi/MyCoucou?style=social)
+![GitHub stars](https://img.shields.io/github/stars/goodends/MyCoucou?style=social)
 
 <img src="docs/media/demo.gif" width="760" alt="MyCoucou in action">
 
@@ -70,39 +70,39 @@ Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch
 
 ## Versions
 
-macOS releases are published as `v*` tags. See [CHANGELOG.md](CHANGELOG.md) for the full notes of each version.
+Releases are published as `v*` tags. **1.0.0 is this fork's first release**; 0.2.3 and earlier were published by the upstream project and link there. See [CHANGELOG.md](CHANGELOG.md) for the full notes of each version.
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| [1.0.0](https://github.com/suoyuanxi/MyCoucou/releases/tag/v1.0.0) | Oct 12, 2026 | Now called MyCoucou, Mac only, sessions report their real state, grouped by folder, working Resume |
-| [0.2.3](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.2.3) | Oct 8, 2026 | Terminal sessions, Spotify, a colour per Mochi, dictation in any language, open on hover, your own sounds |
-| [0.2.2](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.2.2) | Oct 8, 2026 | Choose Mochi's screen, Claude Desktop pill, Codex plan usage, full questions, safer settings.json |
-| [0.2.1](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.2.1) | Oct 7, 2026 | Hermes Agent support |
-| [0.2.0](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.2.0) | Oct 6, 2026 | Copilot CLI, Muse Code, OpenCode and Amp, weekly recap, 10 languages |
-| [0.1.9](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.9) | Oct 6, 2026 | Weekly recap card refinements |
-| [0.1.8](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.8) | Oct 5, 2026 | Weekly recap core |
-| [0.1.7](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.7) | Oct 4, 2026 | Keyboard shortcuts |
-| [0.1.6](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.6) | Oct 4, 2026 | Mochi on the desktop |
-| [0.1.5](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.5) | Oct 4, 2026 | Wardrobe and seasonal outfits, new launch greeting |
-| [0.1.4](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.4) | Oct 3, 2026 | Live diffs, GitHub pull requests, CI, reviews and contribution grid |
-| [0.1.3](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.3) | Oct 3, 2026 | Answer Claude's questions from the notch, plan usage, local models, Apple Music |
-| [0.1.2](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.2) | Oct 2, 2026 | Codex and Cursor support, the permission card stays until you answer |
-| [0.1.1](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.1) | Oct 2, 2026 | Gemini and OpenAI chat, more agents and pills, security hardening |
-| [0.1.0](https://github.com/suoyuanxi/MyCoucou/releases/tag/v0.1.0) | Sep 27, 2026 | First release: Mochi, Claude Code sessions, chat, file drop, integrations |
+| [1.0.0](https://github.com/goodends/MyCoucou/releases/tag/v1.0.0) | Oct 12, 2026 | Now called MyCoucou, Mac only, sessions report their real state, grouped by folder, working Resume |
+| [0.2.3](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.3) | Oct 8, 2026 | Terminal sessions, Spotify, a colour per Mochi, dictation in any language, open on hover, your own sounds |
+| [0.2.2](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.2) | Oct 8, 2026 | Choose Mochi's screen, Claude Desktop pill, Codex plan usage, full questions, safer settings.json |
+| [0.2.1](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.1) | Oct 7, 2026 | Hermes Agent support |
+| [0.2.0](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.0) | Oct 6, 2026 | Copilot CLI, Muse Code, OpenCode and Amp, weekly recap, 10 languages |
+| [0.1.9](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.9) | Oct 6, 2026 | Weekly recap card refinements |
+| [0.1.8](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.8) | Oct 5, 2026 | Weekly recap core |
+| [0.1.7](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.7) | Oct 4, 2026 | Keyboard shortcuts |
+| [0.1.6](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.6) | Oct 4, 2026 | Mochi on the desktop |
+| [0.1.5](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.5) | Oct 4, 2026 | Wardrobe and seasonal outfits, new launch greeting |
+| [0.1.4](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.4) | Oct 3, 2026 | Live diffs, GitHub pull requests, CI, reviews and contribution grid |
+| [0.1.3](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.3) | Oct 3, 2026 | Answer Claude's questions from the notch, plan usage, local models, Apple Music |
+| [0.1.2](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.2) | Oct 2, 2026 | Codex and Cursor support, the permission card stays until you answer |
+| [0.1.1](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.1) | Oct 2, 2026 | Gemini and OpenAI chat, more agents and pills, security hardening |
+| [0.1.0](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.0) | Sep 27, 2026 | First release: Mochi, Claude Code sessions, chat, file drop, integrations |
 
-> **Note:** the repo ships the macOS app only. Earlier `windows-v*`, `linux-v*` and an iPhone App Store / TestFlight track were part of the project history and are no longer maintained.
+> **Note:** this fork ships the macOS app only. Upstream's earlier `windows-v*`, `linux-v*` and iPhone App Store / TestFlight tracks are not continued here, and none of those releases exist in this repository.
 
 ## Install
 
 ### App Store
 
-MyCoucou is coming to the **Mac App Store**: one click to install, automatic updates. The link will be here as soon as Apple publishes it.
+MyCoucou is not on the App Store. The Mac App Store build (`fr.louisraille.Coucou`, currently 1.1) belongs to the upstream project and is untouched by this fork — that bundle id is Louis Raillé's, not ours to ship under.
 
-The App Store build of the Mac app runs in Apple's sandbox, so a few features stay in the GitHub build: Claude plan usage, the Apple Music pill and attaching the front window to the chat.
+It runs in Apple's sandbox, which is why the DMG build keeps Claude plan usage, the Apple Music pill and attaching the front window to the chat.
 
 ### Download for macOS
 
-1. Grab the latest `MyCoucou.zip` from [Releases](https://github.com/suoyuanxi/MyCoucou/releases).
+1. Grab the latest `MyCoucou.zip` from [Releases](https://github.com/goodends/MyCoucou/releases).
 2. Unzip and move **MyCoucou.app** to `/Applications`.
 3. Launch it, and click **Open** when macOS asks you to confirm. Updating from 0.1.0? macOS may ask you, once for each key you saved, to let MyCoucou use it: enter your Mac password and click **Always Allow**.
 
@@ -112,7 +112,7 @@ The App Store build of the Mac app runs in Apple's sandbox, so a few features st
 
 ```bash
 brew install xcodegen
-git clone https://github.com/suoyuanxi/MyCoucou.git
+git clone https://github.com/goodends/MyCoucou.git
 cd coucou/NotchBuddy
 xcodegen
 open NotchBuddy.xcodeproj   # then ⌘R
@@ -188,7 +188,7 @@ Want to add or improve a translation? Open a PR with changes to `NotchBuddy/Reso
 
 ## Credits
 
-Originally built by [Louis Raillé](https://louisraille.fr) with Claude Code. The rename to MyCoucou, the session-state work, the Mac-only drop and the DMG releases are this fork's, by [suoyuanxi](https://github.com/suoyuanxi/MyCoucou).
+Originally built by [Louis Raillé](https://louisraille.fr) with Claude Code. The rename to MyCoucou, the session-state work, the Mac-only drop and the DMG releases are this fork's, by [goodends](https://github.com/goodends/MyCoucou).
 Inspired by the notch-companion concepts shared by design studios — this project is independent and not affiliated with any of them.
 
 ## License
@@ -200,6 +200,6 @@ Inspired by the notch-companion concepts shared by design studios — this proje
 
 **If Mochi made you smile, a ⭐ helps a lot.**
 
-[Website](https://suoyuanxi.github.io/MyCoucou/) · [Privacy](https://suoyuanxi.github.io/MyCoucou/privacy.html) · [Terms](https://suoyuanxi.github.io/MyCoucou/terms.html) · [Support](https://suoyuanxi.github.io/MyCoucou/support.html)
+[Website](https://goodends.github.io/MyCoucou/) · [Privacy](https://goodends.github.io/MyCoucou/privacy.html) · [Terms](https://goodends.github.io/MyCoucou/terms.html) · [Support](https://goodends.github.io/MyCoucou/support.html)
 
 </div>
