@@ -105,6 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         islandController?.showWindow(nil)
         islandController?.fsm.launch()
         HookServer.shared.start()
+        // Sessions already running when we launched never fire a SessionStart
+        // at us, so pick them up from the process table instead.
+        AppState.shared.scanForRunningClaudeSessions()
         NotificationCenter.default.addObserver(self, selector: #selector(openSettingsFromNotification(_:)),
                                                name: .openFullSettings, object: nil)
         // After the greeting ends, fly Mochi back to the desktop if it was there at last quit

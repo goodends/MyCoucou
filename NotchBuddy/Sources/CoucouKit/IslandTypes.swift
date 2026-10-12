@@ -103,6 +103,11 @@ struct ClaudeSession: Identifiable, Equatable {
     /// nil for sessions last seen before the relay learned to report a pid (or
     /// from a third-party agent whose parent chain couldn't be resolved).
     var pid: Int32? = nil
+    /// True for a session found by scanning the process table (see
+    /// ClaudeProcessScanner): the pid and cwd are real, but there is no session
+    /// id yet, so we can't say what it's doing or read its transcript. Derived
+    /// from the placeholder id so the two can't drift apart.
+    var provisional: Bool { ClaudeSession.isProvisionalId(sessionId) }
     /// Body color for this session's mini Mochi — random on first upsert,
     /// fixed for the session's lifetime.
     var bodyColor: String = "#F5F6F8"
@@ -141,11 +146,38 @@ enum SessionPhase: String, Equatable {
     case stopped    // StopFailure / Interrupt
 }
 
-extension Array where Element == ClaudeSession {
+extension ClaudeSession {
     /// Every outfit except `.auto` (a picker sentinel) and `.none` (the default).
-    private static var avatarOutfits: [Outfit] {
+    static var avatarOutfits: [Outfit] {
         Outfit.allCases.filter { $0 != .auto && $0 != .none }
     }
+
+    /// Placeholder id for a session we only know from the process table. The
+    /// `pid-` prefix namespaces it away from Claude's own UUIDs, so it can
+    /// never collide with a real session.
+    static func provisionalId(_ pid: Int32) -> String { "pid-\(pid)" }
+
+    static func isProvisionalId(_ sessionId: String) -> Bool { sessionId.hasPrefix("pid-") }
+
+    /// A session discovered by scanning the process table. Real pid and cwd,
+    /// honest about everything else: `.stopped` (which renders as the dim
+    /// "idle" dot — we know it exists, not what it's doing), no steps, no
+    /// transcript — until a hook event reports that pid and
+    /// `AppState.upsertClaudeSession` adopts it.
+    static func provisional(pid: Int32, cwd: String, projectName: String) -> ClaudeSession {
+        let id = provisionalId(pid)
+        return ClaudeSession(
+            id: id, sessionId: id,
+            cwd: cwd, hostApp: nil, sessionBundleId: nil, projectName: projectName,
+            state: .stopped, startedAt: .now, lastEventAt: .now,
+            pid: pid,
+            bodyColor: ClaudeSession.palette.randomElement()?.hex ?? "#F5F6F8",
+            outfit: avatarOutfits.randomElement() ?? .none
+        )
+    }
+}
+
+extension Array where Element == ClaudeSession {
 
     /// Insert a new session, or update its fields in place and promote to the front.
     /// Empty / "unknown" `sessionId` is a no-op. List stays sorted most-recent-first.
@@ -177,7 +209,7 @@ extension Array where Element == ClaudeSession {
             insert(s, at: 0)
         } else {
             let bodyColor = ClaudeSession.palette.randomElement()?.hex ?? "#F5F6F8"
-            let outfit    = Self.avatarOutfits.randomElement() ?? .none
+            let outfit    = ClaudeSession.avatarOutfits.randomElement() ?? .none
             insert(
                 ClaudeSession(
                     id: sessionId, sessionId: sessionId,

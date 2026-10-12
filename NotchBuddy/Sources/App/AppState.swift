@@ -97,6 +97,14 @@ final class AppState: ObservableObject {
         var handle: String?
         if let sid, !sid.isEmpty, let bound = orcaHandleBySession[sid] {
             handle = bound
+        } else if let sid, let s = claudeSessions.first(where: { $0.sessionId == sid }),
+                  let pane = s.pid.flatMap({ orcaPaneByPid[$0] }),
+                  let byPane = await OrcaCLIBridge.shared.handle(paneKey: pane) {
+            // A scanned session has no session id to bind a handle to, but we
+            // know its Orca pane. Two sessions in one folder share a cwd and
+            // the cwd fallback sends both to the same tab; the pane does not.
+            handle = byPane
+            orcaHandleBySession[sid] = byPane
         } else {
             // Pick the cwd that matches the session we're jumping to, not
             // the focused one. For Orca, lastOutputAt can't distinguish
@@ -562,6 +570,29 @@ final class AppState: ObservableObject {
         pid: Int32? = nil
     ) {
         guard !hiddenClaudeSessionIds.contains(sessionId) else { return }
+
+        // Adopt a session the process scan found. The relay reports the pid of
+        // the process that spawned it, so matching on pid is exact — this is
+        // the same session we only knew the cwd of, now with its real id and
+        // state, rather than a second card for the same process.
+        if let pid,
+           let idx = claudeSessions.firstIndex(where: { $0.provisional && $0.pid == pid }),
+           !claudeSessions.contains(where: { $0.sessionId == sessionId }) {
+            var s = claudeSessions[idx]
+            s = ClaudeSession(
+                id: sessionId, sessionId: sessionId,
+                cwd: cwd, hostApp: hostApp, sessionBundleId: sessionBundleId,
+                projectName: projectName, state: phase,
+                startedAt: s.startedAt, lastEventAt: eventTime,
+                pid: pid, bodyColor: s.bodyColor, outfit: s.outfit,
+                customName: s.customName
+            )
+            claudeSessions.remove(at: idx)
+            claudeSessions.insert(s, at: 0)
+            appendAppLog("nb.log", "adopt scanned session pid=\(pid) → \(sessionId) cwd=\(cwd) name=\(projectName)")
+            return
+        }
+
         claudeSessions.upsert(
             sessionId: sessionId, cwd: cwd, hostApp: hostApp,
             sessionBundleId: sessionBundleId, projectName: projectName,
@@ -613,6 +644,50 @@ final class AppState: ObservableObject {
             return (try? await OrcaCLIBridge.shared.send(handle: handle, text: prompt)) ?? false
         } catch {
             return false
+        }
+    }
+
+    // MARK: - Process scan (sessions that predate us)
+
+    private var lastScanAt: Date = .distantPast
+    private var scanInFlight = false
+
+    /// Orca pane per scanned pid, so a jump can land on the right terminal.
+    /// Keyed by pid rather than sessionId because the scanned session has no
+    /// session id yet — and the pid survives adoption. Not @Published:
+    /// nothing renders from it, it only feeds the jump.
+    private var orcaPaneByPid: [Int32: String] = [:]
+
+    /// Look for Claude Code processes that were already running at launch.
+    /// Sessions opened after us announce themselves over the hook, so this
+    /// only exists to cover the ones that started first.
+    func scanForRunningClaudeSessions() {
+        guard !scanInFlight else { return }
+        // The view re-asks every couple of seconds while the card is on screen;
+        // a rescan shells out, so rate-limit it well below that.
+        guard Date().timeIntervalSince(lastScanAt) > 30 else { return }
+        scanInFlight = true
+        lastScanAt = .now
+        Task.detached(priority: .utility) { [weak self] in
+            let found = ClaudeProcessScanner.scan()
+            await MainActor.run { self?.applyScan(found) }
+        }
+    }
+
+    private func applyScan(_ found: [ScannedClaudeProcess]) {
+        scanInFlight = false
+        let live = Set(found.map(\.pid))
+        // A process that has since died shouldn't linger as a card.
+        claudeSessions.removeAll { $0.provisional && ($0.pid.map { !live.contains($0) } ?? true) }
+        for p in found where !claudeSessions.contains(where: { $0.pid == p.pid }) {
+            if let key = p.paneKey { orcaPaneByPid[p.pid] = key }
+            let raw = URL(fileURLWithPath: p.cwd).lastPathComponent
+            claudeSessions.insert(
+                .provisional(pid: p.pid, cwd: p.cwd,
+                             projectName: HookServer.aliasProjectName(raw.isEmpty ? "Claude" : raw)),
+                at: 0
+            )
+            appendAppLog("nb.log", "scan: pid=\(p.pid) cwd=\(p.cwd)")
         }
     }
 

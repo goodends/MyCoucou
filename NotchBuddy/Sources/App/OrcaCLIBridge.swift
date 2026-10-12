@@ -18,8 +18,17 @@ struct OrcaTerminalInfo: Decodable, Identifiable {
     let worktreePath: String?
     let title: String?
     let lastOutputAt: Double?
+    let tabId: String?
+    let leafId: String?
 
     var id: String { handle }
+
+    /// Orca's pane identity — the same string the agent sees in its own
+    /// environment as `ORCA_PANE_KEY`.
+    var paneKey: String? {
+        guard let tabId, let leafId, !tabId.isEmpty, !leafId.isEmpty else { return nil }
+        return "\(tabId):\(leafId)"
+    }
 
     /// Orca encodes the worktree path into `worktreeId` as `<uuid>::<path>`.
     var path: String? {
@@ -329,6 +338,17 @@ actor OrcaCLIBridge {
               let data = try? JSONSerialization.data(withJSONObject: terminal)
         else { throw OrcaCLIError.badShape("show returned no terminal: \(resp)") }
         return try JSONDecoder().decode(OrcaTerminalAgentStatus.self, from: data)
+    }
+
+    /// The terminal whose pane is `paneKey` — Orca's `tabId:leafId`, which the
+    /// agent process carries in its own environment as `ORCA_PANE_KEY`.
+    ///
+    /// Unlike `handle(forCwd:)` this is exact. Cwd can only ever name a folder,
+    /// so two Claude sessions in one folder both resolved to the most recently
+    /// active terminal there; the pane key tells them apart.
+    func handle(paneKey: String) async -> String? {
+        guard let ts = try? await terminals() else { return nil }
+        return ts.first { $0.paneKey == paneKey }?.handle
     }
 
     private func isAgentTerminal(_ t: OrcaTerminalInfo) -> Bool {

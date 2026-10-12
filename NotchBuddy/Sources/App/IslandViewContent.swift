@@ -1837,10 +1837,12 @@ struct ClaudeSessionPill: View {
         )
     }
 
-    /// Under the project name: just the host terminal (the project name is
-    /// already the title above, so repeating the cwd here was redundant).
+    /// Under the project name: the host terminal. For a session the process scan
+    /// found we have no host and nothing else worth saying yet, so say that
+    /// instead of naming a host we don't know.
     private var subtitle: String {
-        ClaudeHost.name(for: session.hostApp ?? session.sessionBundleId)
+        if session.provisional { return String(localized: "Started · no events yet") }
+        return ClaudeHost.name(for: session.hostApp ?? session.sessionBundleId)
     }
 
     private func botState(for phase: SessionPhase) -> BotState {
@@ -1853,7 +1855,10 @@ struct ClaudeSessionPill: View {
     }
 
     private var stateDotColor: String {
-        Self.stateDotColor(for: botTask.state)
+        // A scanned session is alive but silent — nothing says what it's doing,
+        // so the dot stays dim rather than claiming "working".
+        if session.provisional { return "#5F646D" }
+        return Self.stateDotColor(for: botTask.state)
     }
 
     /// Shared mapping so the overview's left card and the right-card pill
@@ -2052,6 +2057,12 @@ struct ClaudeSessionsListView: View {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
                 state.pruneDeadClaudeSessions()
+                // Nothing on the hook pipe at all can still mean a session is
+                // running that started before us — re-check the process table
+                // (rate-limited inside) so the card isn't just blank.
+                if state.claudeSessions.isEmpty {
+                    state.scanForRunningClaudeSessions()
+                }
             }
         }
     }
@@ -2119,6 +2130,14 @@ struct ClaudeSessionsListView: View {
         guard !swapping else { return }
         swapping = true
         SoundEngine.shared.play("blip")
+        // A scanned session has no session id yet, so there is no transcript to
+        // open and focusing it would just show an empty chat. Take the user to
+        // the thing itself instead.
+        if s.provisional {
+            Task { await state.jumpToOrcaTerminal(sessionId: s.sessionId) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
+            return
+        }
         // Open the chat view for this session. PromptView swaps its in-memory
         // history for ChatSessionView's JSONL stream when focusedClaudeSession is set.
         state.focusedSessionId = s.sessionId

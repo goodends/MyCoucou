@@ -327,7 +327,7 @@ final class HookServer: @unchecked Sendable {
                      ?? "unknown"
         let cwd = payload["cwd"] as? String ?? ""
         let rawName = URL(fileURLWithPath: cwd).lastPathComponent
-        let projectName = aliasProjectName(rawName.isEmpty ? "Session" : rawName)
+        let projectName = HookServer.aliasProjectName(rawName.isEmpty ? "Session" : rawName)
 
         // Determine which pill this event belongs to.
         // coucou_agent must be lowercase, digits and hyphens, ≤ 24 chars.
@@ -685,7 +685,7 @@ final class HookServer: @unchecked Sendable {
                      ?? "unknown"
         let cwd       = payload["cwd"]        as? String ?? ""
         let rawName   = URL(fileURLWithPath: cwd).lastPathComponent
-        let projectName = aliasProjectName(rawName.isEmpty ? "Session" : rawName)
+        let projectName = HookServer.aliasProjectName(rawName.isEmpty ? "Session" : rawName)
 
         let rawAgent = payload["coucou_agent"] as? String ?? ""
         let termProgram = payload["term_program"] as? String ?? ""
@@ -890,7 +890,7 @@ final class HookServer: @unchecked Sendable {
                      ?? "unknown"
         let cwd       = payload["cwd"]        as? String ?? ""
         let rawName   = URL(fileURLWithPath: cwd).lastPathComponent
-        let projectName = aliasProjectName(rawName.isEmpty ? "Session" : rawName)
+        let projectName = HookServer.aliasProjectName(rawName.isEmpty ? "Session" : rawName)
 
         let rawAgent    = payload["coucou_agent"] as? String ?? ""
         let termProgram = payload["term_program"]  as? String ?? ""
@@ -1093,7 +1093,10 @@ final class HookServer: @unchecked Sendable {
 
     // MARK: - Project name alias mapping
 
-    private func aliasProjectName(_ name: String) -> String {
+    /// Shared so a session found by the process scan gets the same friendly name
+    /// as one that arrived over a hook — a scanned "notch-buddy" must not read
+    /// differently from a hooked one.
+    static func aliasProjectName(_ name: String) -> String {
         let aliases: [String: String] = [
             "notch-buddy":  "Notch Buddy",
             "notchbuddy":   "Notch Buddy",
