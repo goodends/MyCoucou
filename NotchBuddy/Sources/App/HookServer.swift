@@ -337,6 +337,12 @@ final class HookServer: @unchecked Sendable {
         let termProgram = payload["term_program"] as? String ?? ""
         let bundleId    = payload["bundle_id"]    as? String ?? ""
 
+        // PID of the process that spawned the hook (the agent itself), reported by
+        // the relay. nil when the relay couldn't resolve it — the session then falls
+        // back to the idle-timeout rule instead of a liveness check.
+        let rawAgentPid = (payload["agent_pid"] as? NSNumber)?.int32Value ?? 0
+        let agentPid: Int32? = rawAgentPid > 0 ? rawAgentPid : nil
+
         // Cursor identified solely by its stable Electron bundle ID.
         // ToDesktop builds other apps too — do not match on "todesktop" alone.
         let isCursorEditor = bundleId.lowercased() == "com.todesktop.230313mzl4w4u92"
@@ -441,7 +447,7 @@ final class HookServer: @unchecked Sendable {
 
         case "SessionStart":
             activeSessionId = sessionId
-            if isClaudeSession { updateClaudeSession(phase: .spawning, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession { updateClaudeSession(phase: .spawning, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
             if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId, sessionId: sessionId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                 state.tasks[idx].finalLine = nil
@@ -459,7 +465,7 @@ final class HookServer: @unchecked Sendable {
 
         case "UserPromptSubmit":
             activeSessionId = sessionId
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
             if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId, sessionId: sessionId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
             state.updateTask(id: agentId, state: .thinking)
@@ -482,7 +488,7 @@ final class HookServer: @unchecked Sendable {
             let input = payload["tool_input"] as? [String: Any] ?? [:]
             let step = localizedStep(tool: tool, input: input)
             appendStep(id: agentId, step: step, sessionId: sessionId)
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
             nbLog("PreToolUse \(tool)")
 
         case "PostToolUse":
@@ -495,12 +501,12 @@ final class HookServer: @unchecked Sendable {
                 let step = String.makeDiffStep(filename: diff.name, added: diff.added, removed: diff.removed, diffId: idx)
                 appendStep(id: agentId, step: step, sessionId: sessionId)
             }
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "PostToolUseFailure":
             state.updateTask(id: agentId, state: .working)
             appendStep(id: agentId, step: "⚠ failed", sessionId: sessionId)
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "Notification":
             let message = payload["message"] as? String ?? ""
@@ -531,7 +537,7 @@ final class HookServer: @unchecked Sendable {
             state.lastFinishedAgentId = agentId
             if isClaudeSession {
                 state.lastFinishedSessionId = sessionId
-                updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName)
+                updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             SoundEngine.shared.play("finish")
@@ -557,14 +563,14 @@ final class HookServer: @unchecked Sendable {
             } else {
                 setPillBadge(id: agentId, badge: .error)
             }
-            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "Interrupt":
             // Codex: user stopped the turn
             activeSessionId = nil
             state.updateTask(id: agentId, state: .idle)
             clearPillBadge(id: agentId)
-            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName) }
+            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "SessionEnd":
             activeSessionId = nil
@@ -1014,7 +1020,8 @@ final class HookServer: @unchecked Sendable {
         cwd: String,
         hostApp: String?,
         bundleId: String?,
-        projectName: String
+        projectName: String,
+        pid: Int32? = nil
     ) {
         guard !sessionId.isEmpty, sessionId != "unknown" else { return }
         AppState.shared.upsertClaudeSession(
@@ -1024,7 +1031,8 @@ final class HookServer: @unchecked Sendable {
             sessionBundleId: bundleId,
             projectName: projectName,
             phase: phase,
-            eventTime: .now
+            eventTime: .now,
+            pid: pid
         )
     }
 
@@ -3017,7 +3025,40 @@ private let nbHookPythonGitHub = """
 #!/usr/bin/env python3
 # nb-hook.py — Coucou hook relay for Claude Code and third-party agents (GitHub version)
 # Reads JSON from stdin, forwards to Coucou via Unix socket, translates response.
-import sys, json, os, socket
+import sys, json, os, socket, subprocess
+
+_SHELLS = ('sh', 'zsh', 'bash', 'dash', 'ksh')
+
+def agent_pid():
+    # PID of the agent process that spawned this hook (Claude Code, Codex, …).
+    # Walk up the parent chain skipping shells — the agent runs the hook through
+    # one or more of them, so the first non-shell ancestor is the agent itself.
+    # The app uses this to tell a live session from one whose process was killed,
+    # instead of guessing from how long ago the last hook event arrived.
+    # 0 when the chain can't be resolved; the app then falls back to its own rule.
+    try:
+        out = subprocess.run(['ps', '-Ao', 'pid=,ppid=,comm='],
+                             capture_output=True, text=True).stdout
+    except Exception:
+        return 0
+    parent, comm = {}, {}
+    for line in out.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        try:
+            parent[int(parts[0])] = int(parts[1])
+        except ValueError:
+            continue
+        comm[int(parts[0])] = parts[2].rsplit('/', 1)[-1]
+    pid = os.getppid()
+    for _ in range(6):
+        if pid <= 1 or pid not in parent:
+            return 0
+        if comm.get(pid, '') not in _SHELLS:
+            return pid
+        pid = parent[pid]
+    return 0
 
 def normalize_event(name):
     mapping = {
@@ -3105,6 +3146,8 @@ def main():
         # this Claude session. Forwarded on every event so the app can bind
         # sessionId -> handle even when the app started after the session.
         payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
+        # Orca exports the spawning agent's pid directly; prefer it over the guess.
+        payload.setdefault('agent_pid', int(env.get('ORCA_HOOK_AGENT_PID') or 0) or agent_pid())
         if 'cwd' not in payload or not payload['cwd']:
             paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
             if isinstance(paths, list) and paths:
@@ -3176,6 +3219,8 @@ def main():
     # this Claude session. Forwarded on every event so the app can bind
     # sessionId -> handle even when the app started after the session.
     payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
+    # Orca exports the spawning agent's pid directly; prefer it over the guess.
+    payload.setdefault('agent_pid', int(env.get('ORCA_HOOK_AGENT_PID') or 0) or agent_pid())
     if 'cwd' not in payload or not payload['cwd']:
         paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
         if isinstance(paths, list) and paths:
@@ -3297,7 +3342,40 @@ private let nbHookPythonAppStore = """
 #!/usr/bin/env python3
 # nb-hook.py — Coucou (App Store) hook relay for Claude Code and third-party agents
 # Socket lives inside the sandboxed container; script runs outside the sandbox.
-import sys, json, os, socket
+import sys, json, os, socket, subprocess
+
+_SHELLS = ('sh', 'zsh', 'bash', 'dash', 'ksh')
+
+def agent_pid():
+    # PID of the agent process that spawned this hook (Claude Code, Codex, …).
+    # Walk up the parent chain skipping shells — the agent runs the hook through
+    # one or more of them, so the first non-shell ancestor is the agent itself.
+    # The app uses this to tell a live session from one whose process was killed,
+    # instead of guessing from how long ago the last hook event arrived.
+    # 0 when the chain can't be resolved; the app then falls back to its own rule.
+    try:
+        out = subprocess.run(['ps', '-Ao', 'pid=,ppid=,comm='],
+                             capture_output=True, text=True).stdout
+    except Exception:
+        return 0
+    parent, comm = {}, {}
+    for line in out.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        try:
+            parent[int(parts[0])] = int(parts[1])
+        except ValueError:
+            continue
+        comm[int(parts[0])] = parts[2].rsplit('/', 1)[-1]
+    pid = os.getppid()
+    for _ in range(6):
+        if pid <= 1 or pid not in parent:
+            return 0
+        if comm.get(pid, '') not in _SHELLS:
+            return pid
+        pid = parent[pid]
+    return 0
 
 def normalize_event(name):
     mapping = {
@@ -3385,6 +3463,8 @@ def main():
         # this Claude session. Forwarded on every event so the app can bind
         # sessionId -> handle even when the app started after the session.
         payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
+        # Orca exports the spawning agent's pid directly; prefer it over the guess.
+        payload.setdefault('agent_pid', int(env.get('ORCA_HOOK_AGENT_PID') or 0) or agent_pid())
         if 'cwd' not in payload or not payload['cwd']:
             paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
             if isinstance(paths, list) and paths:
@@ -3455,6 +3535,8 @@ def main():
     # this Claude session. Forwarded on every event so the app can bind
     # sessionId -> handle even when the app started after the session.
     payload.setdefault('orca_terminal_handle', env.get('ORCA_TERMINAL_HANDLE', ''))
+    # Orca exports the spawning agent's pid directly; prefer it over the guess.
+    payload.setdefault('agent_pid', int(env.get('ORCA_HOOK_AGENT_PID') or 0) or agent_pid())
     if 'cwd' not in payload or not payload['cwd']:
         paths = payload.get('workspacePaths') or payload.get('workspace_roots', [])
         if isinstance(paths, list) and paths:

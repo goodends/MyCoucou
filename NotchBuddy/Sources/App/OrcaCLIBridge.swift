@@ -33,6 +33,46 @@ struct OrcaTerminalList: Decodable {
     let terminals: [OrcaTerminalInfo]
 }
 
+/// An Orca-managed worktree — the unit `terminal create` can spawn into.
+/// `orca terminal create --worktree path:<p>` rejects anything Orca doesn't
+/// manage (verified: a plain directory returns `selector_not_found`), so this
+/// list is also the set of folders a user can actually start an agent in.
+struct OrcaWorktree: Decodable, Identifiable {
+    let id: String          // "<uuid>::<path>"
+    let path: String
+    let displayName: String?
+    let isArchived: Bool?
+
+    /// What the picker shows. Deliberately the folder's own name rather than
+    /// Orca's `displayName`: for plain checkouts Orca reports `displayName:
+    /// "main"` (the branch), so four unrelated projects all render as "main"
+    /// and the list is unusable. The basename is unique and says which repo it is.
+    var name: String {
+        let base = URL(fileURLWithPath: path).lastPathComponent
+        if !base.isEmpty { return base }
+        if let n = displayName, !n.isEmpty { return n }
+        return path
+    }
+}
+
+struct OrcaWorktreeList: Decodable {
+    let worktrees: [OrcaWorktree]
+}
+
+/// `terminal create` result — the handle is what `send` needs.
+struct OrcaTerminalCreateResult: Decodable {
+    struct Terminal: Decodable { let handle: String }
+    let terminal: Terminal
+}
+
+/// `terminal show` readiness fields. `agentIdentity` turns non-null once the
+/// agent process in the PTY is actually up; `agentWait` is non-null while Orca
+/// still considers the agent starting, so both must clear before we type.
+struct OrcaTerminalAgentStatus: Decodable {
+    let agentIdentity: String?
+    let agentWait: Bool?
+}
+
 /// `terminal send` result: the input-acceptance verdict plus, when the host
 /// supports it, a prompt receipt whose `stages` say whether the agent
 /// actually took the prompt.
@@ -214,6 +254,81 @@ actor OrcaCLIBridge {
             return isAgentTerminal(t)
         }
         return agents.max(by: { ($0.lastOutputAt ?? 0) < ($1.lastOutputAt ?? 0) })?.handle
+    }
+
+    // MARK: - Starting a fresh agent
+
+    /// Orca-managed worktrees, non-archived first. This is the project picker's
+    /// backing list — the only folders `terminal create` will accept.
+    func worktrees() async throws -> [OrcaWorktree] {
+        let resp = try await run(["worktree", "list"])
+        guard resp["ok"] as? Bool == true,
+              let result = resp["result"] as? [String: Any],
+              let data = try? JSONSerialization.data(withJSONObject: result)
+        else { throw OrcaCLIError.badShape("missing result: \(resp)") }
+        let all = try JSONDecoder().decode(OrcaWorktreeList.self, from: data).worktrees
+        return all
+            .filter { $0.isArchived != true }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Spawn a terminal running `command` in `worktreePath` and return its handle.
+    ///
+    /// Deliberately passes neither `--title` nor `--focus`:
+    /// • no title — Orca derives it from what the PTY is actually running, and
+    ///   that title is what marks the terminal as an agent session; pinning our
+    ///   own would hide the agent from every title-based check.
+    /// • no `--focus` — it makes the CLI wait for the Orca UI to adopt the
+    ///   terminal, which intermittently times out *after* the terminal has
+    ///   already spawned (leaking a session we never got a handle for). The
+    ///   terminal is created visible either way; callers switch to it with
+    ///   `focus(handle:)`, which is a separate call we can fail cleanly.
+    func createTerminal(worktreePath: String, command: String) async throws -> String {
+        let resp = try await run([
+            "terminal", "create",
+            "--worktree", "path:\(worktreePath)",
+            "--command", command,
+        ])
+        guard resp["ok"] as? Bool == true,
+              let result = resp["result"] as? [String: Any],
+              let data = try? JSONSerialization.data(withJSONObject: result),
+              let created = try? JSONDecoder().decode(OrcaTerminalCreateResult.self, from: data)
+        else { throw OrcaCLIError.badShape("create returned no handle: \(resp)") }
+        return created.terminal.handle
+    }
+
+    /// Wait until the agent in `handle` is up and accepting input.
+    ///
+    /// `terminal create --command claude` returns as soon as the PTY exists,
+    /// which is well before Claude has rendered. Typing into that window sends
+    /// the text to the shell prompt instead of to Claude, so the send is gated
+    /// on Orca reporting a live agent. Returns false on timeout — the caller
+    /// reports "not sent" rather than firing text at a shell.
+    @discardableResult
+    func waitForAgent(handle: String, timeout: TimeInterval = 25) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let status = try? await agentStatus(handle: handle),
+               status.agentIdentity != nil, status.agentIdentity != "",
+               status.agentWait != true {
+                // Orca can report the agent up a beat before it reads the PTY;
+                // give it one more poll so the first prompt isn't swallowed.
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                return true
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        return false
+    }
+
+    private func agentStatus(handle: String) async throws -> OrcaTerminalAgentStatus {
+        let resp = try await run(["terminal", "show", "--terminal", handle])
+        guard resp["ok"] as? Bool == true,
+              let result = resp["result"] as? [String: Any],
+              let terminal = result["terminal"] as? [String: Any],
+              let data = try? JSONSerialization.data(withJSONObject: terminal)
+        else { throw OrcaCLIError.badShape("show returned no terminal: \(resp)") }
+        return try JSONDecoder().decode(OrcaTerminalAgentStatus.self, from: data)
     }
 
     private func isAgentTerminal(_ t: OrcaTerminalInfo) -> Bool {

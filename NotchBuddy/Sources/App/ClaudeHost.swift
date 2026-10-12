@@ -3,8 +3,8 @@ import AppKit
 // MARK: - ClaudeHost
 //
 // The app a Claude Code session runs in, from the hook payload's term_program /
-// bundle_id. VS Code sessions keep the original "VS Code" pill; sessions from a
-// terminal also route to integration_claude and the pill says "Claude Code".
+// bundle_id. Terminal sessions are named after the terminal; a nil host means
+// the session runs inside an editor, which for Claude Code means VS Code.
 
 struct ClaudeHost: Equatable {
     let bundleId: String
@@ -52,15 +52,16 @@ struct ClaudeHost: Equatable {
         return nil
     }
 
-    /// The app name for a task's host; nil host means VS Code (the original routing).
+    /// The app name for a task's host.
+    ///
+    /// `hostApp` is nil exactly when the session isn't running in one of the
+    /// terminals above — i.e. it runs inside an editor (VS Code being the one
+    /// Claude Code ships an extension for). So "VS Code" here is a real reading
+    /// of the host, not a placeholder: it is only ever reached for a session
+    /// that actually exists.
     static func name(for hostBundleId: String?) -> String {
         guard let id = hostBundleId, let name = terminals[id] else { return "VS Code" }
         return name
-    }
-
-    /// Pill label for integration_claude: "VS Code" for editor sessions, "Claude Code" otherwise.
-    static func pillName(hostApp: String?) -> String {
-        hostApp == nil ? "VS Code" : "Claude Code"
     }
 
     /// Brings the session's terminal forward (launching it if needed). false when not a terminal host.

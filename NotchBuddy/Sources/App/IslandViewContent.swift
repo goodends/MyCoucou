@@ -8,7 +8,12 @@ struct IslandViewContent: View {
 
     var body: some View {
         switch view {
-        case .overview:  OverviewView(state: state)
+        // Nothing real is running (no live Claude session, and the permanent
+        // integration_claude pill has no activity) — say so instead of
+        // rendering a character for an agent that isn't there.
+        case .overview:
+            if state.hasOverviewContent { OverviewView(state: state) }
+            else { EmptyStateView(state: state) }
         case .empty:     EmptyStateView(state: state)
         case .approval:  ApprovalView(state: state)
         case .question:  QuestionView(state: state)
@@ -832,6 +837,139 @@ struct PromptView: View {
     @State private var showNotWiredToast = false
     @State private var chipHovered = false
 
+    // Project picker — shown instead of the host chip when there's no live
+    // session to jump to or type into. Picking a worktree starts a Claude Code
+    // there and delivers `pendingPrompt` (the message the user had already
+    // typed when they found out there was nowhere to send it).
+    @State private var showProjectPicker = false
+    @State private var startingInPath: String? = nil
+    @State private var pendingPrompt: String? = nil
+
+    /// A session the chat can actually reach: one Coucou has seen hook events
+    /// from. Everything host-shaped in this view keys off this — without it the
+    /// chips would be naming a process that isn't there.
+    private var hasSession: Bool {
+        state.focusedSessionId != nil || state.focusTask?.sessionId != nil
+    }
+
+    /// The picker stands in for the host chip when there's no session to name,
+    /// and only where starting a session is actually possible.
+    private var canPickProject: Bool {
+        !hasSession && OrcaCLIBridge.isInstalled
+    }
+
+    private var projectPickerButton: some View {
+        Button {
+            showProjectPicker.toggle()
+            if showProjectPicker { Task { await state.loadOrcaWorktrees() } }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "folder")
+                    .font(.system(size: 9, weight: .medium))
+                Text(String(localized: "Pick a project"))
+                    .font(.system(size: 10.5, weight: .medium))
+            }
+            .foregroundColor(Color(hex: "#7B8089"))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.white.opacity(chipHovered ? 0.12 : 0.06))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { chipHovered = $0 }
+        .help(String(localized: "Start a Claude Code session in a project"))
+        // The chip sits near the bottom edge of the island, so the list opens upward
+        // — flipping it round and down would hang it off the card.
+        .popover(isPresented: $showProjectPicker, arrowEdge: .top) {
+            projectPickerPopover
+        }
+    }
+
+    private var projectPickerPopover: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(String(localized: "Start Claude Code in…"))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Color(hex: "#8E939C"))
+            if state.orcaWorktreesLoading {
+                Text(String(localized: "Loading…"))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#6B7079"))
+            } else if let list = state.orcaWorktrees, !list.isEmpty {
+                ForEach(list) { wt in
+                    Button {
+                        startSession(in: wt)
+                    } label: {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(wt.name)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(Color(hex: "#F5F6F8"))
+                                Text(wt.path)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Color(hex: "#6B7079"))
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                            }
+                            Spacer(minLength: 6)
+                            if startingInPath == wt.path {
+                                ProgressView().controlSize(.mini)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(startingInPath != nil)
+                }
+            } else {
+                // Orca is installed but answered with nothing usable — say so
+                // instead of showing a picker that can only fail.
+                Text(String(localized: "No Orca projects found. Open one in Orca first."))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#6B7079"))
+                    .frame(width: 220, alignment: .leading)
+            }
+        }
+        .padding(12)
+        .frame(width: 260)
+        // Popovers default to the system material — a light panel that clashes
+        // with every other surface here. Same fill and hairline as
+        // CardBackground so it reads as part of the island.
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#141518"))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                )
+        )
+        .presentationBackground(Color(hex: "#141518"))
+    }
+
+    /// Spawn Claude Code in `wt` and deliver whatever the user had already typed
+    /// when they found out there was nowhere to send it.
+    private func startSession(in wt: OrcaWorktree) {
+        let prompt = pendingPrompt
+        pendingPrompt = nil
+        text = ""
+        startingInPath = wt.path
+        Task { @MainActor in
+            let ok = await state.startClaudeSession(in: wt.path, prompt: prompt)
+            startingInPath = nil
+            if ok {
+                showProjectPicker = false
+                showNotWiredToast = false
+            } else {
+                // Keep the words and the picker open: the user can retry, and
+                // Claude Code really might not have come up.
+                text = prompt ?? ""
+                pendingPrompt = prompt
+                showNotWiredToast = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
+            }
+        }
+    }
+
     private var historyBinding: [HistoryEntry] {
         state.focusTask?.history ?? []
     }
@@ -862,7 +1000,13 @@ struct PromptView: View {
         //    (may be stale from a previous terminal session).
         guard let task = state.focusTask else { return "Claude Code" }
         if task.id == "integration_claude" {
-            return ClaudeHost.name(for: task.hostApp ?? task.sessionBundleId)
+            // No live session behind this label. ClaudeHost.name(for: nil)
+            // answers "VS Code" because it reads a nil *host* as an editor
+            // session — true for a real session, a guess for the bare
+            // placeholder pill. Name the agent instead of inventing a host.
+            return state.hasOverviewContent
+                ? ClaudeHost.name(for: task.hostApp ?? task.sessionBundleId)
+                : "Claude Code"
         }
         return task.name
     }
@@ -943,21 +1087,30 @@ struct PromptView: View {
 
                 HStack(spacing: 6) {
                     Spacer()
-                    #if !APPSTORE
-                    Button(action: { openChatTerminal() }) {
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundColor(Color(hex: "#5F646D"))
-                            .frame(width: 16, height: 16)
-                            .background(Color.white.opacity(0.07))
-                            .clipShape(Circle())
+                    // With no live session there is no terminal to jump to and
+                    // no host to name — both chips would lie. Offer the only
+                    // action that does something real: start one.
+                    if canPickProject {
+                        projectPickerButton
                     }
-                    .buttonStyle(.plain)
-                    .help(String(localized: "Open terminal"))
+                    #if !APPSTORE
+                    if hasSession {
+                        Button(action: { openChatTerminal() }) {
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(Color(hex: "#5F646D"))
+                                .frame(width: 16, height: 16)
+                                .background(Color.white.opacity(0.07))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(String(localized: "Open terminal"))
+                    }
                     #endif
                     // The chip names where the session runs, so it doubles as
                     // the jump — same action as the ↗ beside it.
-                    Button(action: { openChatTerminal() }) {
+                    if hasSession {
+                        Button(action: { openChatTerminal() }) {
                         HStack(spacing: 5) {
                             Circle()
                                 .fill(Color(hex: state.focusTask?.color ?? "#7B8089"))
@@ -970,10 +1123,11 @@ struct PromptView: View {
                         .padding(.vertical, 4)
                         .background(Color.white.opacity(chipHovered ? 0.12 : 0.06))
                         .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { chipHovered = $0 }
+                        .help(String(localized: "Open terminal"))
                     }
-                    .buttonStyle(.plain)
-                    .onHover { chipHovered = $0 }
-                    .help(String(localized: "Open terminal"))
                 }
                 .padding(.horizontal, 10)
 
@@ -1071,6 +1225,18 @@ struct PromptView: View {
         #endif
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
+
+        // Nothing to type into. Echoing the prompt anyway used to leave it
+        // sitting in the transcript looking delivered while no agent existed,
+        // which is worse than saying so. Keep the words, and let the user pick
+        // a project to start one in — the pending prompt rides along.
+        guard state.focusedSessionId != nil || state.focusTask?.sessionId != nil else {
+            pendingPrompt = query
+            showNotWiredToast = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
+            if OrcaCLIBridge.isInstalled { showProjectPicker = true }
+            return
+        }
         text = ""
 
         // Append the prompt locally so the user sees it immediately, then
@@ -1816,12 +1982,20 @@ struct ClaudeSessionsListView: View {
     @State private var swapping = false
     @State private var showHidden = false
 
-    /// 30-min idle threshold for zombie sessions (killed Claude process with no SessionEnd).
+    /// Fallback threshold for sessions the relay gave us no pid for (an agent
+    /// still on an older relay, or a parent chain it couldn't resolve). Only
+    /// these age out — a session that reported a pid is judged by whether its
+    /// process is still alive, never by how long ago the last event arrived:
+    /// a session idling at the prompt fires no events at all, and used to
+    /// vanish from here after 30 minutes while its process was perfectly fine.
     private static let idleCutoff: TimeInterval = 30 * 60
 
     private var live: [ClaudeSession] {
         let cutoff = Date().addingTimeInterval(-Self.idleCutoff)
-        return state.claudeSessions.filter { $0.lastEventAt >= cutoff }
+        return state.claudeSessions.filter { s in
+            if s.pid != nil { return state.isClaudeSessionAlive(s) }
+            return s.lastEventAt >= cutoff
+        }
     }
 
     /// Sessions the user has hidden via "Stop monitoring" but the process is
@@ -1868,6 +2042,18 @@ struct ClaudeSessionsListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            // A killed process announces nothing, so there is no event to
+            // re-render this list — the stale pill would sit there until the
+            // user happened to touch something. Poll while the card is on
+            // screen; `.task` is cancelled when it goes away, so a hidden
+            // island stays at 0% CPU.
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled else { return }
+                state.pruneDeadClaudeSessions()
+            }
+        }
     }
 
     /// "Hidden: N" chip + a popover with one row per hidden session, each

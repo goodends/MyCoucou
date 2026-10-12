@@ -188,6 +188,20 @@ final class AppState: ObservableObject {
         return claudeSessions.first
     }
 
+    /// Whether the overview has something real to show.
+    ///
+    /// `integration_claude` is a permanent catalog placeholder — it means
+    /// "Claude Code is wired up", not "a session is running". Rendering it as
+    /// the left card's character painted an empty Mochi under a host name
+    /// Coucou knew nothing about, so the home view claimed an agent that
+    /// didn't exist. It only counts once a hook event has given it steps to
+    /// report; any other pill (Codex, Copilot…) counts on its own.
+    var hasOverviewContent: Bool {
+        if overviewSession != nil { return true }
+        guard let task = focusTask else { return false }
+        return task.id != "integration_claude" || !task.steps.isEmpty
+    }
+
     /// Synthesise an `AgentTask` for a Claude session so we can feed existing
     /// ticker / pill views that take an AgentTask. Source is always `.claudeCode`;
     /// `id` carries the sessionId so list lookups still work.
@@ -544,14 +558,85 @@ final class AppState: ObservableObject {
         sessionBundleId: String?,
         projectName: String,
         phase: SessionPhase,
-        eventTime: Date
+        eventTime: Date,
+        pid: Int32? = nil
     ) {
         guard !hiddenClaudeSessionIds.contains(sessionId) else { return }
         claudeSessions.upsert(
             sessionId: sessionId, cwd: cwd, hostApp: hostApp,
             sessionBundleId: sessionBundleId, projectName: projectName,
-            phase: phase, eventTime: eventTime
+            phase: phase, eventTime: eventTime, pid: pid
         )
+    }
+
+    /// Orca-managed worktrees, loaded when the project picker opens. nil until
+    /// then — this is a user-initiated list, not something to fetch at launch.
+    @Published var orcaWorktrees: [OrcaWorktree]? = nil
+    /// Worktrees still loading, or whose load failed. Drives the picker's
+    /// "loading" / "couldn't reach Orca" copy.
+    @Published var orcaWorktreesLoading = false
+
+    /// Load (once per open) the list of projects a Claude session can be
+    /// started in. Returns false when Orca isn't installed or the CLI failed,
+    /// so the caller can keep the picker closed.
+    @discardableResult
+    func loadOrcaWorktrees() async -> Bool {
+        guard OrcaCLIBridge.isInstalled else { return false }
+        if orcaWorktrees != nil { return true }
+        orcaWorktreesLoading = true
+        defer { orcaWorktreesLoading = false }
+        guard let list = try? await OrcaCLIBridge.shared.worktrees() else { return false }
+        orcaWorktrees = list
+        return true
+    }
+
+    /// Start a fresh Claude Code session in `worktreePath` and hand `prompt` to
+    /// it. Returns false when Orca is missing, the create failed, the agent
+    /// never came up, or the prompt wasn't accepted — the caller must not
+    /// pretend any of those sent.
+    ///
+    /// The new session announces itself through the usual SessionStart hook a
+    /// moment later, so it joins `claudeSessions` on its own; we only cache the
+    /// handle so the send path can reach it before that lands.
+    func startClaudeSession(in worktreePath: String, prompt: String?) async -> Bool {
+        guard OrcaCLIBridge.isInstalled else { return false }
+        do {
+            let handle = try await OrcaCLIBridge.shared.createTerminal(
+                worktreePath: worktreePath, command: "claude"
+            )
+            // Bring the new tab forward ourselves rather than making `create`
+            // block on the UI adopting it (see createTerminal's note).
+            activateOrcaApp()
+            try? await OrcaCLIBridge.shared.focus(handle: handle)
+            guard await OrcaCLIBridge.shared.waitForAgent(handle: handle) else { return false }
+            guard let prompt, !prompt.isEmpty else { return true }
+            return (try? await OrcaCLIBridge.shared.send(handle: handle, text: prompt)) ?? false
+        } catch {
+            return false
+        }
+    }
+
+    /// True while the session's agent process is still running.
+    ///
+    /// Signal 0 makes `kill` do its permission / existence check only — it never
+    /// signals the process. `EPERM` (pid exists, owned by someone else) still
+    /// means alive; only `ESRCH` (no such process) means dead.
+    func isClaudeSessionAlive(_ session: ClaudeSession) -> Bool {
+        guard let pid = session.pid, pid > 0 else { return false }
+        return kill(pid, 0) == 0 || errno == EPERM
+    }
+
+    /// Drop sessions whose agent process is gone. Called on a timer while the
+    /// overview is on screen, because nothing else re-renders the list when a
+    /// process dies — the last hook event already came in minutes ago.
+    func pruneDeadClaudeSessions() {
+        let dead = claudeSessions.filter { $0.pid != nil && !isClaudeSessionAlive($0) }
+        guard !dead.isEmpty else { return }
+        for s in dead {
+            claudeSessions.removeById(s.sessionId)
+            claudeSessionSteps[s.sessionId] = nil
+            if focusedSessionId == s.sessionId { focusedSessionId = nil }
+        }
     }
 
     /// Mark a session as "stop monitoring": drop it from the right-side list
@@ -643,9 +728,11 @@ final class AppState: ObservableObject {
         } else if let cwd = tasks[idx].sessionCwd {
             url = SessionHistoryLoader.mostRecentSessionURL(cwd: cwd)
         } else {
-            // Fallback: SessionStart never fired (Coucou started after Claude Code).
-            // Scan every project and use the most recently modified .jsonl anywhere.
-            url = SessionHistoryLoader.mostRecentSessionAcrossProjects()
+            // No cwd and no session id: nothing identifies which transcript
+            // belongs to this task. The old fallback took the newest .jsonl
+            // under ~/.claude and filed it here, which attributes an unrelated
+            // past session to whatever agent this pill is showing.
+            url = nil
         }
         guard let url, FileManager.default.fileExists(atPath: url.path) else { return }
         let entries = SessionHistoryLoader.loadHistory(from: url)

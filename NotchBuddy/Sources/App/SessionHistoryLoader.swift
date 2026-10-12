@@ -29,20 +29,6 @@ enum SessionHistoryLoader {
             .appendingPathComponent(".claude/projects/\(encoded)"))
     }
 
-    /// Most recently modified `.jsonl` across ALL `~/.claude/projects/*/`.
-    /// Used when the task has no `sessionCwd` either (Coucou has never seen a
-    /// SessionStart event for the pill).
-    static func mostRecentSessionAcrossProjects() -> URL? {
-        // Try homeDirectoryForCurrentUser first, then fall back to NSHomeDirectory
-        // (the app's container can differ from $HOME in some Xcode runs).
-        let home = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/projects")
-        if let url = mostRecentJSONL(in: home) { return url }
-        let alt = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent(".claude/projects")
-        return mostRecentJSONL(in: alt)
-    }
-
     /// Find the `.jsonl` for `sessionId` across ALL `~/.claude/projects/*/`.
     /// Used when the session's cwd doesn't match the JSONL's project directory
     /// (e.g. Orca launches Claude Code with a process cwd different from the

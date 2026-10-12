@@ -297,13 +297,22 @@ struct ChatSessionView: View {
             } else if let cwd = state.focusTask?.sessionCwd {
                 return SessionHistoryLoader.mostRecentSessionURL(cwd: cwd)
             } else {
-                return SessionHistoryLoader.mostRecentSessionAcrossProjects()
+                // No session, no cwd — nothing identifies a transcript. The old
+                // fallback grabbed the newest .jsonl anywhere under ~/.claude and
+                // rendered it as this conversation, which on a fresh launch is
+                // some unrelated past session dressed up as the current one.
+                return nil
             }
         }()
         guard let url, FileManager.default.fileExists(atPath: url.path) else {
-            let tried = url?.path ?? "<nil>"
+            // Nothing identifies a transcript at all (no session, no cwd) is a
+            // plain empty chat, not a load failure worth shouting about. A cwd
+            // that pointed at a missing file still is an error.
+            let nothingToShow = target == nil && state.focusTask?.sessionCwd == nil
             lines = []
-            loadError = "no .jsonl found\ntried: \(tried)\nhome: \(NSHomeDirectory())"
+            loadError = nothingToShow
+                ? nil
+                : "no .jsonl found\ntried: \(url?.path ?? "<nil>")\nhome: \(NSHomeDirectory())"
             lastLoadedURL = "MISSING"
             stopWatching()
             return

@@ -96,7 +96,13 @@ struct ClaudeSession: Identifiable, Equatable {
     var projectName: String         // cwd.lastPathComponent, after aliasProjectName
     var state: SessionPhase
     var startedAt: Date
-    var lastEventAt: Date           // used for lazy GC of zombie sessions (>30 min idle)
+    var lastEventAt: Date           // fallback GC for sessions that never reported a pid
+    /// PID of the agent process running this session, reported by the hook relay.
+    /// The right-side list keeps the session while this process is alive, so an
+    /// idle session waiting at the prompt stays visible instead of timing out.
+    /// nil for sessions last seen before the relay learned to report a pid (or
+    /// from a third-party agent whose parent chain couldn't be resolved).
+    var pid: Int32? = nil
     /// Body color for this session's mini Mochi — random on first upsert,
     /// fixed for the session's lifetime.
     var bodyColor: String = "#F5F6F8"
@@ -152,7 +158,8 @@ extension Array where Element == ClaudeSession {
         sessionBundleId: String?,
         projectName: String,
         phase: SessionPhase,
-        eventTime: Date
+        eventTime: Date,
+        pid: Int32? = nil
     ) {
         guard !sessionId.isEmpty, sessionId != "unknown" else { return }
         if let idx = firstIndex(where: { $0.sessionId == sessionId }) {
@@ -163,6 +170,9 @@ extension Array where Element == ClaudeSession {
             s.projectName = projectName
             s.state = phase
             s.lastEventAt = eventTime
+            // Keep the last known pid when an event omits it — an older relay
+            // reporting no pid must not demote a session we can already track.
+            if let pid { s.pid = pid }
             remove(at: idx)
             insert(s, at: 0)
         } else {
@@ -174,6 +184,7 @@ extension Array where Element == ClaudeSession {
                     cwd: cwd, hostApp: hostApp, sessionBundleId: sessionBundleId,
                     projectName: projectName, state: phase,
                     startedAt: eventTime, lastEventAt: eventTime,
+                    pid: pid,
                     bodyColor: bodyColor, outfit: outfit
                 ),
                 at: 0
