@@ -534,8 +534,9 @@ final class IslandWindowController: NSWindowController {
         if cmd && event.keyCode == 126 { navigateCard(by: -1); return true }
         // ⌘O — open selected card item
         if cmd && event.keyCode == 31  { openCardSelection(); return true }
-        // ⌘E — toggle diff
-        if cmd && event.keyCode == 14 && state.view == .overview {
+        // ⌘E — toggle diff. Also valid on the changes view, which is where most
+        // diffs are opened from now that a session tap leads there.
+        if cmd && event.keyCode == 14 && (state.view == .overview || state.view == .changes) {
             NotificationCenter.default.post(name: .islandToggleDiff, object: nil)
             return true
         }

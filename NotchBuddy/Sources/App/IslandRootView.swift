@@ -370,9 +370,9 @@ struct IslandContentView: View {
                 ForEach(IslandView.allCases, id: \.self) { v in
                     let active = state.view == v
                     // Views that fill available height instead of the fixed 98pt content frame:
-                    // chat (prompt) is always flexible; mail is flexible only when active so
+                    // chat (prompt) and changes are always flexible; mail is flexible only when active so
                     // it doesn't push the ZStack taller when inactive.
-                    let isTall = v == .prompt
+                    let isTall = v == .prompt || v == .changes
                     let anim: Animation = active
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)

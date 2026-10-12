@@ -10,13 +10,9 @@ swiftc -swift-version 6 -strict-concurrency=complete \
     NotchBuddy/Sources/CoucouKit/IslandTypes.swift \
     NotchBuddy/Sources/CoucouKit/MochiOutfitDrawing.swift \
     NotchBuddy/Sources/CoucouKit/MochiWardrobe.swift \
-    NotchBuddy/Sources/CoucouKit/MochiStill.swift \
-    NotchBuddy/Sources/CoucouKit/MochiActivityState.swift \
     NotchBuddy/Sources/CoucouKit/DiffEngine.swift \
     NotchBuddy/Sources/CoucouKit/PillCatalog.swift \
     NotchBuddy/Sources/CoucouKit/PillColors.swift \
-    NotchBuddy/Sources/CoucouKit/TurnSnapshot.swift \
-    NotchBuddy/Sources/CoucouKit/QuestionPayload.swift \
     tests/_stubs.swift \
     tests/ClaudeSessionTests.swift -o "$TEST_DIR/claude-session-tests"
 "$TEST_DIR/claude-session-tests"

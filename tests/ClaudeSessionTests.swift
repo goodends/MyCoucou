@@ -151,6 +151,20 @@ enum ClaudeSessionTests {
               afterRemoveAndReAdd.map { $0.outfit != .auto && $0.outfit != .none } ?? false,
               failures: &failures)
 
+        // Every IslandView needs an entry in viewLayouts. IslandWindowController
+        // and IslandRootView both reach it with a force-unwrap, so a case added
+        // without one compiles fine and then crashes on first display — the one
+        // place where adding a view is a runtime hazard rather than a build
+        // error. This is the only automated guard against that.
+        for v in IslandView.allCases {
+            check("viewLayouts covers .\(v.rawValue)",
+                  IslandConst.viewLayouts[v] != nil,
+                  failures: &failures)
+        }
+        check("viewLayouts has no entry for a view that does not exist",
+              IslandConst.viewLayouts[.overview] != nil,
+              failures: &failures)
+
         if failures > 0 {
             print("\n\(failures) test(s) failed."); exit(1)
         }

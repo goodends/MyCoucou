@@ -496,10 +496,23 @@ final class HookServer: @unchecked Sendable {
             // Live diff for Edit / MultiEdit / Write
             let diffTool = payload["tool_name"] as? String ?? ""
             let diffInput = payload["tool_input"] as? [String: Any] ?? [:]
-            if let diff = buildFileDiff(tool: diffTool, input: diffInput, pillId: agentId) {
-                let idx = state.appendSessionDiff(diff, for: agentId)
-                let step = String.makeDiffStep(filename: diff.name, added: diff.added, removed: diff.removed, diffId: idx)
-                appendStep(id: agentId, step: step, sessionId: sessionId)
+            // File the diff under the session that produced it, not under the
+            // pill: one Claude pill serves every Claude session, so keying on
+            // agentId mixed them all into one array. Same fallback appendStep
+            // uses for a missing session id.
+            if let diff = buildFileDiff(tool: diffTool, input: diffInput) {
+                let scope = isClaudeSession
+                    ? (sessionId.isEmpty || sessionId == "unknown"
+                       ? state.tasks.first { $0.id == agentId }?.sessionId
+                       : sessionId)
+                    : agentId
+                // No usable key means no diff — better to record nothing than
+                // to file a step whose diffId can never be resolved.
+                if let scope, !scope.isEmpty {
+                    let idx = state.appendSessionDiff(diff, for: scope)
+                    let step = String.makeDiffStep(filename: diff.name, added: diff.added, removed: diff.removed, diffId: idx)
+                    appendStep(id: agentId, step: step, sessionId: sessionId)
+                }
             }
             if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
@@ -592,7 +605,9 @@ final class HookServer: @unchecked Sendable {
                 state.tasks[idx].history = []
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
-            state.clearSessionDiffs(for: agentId)
+            // The ended Claude session's diffs went out with removeClaudeSession
+            // above; what remains here are pills that have no session of their own.
+            if !isClaudeSession { state.clearSessionDiffs(for: agentId) }
             // Don't drop the focus pill while other live Claude Code sessions exist.
             let otherLive = !endedSid.isEmpty && state.claudeSessions.contains { $0.sessionId != endedSid }
             if !otherLive { state.removeTask(id: agentId) }
@@ -1187,7 +1202,7 @@ final class HookServer: @unchecked Sendable {
     // MARK: - Live diff helpers
 
     @MainActor
-    private func buildFileDiff(tool: String, input: [String: Any], pillId: String) -> FileDiff? {
+    private func buildFileDiff(tool: String, input: [String: Any]) -> FileDiff? {
         switch tool {
         case "Edit":
             guard let old = input["old_string"] as? String,

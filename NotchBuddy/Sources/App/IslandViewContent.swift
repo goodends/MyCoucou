@@ -26,6 +26,7 @@ struct IslandViewContent: View {
         case .note:      NoteView(state: state)
         case .greeting:  EmptyView()  // GreetingCanvasView overlaid in IslandRootView
         case .wardrobe:  WardrobeView(state: state)
+        case .changes:  SessionChangesView(state: state)
         }
     }
 }
@@ -157,10 +158,13 @@ struct OverviewView: View {
                     .padding(.top, 4)
                 }
 
-                // Diff overlay — replaces ticker when a diff step is tapped
+                // Diff overlay — replaces ticker when a diff step is tapped.
+                // Look the diff up by the session it belongs to: `agent.id` is
+                // a per-session synthetic id ("claude:<uuid>") while diffs are
+                // filed under the real session id, so keying on task.id found
+                // nothing and the card never opened.
                 if let diffId = activeDiffId,
-                   let task = agent,
-                   let diff = state.sessionDiffs[task.id]?.first(where: { $0.id == diffId }) {
+                   let diff = state.diff(id: diffId, in: agent?.sessionId ?? state.focusedSessionId) {
                     CardBackground(wash: nil)
                     DiffCardView(diff: diff, onDismiss: { activeDiffId = nil })
                         .transition(.opacity)
@@ -209,12 +213,18 @@ struct OverviewView: View {
         .onChange(of: state.mode) { _, m in
             if m != .expanded { activeDiffId = nil }
         }
+        // Left card can start showing a different session without focusId
+        // changing (the overview falls back to claudeSessions.first), which
+        // would leave an activeDiffId belonging to the previous one.
+        .onChange(of: agent?.sessionId) { _, _ in
+            activeDiffId = nil
+        }
         .onReceive(NotificationCenter.default.publisher(for: .islandToggleDiff)) { _ in
             if let id = activeDiffId {
                 withAnimation(.easeIn(duration: 0.16)) { activeDiffId = nil }
                 _ = id
-            } else if let task = state.focusTask,
-                      let last = state.sessionDiffs[task.id]?.last {
+            } else if let key = agent?.sessionId ?? state.focusedSessionId ?? state.focusTask?.sessionId,
+                      let last = state.diffs(for: key).last {
                 withAnimation(.easeIn(duration: 0.16)) { activeDiffId = last.id }
             }
         }
@@ -734,6 +744,159 @@ struct DiffCardView: View {
         }
         #endif
         NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+}
+
+// MARK: - Per-session changes
+
+/// The files one session edited, rolled up per file and most recent first.
+/// Tapping a row opens that file's latest diff in the same card the ticker
+/// opens — `lastDiffId` rather than the row itself, so a file edited twice
+/// still shows its newest state while the counts stay cumulative.
+struct SessionChangesView: View {
+    @ObservedObject var state: AppState
+    /// Held as an id rather than a FileDiff so the card re-reads itself if the
+    /// same file is edited again while it is open.
+    @State private var openDiffId: Int?
+
+    private var session: ClaudeSession? { state.focusedClaudeSession ?? state.overviewSession }
+    private var scopeKey: String? { session?.sessionId }
+    private var changes: [FileChange] { scopeKey.map { state.fileChanges(for: $0) } ?? [] }
+    private var totalAdded: Int { changes.reduce(0) { $0 + $1.added } }
+    private var totalRemoved: Int { changes.reduce(0) { $0 + $1.removed } }
+
+    var body: some View {
+        if let openDiffId, let scopeKey, let diff = state.diff(id: openDiffId, in: scopeKey) {
+            DiffCardView(diff: diff) { self.openDiffId = nil }
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            if changes.isEmpty {
+                // Normal for a session the process scan found: it has an id and
+                // a name long before Claude Code edits anything.
+                Text(String(localized: "No file changes yet"))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#6B7079"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 36)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(changes) { change in
+                            row(change)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 108)
+        .padding(.trailing, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onExitCommand { state.view = .overview }
+        // ⌘E is the island-wide "open the diff" key, and this is now where most
+        // diffs get opened from, so it has to toggle here too. OverviewView
+        // hears the same notification but is invisible; its activeDiffId is
+        // cleared by onChange(of: state.view) anyway.
+        .onReceive(NotificationCenter.default.publisher(for: .islandToggleDiff)) { _ in
+            withAnimation(.easeIn(duration: 0.16)) {
+                if openDiffId != nil { openDiffId = nil }
+                else { openDiffId = changes.first?.lastDiffId }
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 6) {
+            Button {
+                state.view = .overview
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 8, weight: .medium))
+                    Text(session?.displayName ?? "")
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundColor(Color(hex: "#F5F6F8"))
+            }
+            .buttonStyle(.plain)
+            Spacer(minLength: 2)
+            if totalAdded > 0 {
+                Text("+\(totalAdded)")
+                    .font(.system(size: 10, weight: .medium).monospaced())
+                    .foregroundColor(Color(hex: "#22C55E"))
+            }
+            if totalRemoved > 0 {
+                Text("−\(totalRemoved)")
+                    .font(.system(size: 10, weight: .medium).monospaced())
+                    .foregroundColor(Color(hex: "#F4505E"))
+            }
+            // Straight to the chat this session was reached from, so the
+            // changes view is never a dead end.
+            Button {
+                state.view = .prompt
+            } label: {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundColor(Color(hex: "#5F646D"))
+                    .frame(width: 14, height: 14)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+    }
+
+    private func row(_ change: FileChange) -> some View {
+        Button {
+            openDiffId = change.lastDiffId
+        } label: {
+            HStack(spacing: 6) {
+                // A dot rather than a "NEW" label: new-file-ness is the least
+                // important thing on the row and should not cost a translation.
+                if change.isNewFile {
+                    Circle()
+                        .fill(Color(hex: "#22C55E"))
+                        .frame(width: 4, height: 4)
+                }
+                Text(URL(fileURLWithPath: change.path).lastPathComponent)
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#F5F6F8"))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 4)
+                if change.editCount > 1 {
+                    Text("×\(change.editCount)")
+                        .font(.system(size: 9).monospaced())
+                        .foregroundColor(Color(hex: "#5F646D"))
+                }
+                if change.added > 0 {
+                    Text("+\(change.added)")
+                        .font(.system(size: 10, weight: .medium).monospaced())
+                        .foregroundColor(Color(hex: "#22C55E"))
+                }
+                if change.removed > 0 {
+                    Text("−\(change.removed)")
+                        .font(.system(size: 10, weight: .medium).monospaced())
+                        .foregroundColor(Color(hex: "#F4505E"))
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 7, weight: .medium))
+                    .foregroundColor(Color(hex: "#5F646D"))
+            }
+            .frame(height: 22)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1817,7 +1980,10 @@ struct TickerShimmerText: View {
 struct ClaudeSessionPill: View {
     let session: ClaudeSession
     @ObservedObject var state: AppState
+    /// Opens the session's file changes.
     let onTap: () -> Void
+    /// Opens the session's chat, from the 💬 in the corner.
+    let onChatTap: () -> Void
     @State private var isHovered = false
 
     private static let claudeColor = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
@@ -1898,7 +2064,7 @@ struct ClaudeSessionPill: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.leading, 34)
-                    .padding(.trailing, 24)
+                    .padding(.trailing, 40)
                     .allowsHitTesting(false)
                 }
                 .frame(maxWidth: .infinity)
@@ -1909,17 +2075,33 @@ struct ClaudeSessionPill: View {
                 // to appear on hover, but that flickered in and out while a
                 // session was running, so its presence never depends on hover.
                 .overlay(alignment: .topTrailing) {
-                    Button {
-                        AgentLauncher.open(state.overviewTask(for: session), state: state)
-                    } label: {
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundColor(Color(hex: "#5F646D"))
-                            .frame(width: 16, height: 16)
-                            .background(Color.white.opacity(0.07))
-                            .clipShape(Circle())
+                    // Two controls in one overlay: a Button's gesture wins over
+                    // the ancestor onTapGesture, which is why the ↗ has always
+                    // been clickable without also opening the card.
+                    HStack(spacing: 2) {
+                        Button {
+                            onChatTap()
+                        } label: {
+                            Image(systemName: "bubble.left")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(Color(hex: "#5F646D"))
+                                .frame(width: 16, height: 16)
+                                .background(Color.white.opacity(0.07))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            AgentLauncher.open(state.overviewTask(for: session), state: state)
+                        } label: {
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(Color(hex: "#5F646D"))
+                                .frame(width: 16, height: 16)
+                                .background(Color.white.opacity(0.07))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     .padding(.top, 2)
                     .padding(.trailing, 4)
                 }
@@ -2077,7 +2259,9 @@ struct ClaudeSessionsListView: View {
                                           alignment: .leading,
                                           spacing: 4) {
                                     ForEach(group.sessions) { s in
-                                        ClaudeSessionPill(session: s, state: state) { tap(s) }
+                                        ClaudeSessionPill(session: s, state: state,
+                                                     onTap: { openChanges(s) },
+                                                     onChatTap: { openChat(s) })
                                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
                                     }
                                 }
@@ -2198,14 +2382,27 @@ struct ClaudeSessionsListView: View {
         .background(Color(hex: "#141518"))
     }
 
-    private func tap(_ s: ClaudeSession) {
+    /// Tapping a session opens what it changed. Chat moved to the 💬 because a
+/// session's edits are the thing worth seeing first — they are also the only
+/// part that is per-session: `sessionDiffs` is keyed by session id, whereas
+/// the chat pane reads a shared history keyed by pill.
+    private func openChanges(_ s: ClaudeSession) {
         guard !swapping else { return }
         swapping = true
         SoundEngine.shared.play("blip")
-        // Open the chat view for this session. PromptView swaps its in-memory
-        // history for ChatSessionView's JSONL stream when focusedClaudeSession is set.
-        // A scanned session has no transcript yet, so its chat opens empty and
-        // fills in once the first hook event adopts it.
+        state.focusedSessionId = s.sessionId
+        state.view = .changes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
+    }
+
+    /// Open the chat for this session. PromptView swaps its in-memory history for
+    /// ChatSessionView's JSONL stream when focusedClaudeSession is set. A scanned
+    /// session has no transcript yet, so its chat opens empty and fills in once
+    /// the first hook event adopts it.
+    private func openChat(_ s: ClaudeSession) {
+        guard !swapping else { return }
+        swapping = true
+        SoundEngine.shared.play("blip")
         state.focusedSessionId = s.sessionId
         state.view = .prompt
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }

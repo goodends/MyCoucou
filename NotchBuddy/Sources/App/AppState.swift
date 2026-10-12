@@ -399,43 +399,86 @@ final class AppState: ObservableObject {
         didSet { QuestionLayout.height = pendingQuestion?.estimatedIslandHeight }
     }
 
-    // Per-pill flat list of FileDiffs, in order of reception.
-    // Not @Published — steps[] changes already trigger redraws.
-    var sessionDiffs: [String: [FileDiff]] = [:]
+    // Flat list of FileDiffs per scope, in order of reception.
+    //
+    // The key is the Claude session id for Claude Code — one Mochi per session
+    // means one session's diffs belong to that session alone. Agents with no
+    // session concept (Codex, Cursor…) keep the pill id as key.
+    //
+    // @Published on purpose: the changes view reads only this, never the steps
+    // array, so there is no neighbouring write to piggyback on. Mutate by
+    // replacing the whole dictionary — `sessionDiffs[key]!.append(…)` does not
+    // even trigger willSet.
+    @Published var sessionDiffs: [String: [FileDiff]] = [:]
     private var sessionDiffTimers: [String: DispatchWorkItem] = [:]
     // Monotonically increasing — never reset, not even in clearSessionDiffs.
     private var nextDiffId: Int = 0
 
+    // Per-scope cap, and a global one: N concurrent sessions × 50 diffs each is
+    // real memory (every diff holds up to maxLines lines), and the idle timer
+    // only helps for sessions that have actually gone quiet.
+    private static let maxDiffsPerScope = 50
+    private static let maxDiffsTotal = 200
+
     @discardableResult
-    func appendSessionDiff(_ diff: FileDiff, for pillId: String) -> Int {
+    func appendSessionDiff(_ diff: FileDiff, for scopeKey: String) -> Int {
+        guard !scopeKey.isEmpty else { return -1 }
         var d = diff
         d.id = nextDiffId
         nextDiffId += 1
-        if sessionDiffs[pillId] == nil { sessionDiffs[pillId] = [] }
-        sessionDiffs[pillId]!.append(d)
-        // Keep at most 50 diffs per pill; drop oldest first
-        while sessionDiffs[pillId]!.count > 50 {
-            sessionDiffs[pillId]!.removeFirst()
+        var dict = sessionDiffs
+        var list = dict[scopeKey] ?? []
+        list.append(d)
+        while list.count > Self.maxDiffsPerScope { list.removeFirst() }
+        dict[scopeKey] = list
+        // Global trim: evict the scope whose newest diff is oldest. Never drop
+        // the last scope — that is the session the user is looking at.
+        while dict.count > 1,
+              dict.values.reduce(0, { $0 + $1.count }) > Self.maxDiffsTotal,
+              let oldestKey = dict.min(by: { ($0.value.last?.id ?? 0) < ($1.value.last?.id ?? 0) })?.key {
+            dict[oldestKey] = nil
+            sessionDiffTimers[oldestKey]?.cancel()
+            sessionDiffTimers.removeValue(forKey: oldestKey)
         }
-        resetSessionDiffTimer(for: pillId)
+        sessionDiffs = dict
+        resetSessionDiffTimer(for: scopeKey)
         return d.id
     }
 
-    func clearSessionDiffs(for pillId: String) {
-        sessionDiffTimers[pillId]?.cancel()
-        sessionDiffTimers.removeValue(forKey: pillId)
-        sessionDiffs.removeValue(forKey: pillId)
+    /// Diffs for one scope, oldest first.
+    func diffs(for scopeKey: String) -> [FileDiff] { sessionDiffs[scopeKey] ?? [] }
+
+    /// One diff by id, searched in `scopeKey` first and then everywhere else.
+    /// The fallback matters: ids are globally unique, so a stale id from a
+    /// scope that has since been trimmed still resolves instead of showing an
+    /// empty card.
+    func diff(id: Int, in scopeKey: String?) -> FileDiff? {
+        if let scopeKey, let hit = sessionDiffs[scopeKey]?.first(where: { $0.id == id }) {
+            return hit
+        }
+        return sessionDiffs.values.lazy.flatMap { $0 }.first { $0.id == id }
+    }
+
+    /// Per-file rollup for the changes list.
+    func fileChanges(for scopeKey: String) -> [FileChange] {
+        DiffLedger.fileChanges(from: diffs(for: scopeKey))
+    }
+
+    func clearSessionDiffs(for scopeKey: String) {
+        sessionDiffTimers[scopeKey]?.cancel()
+        sessionDiffTimers.removeValue(forKey: scopeKey)
+        sessionDiffs.removeValue(forKey: scopeKey)
         // nextDiffId intentionally NOT reset — ids remain unique across sessions
     }
 
-    private func resetSessionDiffTimer(for pillId: String) {
-        sessionDiffTimers[pillId]?.cancel()
+    private func resetSessionDiffTimer(for scopeKey: String) {
+        sessionDiffTimers[scopeKey]?.cancel()
         // The closure is MainActor-isolated (AppState is @MainActor): it must run on the main
         // queue. Scheduled on a global queue, Swift 6's isolation check traps and the app quits.
         let work = DispatchWorkItem { [weak self] in
-            self?.clearSessionDiffs(for: pillId)
+            self?.clearSessionDiffs(for: scopeKey)
         }
-        sessionDiffTimers[pillId] = work
+        sessionDiffTimers[scopeKey] = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 3600, execute: work)
     }
 
@@ -755,6 +798,7 @@ final class AppState: ObservableObject {
         for s in dead {
             claudeSessions.removeById(s.sessionId)
             claudeSessionSteps[s.sessionId] = nil
+            clearSessionDiffs(for: s.sessionId)
             if focusedSessionId == s.sessionId { focusedSessionId = nil }
         }
     }
@@ -809,6 +853,9 @@ final class AppState: ObservableObject {
     /// Remove a Claude Code session by id. No-op if absent. Does NOT touch tasks/focus.
     func removeClaudeSession(sessionId: String) {
         claudeSessions.removeById(sessionId)
+        // Its diffs were filed under the session id, so they go with it. Without
+        // this they would only fall out via the idle timer, an hour later.
+        clearSessionDiffs(for: sessionId)
     }
 
     /// Set the outfit (hat / glasses / scarf / …) for a Claude session.

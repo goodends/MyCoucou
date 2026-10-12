@@ -210,6 +210,59 @@ enum DiffEngineTests {
                 DiffEngine.toOneLine("\n\nActual content.") == "Actual content.")
         }
 
+        // ── DiffLedger.fileChanges — per-file rollup ───────────────────────────
+        print("\nDiffLedger.fileChanges")
+        do {
+            checkInt("空数组 → 空列表", DiffLedger.fileChanges(from: []).count, 0)
+
+            // Ids come from AppState's monotonic counter; set them explicitly
+            // here so ordering is asserted independently of the app.
+            func diff(_ id: Int, _ path: String, added: Int, removed: Int, isNew: Bool = false) -> FileDiff {
+                FileDiff(id: id, path: path, added: added, removed: removed,
+                         hunks: [], tooLarge: false, isNewFile: isNew)
+            }
+
+            let a1 = diff(1, "/p/A.swift", added: 1, removed: 0)
+            let a2 = diff(2, "/p/A.swift", added: 3, removed: 1)
+            let b1 = diff(3, "/p/B.swift", added: 0, removed: 2)
+            let n1 = diff(4, "/p/New.swift", added: 5, removed: 0, isNew: true)
+            let n2 = diff(5, "/p/New.swift", added: 1, removed: 1)   // edited after creation
+
+            let rolled = DiffLedger.fileChanges(from: [a1, a2, b1, n1, n2])
+            checkInt("3 个路径归并成 3 行", rolled.count, 3)
+
+            // newest edit first
+            checkTrue("最近编辑的排最前 (New.swift)",
+                rolled.first?.path == "/p/New.swift")
+            checkTrue("其次是 B.swift",
+                rolled[1].path == "/p/B.swift")
+            checkTrue("最后是 A.swift",
+                rolled[2].path == "/p/A.swift")
+
+            let a = rolled[2]
+            checkInt("A 的 added 累加", a.added, 4)
+            checkInt("A 的 removed 累加", a.removed, 1)
+            checkInt("A 的 editCount", a.editCount, 2)
+            checkInt("A 的 lastDiffId 指向最新一条", a.lastDiffId, 2)
+            checkTrue("A 不是新文件", !a.isNewFile)
+
+            // A file created by this session stays "new" once it is edited again.
+            let new = rolled[0]
+            checkTrue("创建过的新文件仍标记 new", new.isNewFile)
+            checkInt("new 的 added 累加", new.added, 6)
+            checkInt("new 的 lastDiffId 指向最新一条", new.lastDiffId, 5)
+
+            checkInt("单条 diff 归并成一行",
+                DiffLedger.fileChanges(from: [b1]).count, 1)
+
+            // Same path, counts that cancel out must still produce a row —
+            // a session that edits a file back to its original state changed it.
+            let r1 = diff(6, "/p/C.swift", added: 2, removed: 2)
+            let rc = DiffLedger.fileChanges(from: [r1])
+            checkInt("净零改动仍成行", rc.count, 1)
+            checkInt("净零 added", rc[0].added, 2)
+        }
+
         // ── finish ─────────────────────────────────────────────────────────────
         if failures == 0 {
             print("\nAll tests passed.")

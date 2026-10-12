@@ -31,6 +31,52 @@ struct FileDiff: Equatable {
     static let maxLines = 4000
 }
 
+/// One row in the per-session changes list: everything one session did to one
+/// file, rolled up.
+///
+/// `added` / `removed` accumulate over every edit to the path, so a line
+/// touched twice counts twice. That is intentional — the number is "how much
+/// churn", not a patch. To show the actual change, open `lastDiffId`, which is
+/// the most recent single diff for this file.
+struct FileChange: Identifiable {
+    var id: String { path }
+    let path: String
+    var added: Int
+    var removed: Int
+    var editCount: Int
+    var isNewFile: Bool
+    var lastDiffId: Int
+}
+
+// MARK: - DiffLedger
+
+enum DiffLedger {
+    /// Roll one session's diffs up per file, most recently edited first.
+    ///
+    /// Ties on `lastDiffId` cannot happen: ids come from one monotonic counter
+    /// in AppState, so the ordering is stable without a secondary key.
+    static func fileChanges(from diffs: [FileDiff]) -> [FileChange] {
+        var byPath: [String: FileChange] = [:]
+        for d in diffs {
+            if var existing = byPath[d.path] {
+                existing.added += d.added
+                existing.removed += d.removed
+                existing.editCount += 1
+                existing.lastDiffId = d.id
+                // Once a file has been created by this session it stays
+                // "new", even once it is edited again.
+                existing.isNewFile = existing.isNewFile || d.isNewFile
+                byPath[d.path] = existing
+            } else {
+                byPath[d.path] = FileChange(path: d.path, added: d.added,
+                                            removed: d.removed, editCount: 1,
+                                            isNewFile: d.isNewFile, lastDiffId: d.id)
+            }
+        }
+        return byPath.values.sorted { $0.lastDiffId > $1.lastDiffId }
+    }
+}
+
 // MARK: - DiffEngine
 
 enum DiffEngine {

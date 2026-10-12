@@ -12,6 +12,10 @@ enum IslandView: String, CaseIterable {
     case overview, empty, approval, question, error, finished
     case confused, prompt
     case searching, result, note, greeting, wardrobe
+    // Per-session file changes: the list of files one session edited, with
+    // +N −M per file, newest first. Deeper than a home view, so it gets a
+    // taller layout — see IslandConst.viewLayouts below.
+    case changes
 }
 
 // MARK: - Bot State
@@ -324,6 +328,10 @@ enum IslandConst {
         // Greeting: bot drawn by GreetingCanvasView; no BotPlacement needed
         .greeting:  ViewLayout(height: 150, botX: 320, botY: 90,  botDiameter: 0,  agentMode: .none),
         .wardrobe:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .none),
+        // Changes is the one view that breaks the 160 law, for the same reason
+        // chat does: a list of touched files needs room, and 98pt of content
+        // shows three rows.
+        .changes:   ViewLayout(height: 340, botX: 68,  botY: nil, botDiameter: 58, agentMode: .none),
     ]
 
     // Project colors — keyed by lowercase display name or slug

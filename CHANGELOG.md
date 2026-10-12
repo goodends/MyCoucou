@@ -2,6 +2,13 @@
 
 This changelog covers **MyCoucou**, an independent fork of [Coucou](https://github.com/Louis-CFM/coucou) by Louis Raillé. It starts at the fork point; the upstream project's own releases are listed further down, under the name they shipped under.
 
+## Unreleased
+
+- **Live diffs work again.** Tapping a diff step in the ticker set an id that nothing could resolve: diffs were filed under the shared `integration_claude` pill while the card looked them up under a per-session id (`claude:<uuid>`), so the lookup always missed and no card ever opened. ⌘E still worked, because it went through the real pill — but it could surface *another* session's last diff. Both paths now resolve against the session the diff belongs to.
+- **Diffs are per session.** One pill serves every Claude Code session, so their diffs used to land in one array in an arbitrary order. They are now filed under the session that produced them, and evicted per session plus a global cap.
+- **Tapping a session opens its changes**, not its chat: the files that session edited with `+N −M` each, newest first, tapping a row for the full diff. The chat moved to a 💬 on the session card, and is one click from the changes view too.
+- A session found by the process scan but with no edits yet shows an explicit empty state instead of a blank card.
+
 ## 1.0.0 — October 12, 2026
 
 First release of the fork. The app is now called **MyCoucou**, everywhere the user sees it: in the Finder, in System Settings, on the login items list, and in the island itself.
