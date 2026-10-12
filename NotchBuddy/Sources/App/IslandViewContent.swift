@@ -2007,6 +2007,66 @@ struct ClaudeSessionsListView: View {
     /// entries never made it into `claudeSessions` to begin with.
     private var hiddenCount: Int { state.hiddenClaudeSessionIds.count }
 
+    /// One project's sessions, for the grouped list.
+    private struct ProjectGroup: Identifiable {
+        let key: String                  // the folder — the precise grouping key
+        let name: String                 // what we display, and colour by
+        let sessions: [ClaudeSession]
+        var id: String { key }
+    }
+
+    /// `live` grouped by project, keeping its most-recent-first order: a group
+    /// sits where its most recent session sat, and sessions inside it stay in
+    /// recency order. So the project you're working in floats to the top with
+    /// no extra sorting.
+    ///
+    /// Keyed on `cwd` rather than `projectName`: two folders can share a
+    /// basename, and merging unrelated work because they're both called
+    /// "api" would be worse than showing two groups with the same label.
+    private var groups: [ProjectGroup] {
+        var order: [String] = []
+        var byKey: [String: [ClaudeSession]] = [:]
+        for s in live {
+            let key = s.cwd.isEmpty ? s.projectName : s.cwd
+            if byKey[key] == nil { order.append(key) }
+            byKey[key, default: []].append(s)
+        }
+        return order.map { key in
+            let sessions = byKey[key] ?? []
+            return ProjectGroup(key: key,
+                                name: sessions.first?.projectName ?? key,
+                                sessions: sessions)
+        }
+    }
+
+    private static let columns = [GridItem(.flexible(), spacing: 4),
+                                  GridItem(.flexible(), spacing: 4)]
+
+    /// The project's name over its sessions, tinted with the project's own
+    /// colour (`IslandConst.projectColors`, stable fallback otherwise) so the
+    /// grouping reads at a glance and matches any other place the project's
+    /// colour appears.
+    private func projectHeader(_ group: ProjectGroup) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(Color(hex: IslandConst.colorForProject(group.name)))
+                .frame(width: 5, height: 5)
+            Text(group.name)
+                // Deliberately smaller than the pill titles (10pt): the header
+                // organises the list, it isn't a thing to read first.
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(Color(hex: "#8E939C"))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Text("\(group.sessions.count)")
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundColor(Color(hex: "#5F646D"))
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 2)
+        .padding(.top, 3)
+    }
+
     var body: some View {
         // ZStack so the hidden chip stays visible at the bottom even when
         // the ScrollView is full of session pills (VStack would push it
@@ -2018,18 +2078,25 @@ struct ClaudeSessionsListView: View {
                 // Gemini / …) is gone: this view only renders Claude work.
                 Color.clear
             } else {
-                // Two columns, scrollable so 4+ sessions don't get crushed by
-                // the island's fixed height. No border / indicator — the right
-                // card already sits inside its own CardBackground. Bottom
+                // Grouped by project, two columns per group. Scrollable because the
+                // island's height is fixed at 160pt: grouping decides what fits
+                // above the fold, not what exists. No border / indicator — the
+                // right card already sits inside its own CardBackground. Bottom
                 // padding leaves room for the hidden chip overlay.
                 ScrollView(.vertical, showsIndicators: false) {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 4),
-                                        GridItem(.flexible(), spacing: 4)],
-                              alignment: .leading,
-                              spacing: 4) {
-                        ForEach(live) { s in
-                            ClaudeSessionPill(session: s, state: state) { tap(s) }
-                                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(groups) { group in
+                            VStack(alignment: .leading, spacing: 4) {
+                                projectHeader(group)
+                                LazyVGrid(columns: Self.columns,
+                                          alignment: .leading,
+                                          spacing: 4) {
+                                    ForEach(group.sessions) { s in
+                                        ClaudeSessionPill(session: s, state: state) { tap(s) }
+                                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                                    }
+                                }
+                            }
                         }
                     }
                     .padding(.horizontal, 8)
