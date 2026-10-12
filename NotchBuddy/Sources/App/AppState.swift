@@ -315,8 +315,12 @@ final class AppState: ObservableObject {
     // what is built from the catalog follows on its own; the tasks already on the island
     // hold a copy of their colour and are repainted here.
     @Published var pillColors: [String: String] = [:] {
+        // Same re-entrancy hazard as the inbox arrays above, reading the
+        // property back out of its own observer. Storing the palette in
+        // willSet keeps the original ordering (stored is set before the
+        // repaint below runs) without the self-read.
+        willSet { PillColors.stored = newValue }
         didSet {
-            PillColors.stored = pillColors
             var repainted = tasks
             var changed = false
             for i in repainted.indices {
@@ -420,13 +424,19 @@ final class AppState: ObservableObject {
     // single-slot: a second request used to write "ask" to the first one's fd
     // and take the card, dropping the displaced session into its terminal with
     // nothing on screen saying so. Each entry carries its own deadline.
+    // Each observer hands its *new* value to the height helper instead of
+    // reading the property back. A @Published array read from inside its own
+    // observer re-enters the storage mid-write: appending a question
+    // segfaulted in `inbox`'s map, the app died, and the hook was never
+    // answered — which is what it looked like from the terminal ("the
+    // question came back"). `willSet` because `newValue` only exists there.
     @Published var pendingApprovals: [PendingApproval] = [] {
-        didSet { updateInboxHeight() }
+        willSet { updateInboxHeight(approvals: newValue) }
     }
     @Published var pendingQuestions: [PendingQuestion] = [] {
-        didSet {
-            QuestionLayout.height = pendingQuestions.first?.question.estimatedIslandHeight
-            updateInboxHeight()
+        willSet {
+            QuestionLayout.height = newValue.first?.question.estimatedIslandHeight
+            updateInboxHeight(questions: newValue)
         }
     }
 
@@ -589,7 +599,7 @@ final class AppState: ObservableObject {
     /// back to back must both stay visible with their own avatar, final line
     /// and "Open terminal" target.
     @Published var notifications: [AgentNotification] = [] {
-        didSet { updateInboxHeight() }
+        willSet { updateInboxHeight(notifications: newValue) }
     }
 
     /// Agent id of the session at the head of the queue — the one that
@@ -622,8 +632,13 @@ final class AppState: ObservableObject {
     /// finished sessions — a question row is as tall as a finished card, and
     /// sizing off one of the three arrays left the stack clipped when the
     /// other two grew.
-    private func updateInboxHeight() {
-        NotificationLayout.height = NotificationLayout.height(forCount: inbox.count)
+    private func updateInboxHeight(approvals: [PendingApproval]? = nil,
+                                   questions: [PendingQuestion]? = nil,
+                                   notifications: [AgentNotification]? = nil) {
+        let count = (approvals ?? pendingApprovals).count
+               + (questions ?? pendingQuestions).count
+               + (notifications ?? self.notifications).count
+        NotificationLayout.height = NotificationLayout.height(forCount: count)
     }
 
     /// Hands one inbox row back to whoever raised it. Once the inbox is empty
