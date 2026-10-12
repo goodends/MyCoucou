@@ -172,7 +172,10 @@ struct OverviewView: View {
                         TickerView(task: agent, onDiffTap: { diffIdx in
                             withAnimation(.easeIn(duration: 0.16)) { activeDiffId = diffIdx }
                         })
-                            .padding(.top, 6)
+                            // Breathing room between the title and the step
+                            // below it. The ticker sizes itself to its text, so
+                            // this is the only thing setting that gap.
+                            .padding(.top, 10)
                             .padding(.leading, 108)
                             .padding(.trailing, 12)
                     }
@@ -261,14 +264,18 @@ struct OverviewView: View {
             .frame(width: 322)
             .contentShape(Rectangle())
             .onTapGesture {
-                // The whole card opens the chat, as it always has. What the
-                // session changed is one click away, on the Diff button beside
-                // the jump arrow.
-                if let task = state.focusTask, PillCatalog.isChatablePill(id: task.id) {
-                    // Mirror right-card pill tap: lock the chat to the current
-                    // overview session so its host shows in the bottom-right label
-                    // (e.g. "Orca") instead of falling back to the global tasks[].
-                    if let s = state.overviewSession { state.focusedSessionId = s.sessionId }
+                // The whole card is the way into the chat, for whatever session
+                // it is currently showing — i.e. the one last picked in the
+                // right-hand list. What the session changed is one click away,
+                // on the Diff button beside the jump arrow.
+                if let s = state.overviewSession {
+                    // Lock the chat to the card's session so its host shows in
+                    // the bottom-right label (e.g. "Orca") instead of falling
+                    // back to the global tasks[].
+                    state.focusedSessionId = s.sessionId
+                    state.view = .prompt
+                } else if let task = state.focusTask,
+                          PillCatalog.isChatablePill(id: task.id) {
                     state.view = .prompt
                 }
             }
@@ -1983,13 +1990,15 @@ struct TickerView: View {
             startPoint: .top, endPoint: .bottom
         ))
         .onPreferenceChange(TickerHistoryHeightKey.self) { historyHeight = $0 }
-        .onAppear {
-            let idx = task?.stepIndex ?? -1
-            displayIndex = idx
-            if idx >= 0, !steps.isEmpty {
-                rowA = idx > 0 ? steps[max(0, idx - 1)] : "…"
-                rowB = steps[min(idx, steps.count - 1)]
-            }
+        .onAppear { resetRows() }
+        .onChange(of: task?.sessionId) { _, _ in
+            // The card is showing a different session — picking another one in
+            // the list, or the overview falling back. The rows on screen belong
+            // to the previous conversation, and the steps-count watcher below
+            // won't rescue them: it only fires when the count moves, and two
+            // sessions can sit on the same step (both on their first, both with
+            // nothing recorded yet).
+            resetRows()
         }
         .onChange(of: task?.steps.count) { _, _ in
             guard let task, !task.steps.isEmpty, !isTransitioning else { return }
@@ -2002,6 +2011,30 @@ struct TickerView: View {
             }
             guard newIdx != displayIndex else { return }
             tickerAnimate(to: newIdx)
+        }
+    }
+
+    /// Put the rows on the task's current step with no transition state left
+    /// over — used on first appearance and whenever the card starts showing a
+    /// different session, where animating from the old one's last step would
+    /// be a lie about what the new session has done.
+    private func resetRows() {
+        let idx = task?.stepIndex ?? -1
+        displayIndex = idx
+        rowAOffset = 0
+        rowAOpacity = 1
+        rowBOffset = 0
+        rowBPhase = 0
+        rowC = ""
+        rowCOffset = Self.height
+        rowCOpacity = 0
+        isTransitioning = false
+        if idx >= 0, !steps.isEmpty {
+            rowA = idx > 0 ? steps[max(0, idx - 1)] : "…"
+            rowB = steps[min(idx, steps.count - 1)]
+        } else {
+            rowA = "…"
+            rowB = "…"
         }
     }
 
@@ -2433,7 +2466,7 @@ struct ClaudeSessionsListView: View {
                                           alignment: .leading,
                                           spacing: 4) {
                                     ForEach(group.sessions) { s in
-                                        ClaudeSessionPill(session: s, state: state) { openChat(s) }
+                                        ClaudeSessionPill(session: s, state: state) { select(s) }
                                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
                                     }
                                 }
@@ -2554,14 +2587,15 @@ struct ClaudeSessionsListView: View {
         .background(Color(hex: "#141518"))
     }
 
-    /// Tapping a session opens its chat. The files it changed are on the left
-/// card's ticker half, and from the chat itself.
-    private func openChat(_ s: ClaudeSession) {
+    /// A pill tap only *selects* the session: it drives the left card, and the
+    /// left card is the way into the chat. Jumping straight to the chat from
+    /// here meant browsing the list and landing somewhere else entirely —
+    /// picking the next thing to look at lost the list you were picking from.
+    private func select(_ s: ClaudeSession) {
         guard !swapping else { return }
         swapping = true
         SoundEngine.shared.play("blip")
         state.focusedSessionId = s.sessionId
-        state.view = .prompt
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
     }
 }
