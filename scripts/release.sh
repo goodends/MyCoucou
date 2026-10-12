@@ -13,8 +13,8 @@ VERSION="${1:?Usage: $0 <version> [--finish]}"
 MODE="${2:-}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="/tmp/coucou-release-$VERSION"
-APP="$BUILD_DIR/Coucou.app"
-ZIP="$BUILD_DIR/Coucou.zip"
+APP="$BUILD_DIR/MyCoucou.app"
+ZIP="$BUILD_DIR/MyCoucou.zip"
 COMMIT_FILE="$BUILD_DIR/commit"
 TAG="v$VERSION"
 
@@ -64,25 +64,6 @@ if [ "$MODE" != "--finish" ]; then
   [ -n "$IDENTITY" ] || die "no 'Developer ID Application' certificate found. Install it via Xcode → Settings → Accounts."
   echo "Signing with: $IDENTITY"
 
-  # ── 1b. Developer ID provisioning profile (iCloud for the iPhone sync) ──────
-  PROFILE_NAME="Coucou Developer ID"
-  PROFILE_FOUND=""
-  TMP_PLIST=$(mktemp)
-  for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
-    [ -d "$dir" ] || continue
-    for f in "$dir"/*.provisionprofile; do
-      [ -f "$f" ] || continue
-      security cms -D -i "$f" > "$TMP_PLIST" 2>/dev/null || continue
-      [ "$(/usr/libexec/PlistBuddy -c "Print :Name" "$TMP_PLIST" 2>/dev/null || true)" = "$PROFILE_NAME" ] || continue
-      PROFILE_FOUND="$f"
-      break 2
-    done
-  done
-  [ -n "$PROFILE_FOUND" ] || { rm -f "$TMP_PLIST"; die "no provisioning profile named '$PROFILE_NAME'. developer.apple.com → Profiles → Developer ID (Mac) for fr.louisraille.NotchBuddy, then copy it to ~/Library/Developer/Xcode/UserData/Provisioning Profiles/"; }
-  EXPIRY=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$TMP_PLIST")
-  rm -f "$TMP_PLIST"
-  echo "Profile: $PROFILE_FOUND (expires $EXPIRY)"
-
   # ── 2. xcodegen + Release build ─────────────────────────────────────────────
   cd "$REPO_ROOT/NotchBuddy"
   PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist 2>/dev/null || true)
@@ -103,10 +84,6 @@ if [ "$MODE" != "--finish" ]; then
     CODE_SIGNING_REQUIRED=YES \
     CODE_SIGNING_ALLOWED=YES \
     CONFIGURATION_BUILD_DIR="$BUILD_DIR"
-
-  [ -f "$APP/Contents/embedded.provisionprofile" ] || die "the provisioning profile was not embedded in the app"
-  codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "iCloud.fr.louisraille.Coucou" \
-    || die "the app is not signed with the iCloud entitlements"
 
   # ── 3. Zip + notarize ───────────────────────────────────────────────────────
   ditto -c -k --keepParent "$APP" "$ZIP"
@@ -144,8 +121,8 @@ $CHANGES
 
 ## Install
 
-1. Download Coucou.zip below and unzip it.
-2. Move Coucou.app to your Applications folder, replacing the old one if you have it.
+1. Download MyCoucou.zip below and unzip it.
+2. Move MyCoucou.app to your Applications folder, replacing the old one if you have it.
 3. Launch it, and click Open when macOS asks you to confirm.
 
 Linux and Windows: see the [README](https://github.com/Louis-CFM/coucou#readme)."

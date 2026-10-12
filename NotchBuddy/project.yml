@@ -67,18 +67,18 @@ targets:
     info:
       path: Resources/Info.plist
       properties:
-        CFBundleName: Coucou
-        CFBundleDisplayName: Coucou
+        CFBundleName: MyCoucou
+        CFBundleDisplayName: MyCoucou
         CFBundleIdentifier: fr.louisraille.NotchBuddy
-        CFBundleVersion: "14"
-        CFBundleShortVersionString: "0.2.3"
+        CFBundleVersion: "15"
+        CFBundleShortVersionString: "1.0.0"
         CFBundlePackageType: APPL
         LSUIElement: YES
         NSHighResolutionCapable: YES
         NSSupportsAutomaticGraphicsSwitching: YES
         NSAppleEventsUsageDescription: "Pour sauter au terminal, envoyer des mails et piloter Musique et Spotify."
-        NSMicrophoneUsageDescription: "Coucou uses the microphone when you dictate a message in the chat."
-        NSSpeechRecognitionUsageDescription: "Coucou turns your voice into the text of a chat message."
+        NSMicrophoneUsageDescription: "MyCoucou uses the microphone when you dictate a message in the chat."
+        NSSpeechRecognitionUsageDescription: "MyCoucou turns your voice into the text of a chat message."
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         CFBundleLocalizations:
@@ -95,7 +95,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.louisraille.NotchBuddy
-        PRODUCT_NAME: Coucou
+        PRODUCT_NAME: MyCoucou
         INFOPLIST_FILE: Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MACOSX_DEPLOYMENT_TARGET: "15.0"
@@ -117,8 +117,8 @@ targets:
     info:
       path: Resources/InfoAppStore.plist
       properties:
-        CFBundleName: Coucou
-        CFBundleDisplayName: Coucou
+        CFBundleName: MyCoucou
+        CFBundleDisplayName: MyCoucou
         CFBundleIdentifier: fr.louisraille.Coucou
         CFBundleVersion: "6"
         CFBundleShortVersionString: "1.1"
@@ -144,7 +144,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.louisraille.Coucou
-        PRODUCT_NAME: Coucou
+        PRODUCT_NAME: MyCoucou
         INFOPLIST_FILE: Resources/InfoAppStore.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MACOSX_DEPLOYMENT_TARGET: "15.0"

@@ -99,7 +99,7 @@ struct SettingsView: View {
                             .resizable()
                             .frame(width: 32, height: 32)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Coucou")
+                            Text("MyCoucou")
                                 .font(.system(size: 13, weight: .semibold))
                             Text(appVersion)
                                 .font(.system(size: 11))
@@ -322,7 +322,7 @@ struct SettingsView: View {
                     UserDefaults.standard.synchronize()
                 }
                 HStack(spacing: 8) {
-                    Button(String(localized: "Restart Coucou")) {
+                    Button(String(localized: "Restart MyCoucou")) {
                         let appPath = Bundle.main.bundleURL.path
                         let pid = ProcessInfo.processInfo.processIdentifier
                         let task = Process()

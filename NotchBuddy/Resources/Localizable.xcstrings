@@ -449,66 +449,66 @@
         }
       }
     },
-    "Allow Coucou to control Music": {
+    "Allow MyCoucou to control Music": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "السماح لـ Coucou بالتحكم في الموسيقى"
+            "value": "السماح لـ MyCoucou بالتحكم في الموسيقى"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou-কে Music নিয়ন্ত্রণ করতে দিন"
+            "value": "MyCoucou-কে Music নিয়ন্ত্রণ করতে দিন"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Allow Coucou to control Music"
+            "value": "Allow MyCoucou to control Music"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Permitir que Coucou controle Music"
+            "value": "Permitir que MyCoucou controle Music"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Autoriser Coucou à contrôler Music"
+            "value": "Autoriser MyCoucou à contrôler Music"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou को Music नियंत्रित करने दें"
+            "value": "MyCoucou को Music नियंत्रित करने दें"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Izinkan Coucou mengontrol Music"
+            "value": "Izinkan MyCoucou mengontrol Music"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Permitir que o Coucou controle o Music"
+            "value": "Permitir que o MyCoucou controle o Music"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Разрешить Coucou управлять Music"
+            "value": "Разрешить MyCoucou управлять Music"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "允许 Coucou 控制音乐"
+            "value": "允许 MyCoucou 控制音乐"
           }
         }
       }
@@ -1153,66 +1153,66 @@
         }
       }
     },
-    "Choose the tools you use. Coucou only shows what you declare here.": {
+    "Choose the tools you use. MyCoucou only shows what you declare here.": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "اختر الأدوات التي تستخدمها. يعرض Coucou فقط ما تُعلنه هنا."
+            "value": "اختر الأدوات التي تستخدمها. يعرض MyCoucou فقط ما تُعلنه هنا."
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "আপনি যে টুলগুলো ব্যবহার করেন তা বেছে নিন। Coucou শুধুমাত্র আপনার ঘোষণা করা জিনিস দেখায়।"
+            "value": "আপনি যে টুলগুলো ব্যবহার করেন তা বেছে নিন। MyCoucou শুধুমাত্র আপনার ঘোষণা করা জিনিস দেখায়।"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose the tools you use. Coucou only shows what you declare here."
+            "value": "Choose the tools you use. MyCoucou only shows what you declare here."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Elige las herramientas que usas. Coucou solo muestra lo que declares aquí."
+            "value": "Elige las herramientas que usas. MyCoucou solo muestra lo que declares aquí."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choisis les outils que tu utilises. Coucou n'affiche que ce que tu déclares ici."
+            "value": "Choisis les outils que tu utilises. MyCoucou n'affiche que ce que tu déclares ici."
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "वे टूल चुनें जो आप उपयोग करते हैं। Coucou केवल वही दिखाता है जो आप यहाँ घोषित करते हैं।"
+            "value": "वे टूल चुनें जो आप उपयोग करते हैं। MyCoucou केवल वही दिखाता है जो आप यहाँ घोषित करते हैं।"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pilih alat yang Anda gunakan. Coucou hanya menampilkan yang Anda deklarasikan di sini."
+            "value": "Pilih alat yang Anda gunakan. MyCoucou hanya menampilkan yang Anda deklarasikan di sini."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escolha as ferramentas que você usa. O Coucou mostra apenas o que você declarar aqui."
+            "value": "Escolha as ferramentas que você usa. O MyCoucou mostra apenas o que você declarar aqui."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Выбери инструменты, которые ты используешь. Coucou показывает только то, что ты здесь объявишь."
+            "value": "Выбери инструменты, которые ты используешь. MyCoucou показывает только то, что ты здесь объявишь."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择你使用的工具。Coucou 只显示你在这里声明的内容。"
+            "value": "选择你使用的工具。MyCoucou 只显示你在这里声明的内容。"
           }
         }
       }
@@ -5073,66 +5073,66 @@
         }
       }
     },
-    "Open Coucou": {
+    "Open MyCoucou": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "فتح Coucou"
+            "value": "فتح MyCoucou"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou খুলুন"
+            "value": "MyCoucou খুলুন"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Coucou"
+            "value": "Open MyCoucou"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abrir Coucou"
+            "value": "Abrir MyCoucou"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvrir Coucou"
+            "value": "Ouvrir MyCoucou"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou खोलें"
+            "value": "MyCoucou खोलें"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Buka Coucou"
+            "value": "Buka MyCoucou"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abrir Coucou"
+            "value": "Abrir MyCoucou"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Открыть Coucou"
+            "value": "Открыть MyCoucou"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开 Coucou"
+            "value": "打开 MyCoucou"
           }
         }
       }
@@ -6353,66 +6353,66 @@
         }
       }
     },
-    "Restart Coucou": {
+    "Restart MyCoucou": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إعادة تشغيل Coucou"
+            "value": "إعادة تشغيل MyCoucou"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou পুনরায় শুরু করুন"
+            "value": "MyCoucou পুনরায় শুরু করুন"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Restart Coucou"
+            "value": "Restart MyCoucou"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reiniciar Coucou"
+            "value": "Reiniciar MyCoucou"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Redémarrer Coucou"
+            "value": "Redémarrer MyCoucou"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou को पुनः आरंभ करें"
+            "value": "MyCoucou को पुनः आरंभ करें"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mulai ulang Coucou"
+            "value": "Mulai ulang MyCoucou"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reiniciar Coucou"
+            "value": "Reiniciar MyCoucou"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Перезапустить Coucou"
+            "value": "Перезапустить MyCoucou"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重启 Coucou"
+            "value": "重启 MyCoucou"
           }
         }
       }
@@ -8278,61 +8278,61 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "هل تريد تثبيت خطافات Coucou في ~/.claude؟"
+            "value": "هل تريد تثبيت خطافات MyCoucou في ~/.claude؟"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "~/.claude-এ Coucou হুক ইনস্টল করবেন?"
+            "value": "~/.claude-এ MyCoucou হুক ইনস্টল করবেন?"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Install Coucou hooks in ~/.claude?"
+            "value": "Install MyCoucou hooks in ~/.claude?"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "¿Instalar los hooks de Coucou en ~/.claude?"
+            "value": "¿Instalar los hooks de MyCoucou en ~/.claude?"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installer les hooks Coucou dans ~/.claude ?"
+            "value": "Installer les hooks MyCoucou dans ~/.claude ?"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "~/.claude में Coucou हुक इंस्टॉल करें?"
+            "value": "~/.claude में MyCoucou हुक इंस्टॉल करें?"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pasang hooks Coucou di ~/.claude?"
+            "value": "Pasang hooks MyCoucou di ~/.claude?"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Instalar os hooks do Coucou em ~/.claude?"
+            "value": "Instalar os hooks do MyCoucou em ~/.claude?"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Установить хуки Coucou в ~/.claude?"
+            "value": "Установить хуки MyCoucou в ~/.claude?"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "是否将 Coucou Hooks 安装到 ~/.claude？"
+            "value": "是否将 MyCoucou Hooks 安装到 ~/.claude？"
           }
         }
       }
@@ -11606,61 +11606,61 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تظهر طلبات الموافقة في الشريط. إذا لم تكن Coucou تعمل، يعود Hermes إلى طرفيته الخاصة."
+            "value": "تظهر طلبات الموافقة في الشريط. إذا لم تكن MyCoucou تعمل، يعود Hermes إلى طرفيته الخاصة."
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "নচে অনুমোদন অনুরোধ দেখানো হয়। Coucou না চললে Hermes তার নিজের প্রম্পটে ফলব্যাক করে।"
+            "value": "নচে অনুমোদন অনুরোধ দেখানো হয়। MyCoucou না চললে Hermes তার নিজের প্রম্পটে ফলব্যাক করে।"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Approval requests appear in the notch. If Coucou is not running, Hermes falls back to its own prompt."
+            "value": "Approval requests appear in the notch. If MyCoucou is not running, Hermes falls back to its own prompt."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las solicitudes de aprobación aparecen en el notch. Si Coucou no está en ejecución, Hermes usa su propio prompt."
+            "value": "Las solicitudes de aprobación aparecen en el notch. Si MyCoucou no está en ejecución, Hermes usa su propio prompt."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les demandes d'approbation s'affichent dans le notch. Si Coucou ne tourne pas, Hermes utilise son propre prompt."
+            "value": "Les demandes d'approbation s'affichent dans le notch. Si MyCoucou ne tourne pas, Hermes utilise son propre prompt."
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "नॉच में अनुमोदन अनुरोध दिखाए जाते हैं। यदि Coucou नहीं चल रहा तो Hermes अपने प्रॉम्प्ट पर वापस जाता है।"
+            "value": "नॉच में अनुमोदन अनुरोध दिखाए जाते हैं। यदि MyCoucou नहीं चल रहा तो Hermes अपने प्रॉम्प्ट पर वापस जाता है।"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Permintaan persetujuan muncul di notch. Jika Coucou tidak berjalan, Hermes menggunakan promptnya sendiri."
+            "value": "Permintaan persetujuan muncul di notch. Jika MyCoucou tidak berjalan, Hermes menggunakan promptnya sendiri."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Solicitações de aprovação aparecem no notch. Se Coucou não estiver em execução, Hermes usa seu próprio prompt."
+            "value": "Solicitações de aprovação aparecem no notch. Se MyCoucou não estiver em execução, Hermes usa seu próprio prompt."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Запросы подтверждения отображаются в notch. Если Coucou не запущен, Hermes использует собственный prompt."
+            "value": "Запросы подтверждения отображаются в notch. Если MyCoucou не запущен, Hermes использует собственный prompt."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "审批请求显示在刘海中。若 Coucou 未运行，Hermes 将回退到其自己的提示。"
+            "value": "审批请求显示在刘海中。若 MyCoucou 未运行，Hermes 将回退到其自己的提示。"
           }
         }
       }
@@ -12246,61 +12246,61 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الإعدادات — Coucou"
+            "value": "الإعدادات — MyCoucou"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "সেটিংস — Coucou"
+            "value": "সেটিংস — MyCoucou"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Settings — Coucou"
+            "value": "Settings — MyCoucou"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajustes — Coucou"
+            "value": "Ajustes — MyCoucou"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Réglages — Coucou"
+            "value": "Réglages — MyCoucou"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "सेटिंग्स — Coucou"
+            "value": "सेटिंग्स — MyCoucou"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pengaturan — Coucou"
+            "value": "Pengaturan — MyCoucou"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Configurações — Coucou"
+            "value": "Configurações — MyCoucou"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Настройки — Coucou"
+            "value": "Настройки — MyCoucou"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "设置 — Coucou"
+            "value": "设置 — MyCoucou"
           }
         }
       }
@@ -17034,66 +17034,66 @@
         }
       }
     },
-    "Allow Coucou to control Spotify": {
+    "Allow MyCoucou to control Spotify": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "السماح لـ Coucou بالتحكم في Spotify"
+            "value": "السماح لـ MyCoucou بالتحكم في Spotify"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou-কে Spotify নিয়ন্ত্রণ করতে দিন"
+            "value": "MyCoucou-কে Spotify নিয়ন্ত্রণ করতে দিন"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Allow Coucou to control Spotify"
+            "value": "Allow MyCoucou to control Spotify"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Permitir que Coucou controle Spotify"
+            "value": "Permitir que MyCoucou controle Spotify"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Autoriser Coucou à contrôler Spotify"
+            "value": "Autoriser MyCoucou à contrôler Spotify"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coucou को Spotify नियंत्रित करने दें"
+            "value": "MyCoucou को Spotify नियंत्रित करने दें"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Izinkan Coucou mengontrol Spotify"
+            "value": "Izinkan MyCoucou mengontrol Spotify"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Permitir que o Coucou controle o Spotify"
+            "value": "Permitir que o MyCoucou controle o Spotify"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Разрешить Coucou управлять Spotify"
+            "value": "Разрешить MyCoucou управлять Spotify"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "允许 Coucou 控制 Spotify"
+            "value": "允许 MyCoucou 控制 Spotify"
           }
         }
       }

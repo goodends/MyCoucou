@@ -494,7 +494,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.NotchBuddy;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_NAME = MyCoucou;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -512,7 +512,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.NotchBuddy;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_NAME = MyCoucou;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -534,7 +534,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.Coucou;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_NAME = MyCoucou;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = APPSTORE;
 			};
@@ -557,7 +557,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = fr.louisraille.Coucou;
-				PRODUCT_NAME = Coucou;
+				PRODUCT_NAME = MyCoucou;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = APPSTORE;
 			};

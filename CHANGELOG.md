@@ -1,11 +1,19 @@
 # Changelog
 
-## Mac only — Unreleased
+## 1.0.0 — October 12, 2026
+
+The app is now called **MyCoucou**, everywhere the user sees it: in the Finder, in System Settings, on the login items list, and in the island itself.
 
 - Drop the iPhone App (Coucou on iPhone, widgets, notification content extension, Mac `PhoneLink` iCloud sync). The Mac no longer publishes sessions, turns or services through CloudKit, and the Live Activity relay is gone.
-- Drop the Windows and Linux (Tauri) app.
-- This codebase now ships Mac only.
-- **Hide after** is entered in seconds, not minutes (minimum 1 s), and the value actually drives the island's petit → hidden delay.
+- Drop the Windows and Linux (Tauri) app. This codebase now ships Mac only.
+- **Sessions report their real state**: a session that has stopped is shown as stopped instead of being guessed at, and a new session can be started from the island
+- Claude sessions that were already running when the app launched are found too, not only the ones that start afterwards
+- Sessions are matched by their real identity rather than by guessing
+- The home list groups sessions by folder
+- **Resume actually resumes**, and Mochi carries the status dot himself
+- **Hide after** is entered in seconds, not minutes (minimum 1 s), and the value actually drives the island's petit → hidden delay
+- Opening Settings keeps the island up instead of collapsing it
+- Weekly recap is gone
 
 ## Windows and Linux 0.3.0 — October 9, 2026
 
