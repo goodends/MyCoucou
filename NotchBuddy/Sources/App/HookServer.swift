@@ -973,10 +973,13 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
-    /// "VS Code", "Warp"… — where the Claude Code pill's current session runs.
+    /// "Warp", "VS Code"… — the app the Claude Code pill's current session runs
+    /// in. Falls back to the agent's own name when the host was never
+    /// reported, rather than inventing one.
     @MainActor
     private var claudeHostName: String {
         ClaudeHost.name(for: AppState.shared.tasks.first { $0.id == "integration_claude" }?.hostApp)
+            ?? "Claude Code"
     }
 
     /// Updates or transiently creates a workspace pill (VS Code or Cursor) task.

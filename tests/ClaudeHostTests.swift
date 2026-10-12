@@ -25,9 +25,17 @@ enum ClaudeHostTests {
         check("unknown → nil", ClaudeHost.terminal(termProgram: "", bundleId: "com.example.app") == nil)
 
         print("ClaudeHost.name")
-        check("nil host = VS Code", ClaudeHost.name(for: nil) == "VS Code")
+        // A host we were never told is unknown, not "VS Code". The old version
+        // answered "VS Code" for anything unrecognised, which was right for
+        // editor sessions by coincidence and wrong everywhere else.
+        check("nil host = unknown", ClaudeHost.name(for: nil) == nil)
+        check("empty host = unknown", ClaudeHost.name(for: "") == nil)
+        check("unknown host = unknown", ClaudeHost.name(for: "com.example.app") == nil)
         check("Warp host", ClaudeHost.name(for: "dev.warp.Warp-Stable") == "Warp")
-        check("unknown host = VS Code", ClaudeHost.name(for: "com.example.app") == "VS Code")
+        check("Orca host", ClaudeHost.name(for: "com.stablyai.orca") == "Orca")
+        // Editors are hosts too, recognised by their own bundle id.
+        check("VS Code host", ClaudeHost.name(for: "com.microsoft.VSCode") == "VS Code")
+        check("Cursor host", ClaudeHost.name(for: "com.todesktop.230313mzl4w4u92") == "Cursor")
 
         print("ClaudeHost.terminalCardsEnabled")
         UserDefaults.standard.removeObject(forKey: ClaudeHost.terminalCardsKey)

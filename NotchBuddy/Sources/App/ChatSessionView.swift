@@ -274,6 +274,18 @@ struct ChatSessionView: View {
     // MARK: - Loading
 
     private func reload() {
+        // A session found by the process scan has no session id yet, so there
+        // is no transcript to read. Open the chat empty rather than reaching
+        // for some other session's file or reporting a missing path — the
+        // first hook event adopts the session, which re-focuses this view on
+        // the real id and loads the transcript then.
+        if let s = state.focusedClaudeSession, s.provisional {
+            lines = []
+            loadError = nil
+            lastLoadedURL = "PROVISIONAL"
+            stopWatching()
+            return
+        }
         // Resolve which Claude session to render. A tapped session pill sets
         // `focusedSessionId` so we read that session's JSONL even when it differs
         // from the focus task's last-known cwd.

@@ -95,34 +95,13 @@ final class AppState: ObservableObject {
         // cache the result for the next jump.
         let sid = sessionId ?? focusedSessionId
         var handle: String?
-        if let sid, !sid.isEmpty, let bound = orcaHandleBySession[sid] {
-            handle = bound
-        } else if let sid, let s = claudeSessions.first(where: { $0.sessionId == sid }),
-                  let pane = s.pid.flatMap({ orcaPaneByPid[$0] }),
-                  let byPane = await OrcaCLIBridge.shared.handle(paneKey: pane) {
-            // A scanned session has no session id to bind a handle to, but we
-            // know its Orca pane. Two sessions in one folder share a cwd and
-            // the cwd fallback sends both to the same tab; the pane does not.
-            handle = byPane
-            orcaHandleBySession[sid] = byPane
+        if let sid, !sid.isEmpty {
+            handle = await resolveOrcaHandle(for: sid)
         } else {
-            // Pick the cwd that matches the session we're jumping to, not
-            // the focused one. For Orca, lastOutputAt can't distinguish
-            // two sessions in the same worktree — it's only used as a
-            // last-ditch fallback when no exact binding exists.
-            let cwd: String?
-            if let sid, let s = claudeSessions.first(where: { $0.sessionId == sid }) {
-                cwd = s.cwd
-            } else {
-                cwd = terminalLookupCwd
-            }
-            guard let cwd, !cwd.isEmpty else { return false }
-            handle = await OrcaCLIBridge.shared.handle(forCwd: cwd)
-            if let handle, let sid, !sid.isEmpty {
-                orcaHandleBySession[sid] = handle
-            }
+            // No session to key on — fall back to whatever the chat is about.
+            handle = await OrcaCLIBridge.shared.handle(forCwd: terminalLookupCwd ?? "")
         }
-        guard let handle else { return false }
+        guard let handle, !handle.isEmpty else { return false }
         // Raise the Orca window first — `orca terminal switch` only changes
         // the selected tab inside the app, it doesn't bring the window
         // forward on macOS. Then give the activation a moment to settle:
@@ -175,16 +154,39 @@ final class AppState: ObservableObject {
         guard let key = focusedSessionId ?? focusTask?.id, !key.isEmpty else { return false }
 
         var handle = orcaHandleBySession[key]
-        if handle == nil, let cwd = terminalLookupCwd {
-            handle = await OrcaCLIBridge.shared.handle(forCwd: cwd)
-            if let h = handle { orcaHandleBySession[key] = h }
-        }
+        if handle == nil { handle = await resolveOrcaHandle(for: key) }
         guard let handle else { return false }
         do {
             return try await OrcaCLIBridge.shared.send(handle: handle, text: text)
         } catch {
             return false
         }
+    }
+
+    /// Find the Orca terminal for `sessionId`, most precise source first, and
+    /// cache the result. Shared by the jump and the send path so both agree on
+    /// which tab a session lives in — they used to resolve differently, and a
+    /// send that landed on a different tab than the jump would be very hard to
+    /// notice.
+    ///
+    /// 1. A handle already bound to this session (from ORCA_TERMINAL_HANDLE,
+    ///    which the relay forwards on every event) is exact.
+    /// 2. A scanned session has no bound handle, but we know its Orca pane.
+    /// 3. cwd is the last resort and only names a *folder* — two sessions in
+    ///    one folder both resolve to the most recently active terminal there,
+    ///    which is why 2 has to come first.
+    private func resolveOrcaHandle(for sessionId: String) async -> String? {
+        if let bound = orcaHandleBySession[sessionId] { return bound }
+        let session = claudeSessions.first { $0.sessionId == sessionId }
+        if let session, let pane = session.pid.flatMap({ orcaPaneByPid[$0] }),
+           let byPane = await OrcaCLIBridge.shared.handle(paneKey: pane) {
+            orcaHandleBySession[sessionId] = byPane
+            return byPane
+        }
+        guard let cwd = session?.cwd ?? terminalLookupCwd, !cwd.isEmpty else { return nil }
+        guard let byCwd = await OrcaCLIBridge.shared.handle(forCwd: cwd) else { return nil }
+        orcaHandleBySession[sessionId] = byCwd
+        return byCwd
     }
 
     /// The Claude session that should drive the OverviewView's left card:
@@ -585,10 +587,15 @@ final class AppState: ObservableObject {
                 projectName: projectName, state: phase,
                 startedAt: s.startedAt, lastEventAt: eventTime,
                 pid: pid, bodyColor: s.bodyColor, outfit: s.outfit,
-                customName: s.customName
+                sessionName: s.sessionName, customName: s.customName,
+                scanned: s.scanned
             )
             claudeSessions.remove(at: idx)
             claudeSessions.insert(s, at: 0)
+            // The chat can be focused on the placeholder id (tapping a scanned
+            // card opens it). Carry that focus over to the real id, or the open
+            // chat silently loses its session and never fills in.
+            if focusedSessionId == s.sessionId { focusedSessionId = sessionId }
             appendAppLog("nb.log", "adopt scanned session pid=\(pid) → \(sessionId) cwd=\(cwd) name=\(projectName)")
             return
         }
@@ -681,14 +688,47 @@ final class AppState: ObservableObject {
         claudeSessions.removeAll { $0.provisional && ($0.pid.map { !live.contains($0) } ?? true) }
         for p in found where !claudeSessions.contains(where: { $0.pid == p.pid }) {
             if let key = p.paneKey { orcaPaneByPid[p.pid] = key }
-            let raw = URL(fileURLWithPath: p.cwd).lastPathComponent
-            claudeSessions.insert(
-                .provisional(pid: p.pid, cwd: p.cwd,
-                             projectName: HookServer.aliasProjectName(raw.isEmpty ? "Claude" : raw)),
-                at: 0
-            )
-            appendAppLog("nb.log", "scan: pid=\(p.pid) cwd=\(p.cwd)")
+            // Holding ORCA_PANE_KEY *is* the evidence that Orca spawned this
+            // process, so a scanned Orca session has a known host even though
+            // no hook has ever reported one. Otherwise fall back to whatever
+            // the parent chain says (Terminal.app, VS Code, …).
+            let hostApp = p.paneKey != nil ? ClaudeHost.orcaBundleId : p.hostBundleId
+
+            // Claude's registry knows the cwd, the name and whether the agent
+            // is busy; prefer those over what the process table could tell us.
+            let cwd = p.descriptor?.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? p.cwd
+            let raw = URL(fileURLWithPath: cwd).lastPathComponent
+            let projectName = HookServer.aliasProjectName(raw.isEmpty ? "Claude" : raw)
+
+            if let d = p.descriptor, let sid = d.sessionId, !sid.isEmpty, !ClaudeSession.isProvisionalId(sid) {
+                claudeSessions.insert(
+                    .scanned(sessionId: sid, pid: p.pid, cwd: cwd,
+                              projectName: projectName,
+                              sessionName: d.name ?? "",
+                              phase: Self.phase(forClaudeStatus: d.status),
+                              startedAt: d.startedAt.map { Date(timeIntervalSince1970: $0 / 1000) } ?? .now,
+                              hostApp: hostApp),
+                    at: 0
+                )
+                appendAppLog("nb.log", "scan: pid=\(p.pid) sid=\(sid) cwd=\(cwd) status=\(d.status ?? "?")")
+            } else {
+                // No registry entry — an older Claude Code, or the file wasn't
+                // readable. Fall back to a placeholder that a hook will adopt.
+                claudeSessions.insert(
+                    .provisional(pid: p.pid, cwd: cwd, projectName: projectName, hostApp: hostApp),
+                    at: 0
+                )
+                appendAppLog("nb.log", "scan: pid=\(p.pid) cwd=\(cwd) (provisional)")
+            }
         }
+    }
+
+    /// Claude's `status` → our visual phase. "busy" means the agent is working;
+    /// anything else (notably "idle", the common state — sitting at the prompt
+    /// waiting for you) renders as the dim stopped dot rather than green, which
+    /// would wrongly read as "look, it just finished something".
+    private static func phase(forClaudeStatus status: String?) -> SessionPhase {
+        status == "busy" ? .working : .stopped
     }
 
     /// True while the session's agent process is still running.

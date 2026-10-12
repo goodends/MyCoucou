@@ -2,11 +2,15 @@ import AppKit
 
 // MARK: - ClaudeHost
 //
-// The app a Claude Code session runs in, from the hook payload's term_program /
-// bundle_id. Terminal sessions are named after the terminal; a nil host means
-// the session runs inside an editor, which for Claude Code means VS Code.
+// The *host* a Claude Code session runs in — Orca, Warp, VS Code — read from
+// the hook payload's term_program / bundle_id. This is a different axis from
+// the agent itself (Claude Code, Gemini, Codex), which the pill catalog names.
 
 struct ClaudeHost: Equatable {
+    /// Orca's bundle id. Also how a session discovered by the process scan is
+    /// identified as Orca-hosted: Orca injects `ORCA_PANE_KEY` into every
+    /// process it spawns, so holding that variable *is* the evidence.
+    static let orcaBundleId = "com.stablyai.orca"
     let bundleId: String
     let name: String
 
@@ -29,7 +33,7 @@ struct ClaudeHost: Equatable {
         "co.zeit.hyper":              "Hyper",
         "dev.zed.Zed":                "Zed",
         "com.cmuxterm.app":           "cmux",    // sets TERM_PROGRAM=ghostty: the bundle id decides
-        "com.stablyai.orca":          "Orca",
+        orcaBundleId:                 "Orca",
     ]
     private static let termPrograms: [String: String] = [
         "warpterminal":   "dev.warp.Warp-Stable",
@@ -52,16 +56,37 @@ struct ClaudeHost: Equatable {
         return nil
     }
 
-    /// The app name for a task's host.
+    /// Host apps that are not terminals. Deliberately a separate table from
+    /// `terminals`: a session's *agent* (Claude Code, Gemini, Codex) is named by
+    /// the pill catalog, while this is the *app the session runs in*. Folding
+    /// the two together is what let a nil host silently read as "VS Code".
+    private static let editors: [String: String] = [
+        "com.microsoft.VSCode":           "VS Code",
+        "com.microsoft.VSCodeInsiders":   "VS Code Insiders",
+        "com.todesktop.230313mzl4w4u92":  "Cursor",
+        "com.cursor.Cursor":              "Cursor",
+    ]
+
+    /// The host app's name, or nil when we were never told.
     ///
-    /// `hostApp` is nil exactly when the session isn't running in one of the
-    /// terminals above — i.e. it runs inside an editor (VS Code being the one
-    /// Claude Code ships an extension for). So "VS Code" here is a real reading
-    /// of the host, not a placeholder: it is only ever reached for a session
-    /// that actually exists.
-    static func name(for hostBundleId: String?) -> String {
-        guard let id = hostBundleId, let name = terminals[id] else { return "VS Code" }
-        return name
+    /// Returning nil is the point. This used to answer "VS Code" for anything
+    /// unrecognised, reasoning that a session with no terminal must be in an
+    /// editor — right for editor sessions only by coincidence, and wrong for
+    /// everything else, including every session found by the process scan.
+    static func name(for hostBundleId: String?) -> String? {
+        guard let id = hostBundleId, !id.isEmpty else { return nil }
+        return terminals[id] ?? editors[id]
+    }
+
+    /// How to label where a session runs, shared by the session pill's subtitle
+    /// and the chat's host chip so the two can't drift apart.
+    ///
+    /// The host when we know it, the working folder when we don't — never a
+    /// guess. Holds for scanned and hook-created sessions alike: a scan simply
+    /// has no host information at all.
+    static func label(for session: ClaudeSession) -> String {
+        if let host = name(for: session.hostApp ?? session.sessionBundleId) { return host }
+        return URL(fileURLWithPath: session.cwd).lastPathComponent
     }
 
     /// Brings the session's terminal forward (launching it if needed). false when not a terminal host.

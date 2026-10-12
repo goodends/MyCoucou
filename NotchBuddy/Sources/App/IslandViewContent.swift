@@ -987,15 +987,11 @@ struct PromptView: View {
         // 1. The session the user explicitly tapped into (right-card pill tap, or
         //    a follow-up left-card tap after the first SessionStart has populated
         //    its hostApp/sessionBundleId).
-        if let s = state.focusedClaudeSession {
-            return ClaudeHost.name(for: s.hostApp ?? s.sessionBundleId)
-        }
+        if let s = state.focusedClaudeSession { return ClaudeHost.label(for: s) }
         // 2. The session driving the left card (matches what the user just saw
         //    on the home view, even on the very first click before any tap has
         //    set focusedSessionId).
-        if let s = state.overviewSession {
-            return ClaudeHost.name(for: s.hostApp ?? s.sessionBundleId)
-        }
+        if let s = state.overviewSession { return ClaudeHost.label(for: s) }
         // 3. Last-resort: the global integration_claude task's most-recent host
         //    (may be stale from a previous terminal session).
         guard let task = state.focusTask else { return "Claude Code" }
@@ -1005,7 +1001,7 @@ struct PromptView: View {
             // session — true for a real session, a guess for the bare
             // placeholder pill. Name the agent instead of inventing a host.
             return state.hasOverviewContent
-                ? ClaudeHost.name(for: task.hostApp ?? task.sessionBundleId)
+                ? (ClaudeHost.name(for: task.hostApp ?? task.sessionBundleId) ?? "Claude Code")
                 : "Claude Code"
         }
         return task.name
@@ -1837,12 +1833,13 @@ struct ClaudeSessionPill: View {
         )
     }
 
-    /// Under the project name: the host terminal. For a session the process scan
-    /// found we have no host and nothing else worth saying yet, so say that
-    /// instead of naming a host we don't know.
+    /// Under the session name: where it runs. For a session the process scan found
+    /// there is no host to name — `ClaudeHost.name(for: nil)` would answer "VS
+    /// Code", a guess that only holds for editor sessions — so show the folder
+    /// it is working in instead.
     private var subtitle: String {
         if session.provisional { return String(localized: "Started · no events yet") }
-        return ClaudeHost.name(for: session.hostApp ?? session.sessionBundleId)
+        return ClaudeHost.label(for: session)
     }
 
     private func botState(for phase: SessionPhase) -> BotState {
@@ -2130,16 +2127,10 @@ struct ClaudeSessionsListView: View {
         guard !swapping else { return }
         swapping = true
         SoundEngine.shared.play("blip")
-        // A scanned session has no session id yet, so there is no transcript to
-        // open and focusing it would just show an empty chat. Take the user to
-        // the thing itself instead.
-        if s.provisional {
-            Task { await state.jumpToOrcaTerminal(sessionId: s.sessionId) }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
-            return
-        }
         // Open the chat view for this session. PromptView swaps its in-memory
         // history for ChatSessionView's JSONL stream when focusedClaudeSession is set.
+        // A scanned session has no transcript yet, so its chat opens empty and
+        // fills in once the first hook event adopts it.
         state.focusedSessionId = s.sessionId
         state.view = .prompt
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
