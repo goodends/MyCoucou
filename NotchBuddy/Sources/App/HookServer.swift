@@ -56,10 +56,6 @@ final class HookServer: @unchecked Sendable {
         let pillId: String
     }
 
-    /// True when a real nb-hook connection is holding an approval fd open.
-    @MainActor var hasRealPendingApproval: Bool { !heldApprovals.isEmpty }
-    /// True when a real nb-hook connection is holding a question fd open.
-    @MainActor var hasRealPendingQuestion: Bool { !heldQuestions.isEmpty }
     private var focusBeforeQuestion: String? = nil    // saved focus to restore after question
     private var activeSessionId: String? = nil        // current Claude Code session
     private var focusBeforeApproval: String? = nil    // saved focus to restore after approval
@@ -222,8 +218,9 @@ final class HookServer: @unchecked Sendable {
         presentHeadRequest()
     }
 
-    /// Called by QuestionView "Reply in terminal" — hands this one back and
-    /// lets the agent ask there instead.
+    /// Hands the question at the head of the queue back to its agent, which
+    /// then asks in its own terminal. Bound to Cancel on the last page and to
+    /// "Send back" on the inbox row.
     @MainActor
     func sendQuestionAsk() {
         guard let head = AppState.shared.pendingQuestions.first else { return }
@@ -642,10 +639,17 @@ final class HookServer: @unchecked Sendable {
             }
 
         case "StopFailure":
-            state.updateTask(id: agentId, state: .error)
+            // Same treatment as Stop: queue it. The card used to be a hard-coded
+            // n8n placeholder, which named a workflow that this app no longer has
+            // and said nothing about the session that actually failed. An error
+            // notification is the real thing — its own Mochi, its own session.
+            state.pushNotification(agentId: agentId,
+                                   sessionId: sessionId,
+                                   kind: .error,
+                                   finalLine: DiffEngine.toOneLine((payload["message"] as? String) ?? ""))
             SoundEngine.shared.play("error")
-            if focused {
-                expandIfNeeded(to: .error)
+            if focused || state.view == .finished {
+                expandIfNeeded(to: .finished)
             } else {
                 setPillBadge(id: agentId, badge: .error)
             }
@@ -767,7 +771,7 @@ final class HookServer: @unchecked Sendable {
         let state = AppState.shared
         let isAlert: Bool
         switch view {
-        case .approval, .question, .finished, .error, .confused: isAlert = true
+        case .approval, .question, .finished, .confused: isAlert = true
         default: isAlert = false
         }
         if state.mode == .expanded {

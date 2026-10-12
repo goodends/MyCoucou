@@ -277,7 +277,7 @@ final class AppState: ObservableObject {
     var holdsIslandOpen: Bool {
         guard mode == .expanded else { return false }
         switch view {
-        case .question, .error: return true
+        case .question: return true
         // A queued question or permission holds a hook open on a clock, so the
         // stack stays up while one is waiting even if every finished session
         // below it has already been acknowledged.

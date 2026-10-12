@@ -93,8 +93,9 @@ enum ClaudeSessionTests {
 
         // First upsert for a brand-new session assigns a curated bodyColor
         // and a real outfit (not .auto, not .none).
-        let avatarColors: Set<String> = ["#F5A524", "#5EEAD4", "#EC4899",
-                                         "#A78BFA", "#60A5FA", "#F87171"]
+        // Read the palette rather than listing it: the hand-written copy fell
+        // behind when White was added, which failed ~1 run in 7 at random.
+        let avatarColors = Set(ClaudeSession.palette.map(\.hex))
         sessions.upsert(
             sessionId: "sid-c",
             cwd: "/Users/me/proj-c",

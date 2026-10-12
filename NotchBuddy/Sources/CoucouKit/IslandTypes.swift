@@ -9,7 +9,7 @@ enum IslandMode: String, CaseIterable {
 // MARK: - Island View
 
 enum IslandView: String, CaseIterable {
-    case overview, empty, approval, question, error, finished
+    case overview, empty, approval, question, finished
     case confused, prompt
     case searching, result, note, greeting, wardrobe
     // Per-session file changes: the list of files one session edited, with
@@ -406,7 +406,6 @@ enum IslandConst {
         .empty:     ViewLayout(height: 160, botX: 70,  botY: nil, botDiameter: 62, agentMode: .none),
         .approval:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
         .question:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
-        .error:     ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 58, agentMode: .column),
         .finished:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 58, agentMode: .column),
         .confused:  ViewLayout(height: 160, botX: 76,  botY: nil, botDiameter: 66, agentMode: .column),
         .prompt:    ViewLayout(height: 160, botX: 52,  botY: nil, botDiameter: 44, agentMode: .column),
@@ -451,7 +450,6 @@ enum IslandConst {
     static let washColors: [IslandView: String] = [
         .approval:  "rgba(245,165,36,0.42)",
         .question:  "rgba(34,211,238,0.38)",
-        .error:     "rgba(244,80,94,0.55)",
         .finished:  "rgba(52,211,153,0.5)",
         .confused:  "rgba(244,114,182,0.55)",
         .searching: "rgba(99,102,241,0.5)",

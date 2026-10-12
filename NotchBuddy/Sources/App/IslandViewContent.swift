@@ -17,7 +17,6 @@ struct IslandViewContent: View {
         case .empty:     EmptyStateView(state: state)
         case .approval:  ApprovalView(state: state)
         case .question:  QuestionView(state: state)
-        case .error:     ErrorView(state: state)
         case .finished:  FinishedView(state: state)
         case .confused:  ConfusedView()
         case .prompt:    PromptView(state: state)
@@ -419,7 +418,7 @@ struct QuestionView: View {
                 let canProceed = !curSel.isEmpty || (curOther && !curOtherText.isEmpty)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    // Header row: agent name + question counter + "Reply in terminal" link
+                    // Header row: agent name + question counter
                     HStack(spacing: 4) {
                         AgentWho(task: nil, label: "Claude Code is asking")
                         Spacer(minLength: 4)
@@ -428,11 +427,9 @@ struct QuestionView: View {
                                 .font(.system(size: 10))
                                 .foregroundColor(Color(hex: "#6B7079"))
                         }
-                        Button("Reply in terminal") { HookServer.shared.sendQuestionAsk() }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(hex: "#6B7079"))
-                            .underline()
+                        // Handing back lives on the navigation row's Cancel,
+                        // and on the inbox row's "Send back" — a third copy in
+                        // the header did the same thing three times over.
                     }
                     // Optional short header label above question text
                     if !item.header.isEmpty {
@@ -619,34 +616,6 @@ struct QuestionView: View {
     private func sendAnswers(q: AskQuestion) {
         let answers = AskQuestion.buildAnswers(questions: q.questions, selections: selections)
         HookServer.shared.sendQuestionAnswers(answers)
-    }
-}
-
-// MARK: - Error
-
-struct ErrorView: View {
-    @ObservedObject var state: AppState
-
-    var body: some View {
-        ZStack {
-            CardBackground(wash: .red)
-            VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "n8n")
-                Text("Workflow stopped.")
-                    .font(.system(size: 15, weight: .semibold))
-                Text("Gmail node timed out after 30s. Retry or open n8n.")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "#FF8D97"))
-                HStack(spacing: 8) {
-                    PrimaryButton("Retry") { /* retry */ }
-                    SecondaryButton("Open in n8n") { /* open */ }
-                }
-            }
-            .padding(.leading, 116)
-            .padding(.trailing, 16)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
     }
 }
 
@@ -870,9 +839,9 @@ private struct FinishedCard: View {
 
     private var finalLine: String {
         if !notification.finalLine.isEmpty { return notification.finalLine }
-        if let fl = task?.finalLine { return fl }
+        if let fl = task?.finalLine, !isError { return fl }
         if let s = task?.steps.last(where: { !$0.isDiffStep }) { return s }
-        return String(localized: "Session finished")
+        return String(localized: isError ? "This turn didn't finish" : "Session finished")
     }
 
     /// Make this session drive the home view's left card, so wherever the user
@@ -894,18 +863,22 @@ private struct FinishedCard: View {
         }
     }
 
+    private var isError: Bool { notification.kind == .error }
+
     var body: some View {
-        CardBackground(wash: .green) {
+        CardBackground(wash: isError ? .red : .green) {
             HStack(alignment: .center, spacing: 0) {
                 BotCanvasView(state: state, sessionOverride: session,
-                              stateOverride: notification.kind == .error ? .error : .finished)
+                              stateOverride: isError ? .error : .finished)
                     .frame(width: Self.botDiameter / 0.6, height: Self.botDiameter / 0.6)
                     .frame(width: Self.botDiameter, height: Self.botDiameter)
                     .padding(.leading, 28)
                     .padding(.trailing, 30)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    AgentWho(task: task, label: "Claude Code finished")
+                    AgentWho(task: task, label: isError
+                             ? String(localized: "Claude Code stopped early")
+                             : String(localized: "Claude Code finished"))
                     Text(finalLine)
                         .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
