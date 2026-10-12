@@ -440,6 +440,19 @@ struct IslandHeader: View {
             // Right: action icons
             HStack(spacing: 8) {
                 HStack(spacing: 14) {
+                    // Finished sessions wait here until acknowledged. Same view
+                    // the hook force-expands to, but reachable on demand, and
+                    // badged with the count so an unnoticed finish is visible
+                    // from any page.
+                    TabButton(icon: "bell", view: .finished, state: state)
+                        .overlay(alignment: .topTrailing) {
+                            if !state.notifications.isEmpty {
+                                NotificationBadge(count: state.notifications.count)
+                                    .offset(x: 4, y: -3)
+                            }
+                        }
+                        .help(String(localized: "Notifications"))
+
                     // Settings now pops up as a separate window — the in-island
                     // settings page (sound toggle, auto-close picker, Claude
                     // hook badge) is gone.
@@ -503,6 +516,25 @@ struct TabButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+    }
+}
+
+/// Unacknowledged-finish counter riding the bell tab. Caps the digits at "9+"
+/// so a burst of sessions can't stretch the header.
+struct NotificationBadge: View {
+    let count: Int
+
+    private var label: String {
+        count > 9 ? "9+" : String(count)
+    }
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundColor(Color(hex: "#FFFFFF"))
+            .padding(.horizontal, count > 9 ? 3 : 0)
+            .frame(minWidth: 13, minHeight: 13)
+            .background(Capsule().fill(Color(hex: "#F4505E")))
     }
 }
 

@@ -659,13 +659,37 @@ struct FinishedView: View {
     @ObservedObject var state: AppState
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: NotificationLayout.cardSpacing) {
-                ForEach(state.notifications) { n in
-                    FinishedCard(notification: n, state: state)
+        // Reachable from the bell tab too, so it has to stand on its own when
+        // there is nothing waiting.
+        if state.notifications.isEmpty {
+            EmptyNotificationsView()
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: NotificationLayout.cardSpacing) {
+                    ForEach(state.notifications) { n in
+                        FinishedCard(notification: n, state: state)
+                    }
                 }
+                .padding(.vertical, NotificationLayout.listPadding)
             }
-            .padding(.vertical, NotificationLayout.listPadding)
+        }
+    }
+}
+
+private struct EmptyNotificationsView: View {
+    var body: some View {
+        ZStack {
+            CardBackground(wash: nil)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Nothing has finished yet.")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Sessions that finish will show up here.")
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(hex: "#9398A1"))
+            }
+            .padding(.leading, 24)
+            .padding(.trailing, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
