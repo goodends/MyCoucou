@@ -1,8 +1,10 @@
 # Changelog
 
+This changelog covers **MyCoucou**, an independent fork of [Coucou](https://github.com/Louis-CFM/coucou) by Louis Raillé. It starts at the fork point; the upstream project's own releases are listed further down, under the name they shipped under.
+
 ## 1.0.0 — October 12, 2026
 
-The app is now called **MyCoucou**, everywhere the user sees it: in the Finder, in System Settings, on the login items list, and in the island itself.
+First release of the fork. The app is now called **MyCoucou**, everywhere the user sees it: in the Finder, in System Settings, on the login items list, and in the island itself.
 
 - Drop the iPhone App (Coucou on iPhone, widgets, notification content extension, Mac `PhoneLink` iCloud sync). The Mac no longer publishes sessions, turns or services through CloudKit, and the Live Activity relay is gone.
 - Drop the Windows and Linux (Tauri) app. This codebase now ships Mac only.
