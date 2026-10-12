@@ -885,11 +885,12 @@ private struct FinishedCard: View {
         state.setFocus(notification.agentId)
     }
 
-    /// Drop just this card. The ones below close the gap; when the last one
-    /// goes, `dismissNotification` sends the island home.
+    /// Drop just this card. The ones below close the gap; the island only goes
+    /// home when the *whole* inbox is empty — a question still waiting keeps it
+    /// on this page.
     private func acknowledge() {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            state.dismissNotification(id: notification.id)
+            state.dismissInboxItem(.finished(notification))
         }
     }
 

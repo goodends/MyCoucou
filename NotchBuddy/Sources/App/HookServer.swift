@@ -759,7 +759,7 @@ final class HookServer: @unchecked Sendable {
         }
         guard let stale else { return }
         state.setFocus(stale.agentId)
-        state.dismissNotification(id: stale.id)
+        state.dismissInboxItem(.finished(stale))
     }
 
     @MainActor

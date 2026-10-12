@@ -651,16 +651,12 @@ final class AppState: ObservableObject {
         notifications = notifications.pushing(n)
     }
 
-    /// Acknowledge one notification. Once none are left, the finished view has
-    /// nothing to show and the island goes back home.
+    /// Drop one finished notification. Navigation is `dismissInboxItem`'s job —
+    /// this used to go home when the *finished* list emptied, which walked away
+    /// from a question still waiting on its hook.
     func dismissNotification(id: String) {
         guard notifications.contains(where: { $0.id == id }) else { return }
         notifications = notifications.removing(id: id)
-        if notifications.isEmpty && view == .finished {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                view = .overview
-            }
-        }
     }
 
     // MARK: - Task management
