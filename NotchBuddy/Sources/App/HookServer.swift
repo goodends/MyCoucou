@@ -184,18 +184,32 @@ final class HookServer: @unchecked Sendable {
 
     // MARK: - Approval
 
+    /// What a decision means on the wire.
+    private static func approvalPayload(_ decision: String) -> String {
+        switch decision {
+        case "allow":  return #"{"permissionDecision":"allow"}"#
+        case "always": return #"{"permissionDecision":"always"}"#
+        case "ask":    return #"{"permissionDecision":"ask"}"#
+        default:       return #"{"permissionDecision":"deny"}"#
+        }
+    }
+
     /// Answers the approval at the head of the queue and moves to whatever is next.
     @MainActor
     func sendApprovalDecision(_ decision: String) {
         guard let head = AppState.shared.pendingApprovals.first else { return }
-        let json: String
-        switch decision {
-        case "allow":  json = #"{"permissionDecision":"allow"}"#
-        case "always": json = #"{"permissionDecision":"always"}"#
-        case "ask":    json = #"{"permissionDecision":"ask"}"#
-        default:       json = #"{"permissionDecision":"deny"}"#
-        }
-        releaseHeldRequest(kind: .approval, id: head.id, json: json)
+        releaseHeldRequest(kind: .approval, id: head.id, json: Self.approvalPayload(decision))
+        presentHeadRequest()
+    }
+
+    /// Answers one queued approval by id — from its inbox row. The rows are
+    /// listed in arrival order, so the one the user clicks is usually not the
+    /// head the detail card shows, and answering "the head" there would answer
+    /// a different session's request.
+    @MainActor
+    func answerApproval(id: String, decision: String) {
+        guard heldApprovals[id] != nil else { return }
+        releaseHeldRequest(kind: .approval, id: id, json: Self.approvalPayload(decision))
         presentHeadRequest()
     }
 

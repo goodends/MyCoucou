@@ -384,28 +384,37 @@ struct ApprovalView: View {
             VStack(alignment: .leading, spacing: 5) {
                 AgentWho(task: state.focusTask, label: "needs permission")
                 CodeBlock(text: approval?.command ?? approval?.tool ?? "…")
-                HStack(spacing: 8) {
-                    SecondaryButton("Deny") {
-                        HookServer.shared.sendApprovalDecision("deny")
-                    }
-                    PrimaryButton("Allow") {
-                        HookServer.shared.sendApprovalDecision("allow")
-                    }
-                    // Codex, Copilot CLI and Muse Code do not support updatedPermissions
-                    let hideAlways = approval?.pillId == "agent_codex"
-                        || approval?.pillId == "agent_copilot"
-                        || approval?.pillId == "agent_muse"
-                    if !hideAlways {
-                        SecondaryButton("Always") {
-                            HookServer.shared.sendApprovalDecision("always")
-                        }
-                    }
+                ApprovalDecisionButtons(info: approval) {
+                    HookServer.shared.sendApprovalDecision($0)
                 }
             }
             .padding(.leading, 116)
             .padding(.trailing, 16)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// Deny / Allow / Always, shared by the detail card and the inbox row so the
+/// two can't drift. `onDecision` receives "deny", "allow" or "always".
+private struct ApprovalDecisionButtons: View {
+    let info: ApprovalInfo?
+    let onDecision: (String) -> Void
+
+    /// Codex, Copilot CLI and Muse Code do not support updatedPermissions.
+    private var hideAlways: Bool {
+        guard let pillId = info?.pillId else { return false }
+        return pillId == "agent_codex" || pillId == "agent_copilot" || pillId == "agent_muse"
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            SecondaryButton("Deny") { onDecision("deny") }
+            PrimaryButton("Allow") { onDecision("allow") }
+            if !hideAlways {
+                SecondaryButton("Always") { onDecision("always") }
+            }
         }
     }
 }
@@ -713,8 +722,10 @@ private struct QuestionInboxCard: View {
     }
 }
 
-/// A permission request waiting to be allowed or denied. Same shape: a row that
-/// opens the real approval card, and a clock showing what's left of it.
+/// A permission request waiting to be allowed or denied. The row answers it
+/// outright — same Deny / Allow / Always the detail card has — so nothing has
+/// to be opened first, and "Send back" is the way out for a request the user
+/// would rather answer in the terminal. The clock says what's left of it.
 private struct ApprovalInboxCard: View {
     let approval: PendingApproval
     @ObservedObject var state: AppState
@@ -731,12 +742,14 @@ private struct ApprovalInboxCard: View {
                 .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .truncationMode(.tail)
-            InboxActions(
-                deadline: approval.deadline,
-                openLabel: String(localized: "Review"),
-                onOpen: { HookServer.shared.openInboxItem(.approval(approval)) },
-                onHandBack: { state.dismissInboxItem(.approval(approval)) }
-            )
+            HStack(spacing: 8) {
+                ApprovalDecisionButtons(info: approval.info) {
+                    HookServer.shared.answerApproval(id: approval.id, decision: $0)
+                }
+                SecondaryButton("Send back") { state.dismissInboxItem(.approval(approval)) }
+                Spacer(minLength: 4)
+                DeadlineChip(deadline: approval.deadline)
+            }
         }
     }
 }
