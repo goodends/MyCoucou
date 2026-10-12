@@ -1929,6 +1929,9 @@ struct TickerView: View {
     static let currentLines = 5
     /// Reading between the two rows. Same rhythm as the title above them.
     private static let rowGap: CGFloat = 8
+    /// How far the soft edge at each end of the mask reaches, in points.
+    /// Only the row passing through an edge mid-transition should be affected.
+    private static let edgeFade: CGFloat = 4
     /// Enough for the tallest the ticker can get, and what the incoming row
     /// slides up from.
     static var height: CGFloat { lineHeight * CGFloat(historyLines + currentLines) }
@@ -1981,10 +1984,11 @@ struct TickerView: View {
         .mask(LinearGradient(
             stops: [
                 .init(color: .clear, location: 0),
-                // Fades span a fixed few points at each edge, so the taller
-                // ticker still reads fully opaque across its current row.
-                .init(color: .black, location: 0.05),
-                .init(color: .black, location: 0.95),
+                // A few points at each edge, NOT a share of the box. The rows
+                // hang from the top of a 154pt frame, so a proportional fade
+                // ran down the history row and left it looking washed out.
+                .init(color: .black, location: Self.edgeFade / Self.height),
+                .init(color: .black, location: 1 - Self.edgeFade / Self.height),
                 .init(color: .clear, location: 1)
             ],
             startPoint: .top, endPoint: .bottom
