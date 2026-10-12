@@ -43,6 +43,11 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(Array(hiddenClaudeSessionIds), forKey: "hiddenClaudeSessionIds") }
     }
 
+    /// The session behind each hidden id, kept so "Resume" can put it straight
+    /// back. Only the ids are persisted — after a restart a resumed session
+    /// relies on the process scan (or its next hook event) to return.
+    var hiddenClaudeSessions: [String: ClaudeSession] = [:]
+
     /// Per-session step log (rolling window of ~20). Populated by HookServer so the
     /// overview's left ticker can show real-time activity even when the focus task
     /// is shared across concurrent Claude sessions.
@@ -756,16 +761,49 @@ final class AppState: ObservableObject {
 
     /// Mark a session as "stop monitoring": drop it from the right-side list
     /// and keep future hook events from re-adding it. Persists across restarts.
+    ///
+    /// The session itself is kept in `hiddenClaudeSessions`. Hiding used to
+    /// discard everything but the id, which left `unhideClaudeSession` with
+    /// nothing to put back — resuming only cleared the blacklist and the card
+    /// stayed gone until some later hook event happened to re-add it, which for
+    /// an idle session could be hours, and for a dead one never happened.
     func hideClaudeSession(_ sessionId: String) {
+        if let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+            hiddenClaudeSessions[sessionId] = claudeSessions[idx]
+        }
         hiddenClaudeSessionIds.insert(sessionId)
         claudeSessions.removeById(sessionId)
         if focusedSessionId == sessionId { focusedSessionId = nil }
     }
 
-    /// Reverse of `hideClaudeSession` — used by Settings to let the user
-    /// bring a previously hidden session back into the list.
+    /// Reverse of `hideClaudeSession`. Puts the session back immediately when we
+    /// still have it, rather than waiting for the next hook event or scan.
+    ///
+    /// If its process is gone by now, it comes back marked `.stopped` — still
+    /// listed, because the user asked for it back, but not claiming to be
+    /// running. With no snapshot (hidden in an earlier session, before the
+    /// snapshot existed) there is nothing to restore and the id simply leaves
+    /// the blacklist; the process scan will pick the session up if it's alive.
     func unhideClaudeSession(_ sessionId: String) {
         hiddenClaudeSessionIds.remove(sessionId)
+        guard let saved = hiddenClaudeSessions.removeValue(forKey: sessionId) else { return }
+        var s = saved
+        if let pid = s.pid, !isClaudeSessionAlive(s) { s.state = .stopped }
+        claudeSessions.upsert(
+            sessionId: s.sessionId, cwd: s.cwd, hostApp: s.hostApp,
+            sessionBundleId: s.sessionBundleId, projectName: s.projectName,
+            phase: s.state, eventTime: .now, pid: s.pid
+        )
+        // Carry the colour and outfit across too — a re-scan would pick new
+        // ones, so resuming and restarting would otherwise restyle the Mochi.
+        let idx = claudeSessions.firstIndex { $0.sessionId == s.sessionId }
+        if let idx {
+            claudeSessions[idx].bodyColor = s.bodyColor
+            claudeSessions[idx].outfit = s.outfit
+            claudeSessions[idx].customName = s.customName
+            claudeSessions[idx].sessionName = s.sessionName
+            claudeSessions[idx].scanned = s.scanned
+        }
     }
 
     /// Remove a Claude Code session by id. No-op if absent. Does NOT touch tasks/focus.

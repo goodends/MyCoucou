@@ -109,9 +109,13 @@ struct OverviewView: View {
                 if let agent = agent {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 6) {
-                            Circle()
-                                .fill(Color(hex: ClaudeSessionPill.stateDotColor(for: agent.state)))
-                                .frame(width: 7, height: 7)
+                            // No status dot beside the name. The Mochi beside
+                            // this row already carries one — BotEngine's badge,
+                            // three pulsing dots while working, a single dot
+                            // when finished or idle. This one repeated the same
+                            // state in a second place, and the two could even
+                            // disagree: the badge follows `mainMochiState`,
+                            // this followed `agent.state`.
                             Text(agent.name)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(Color(hex: "#F5F6F8"))
@@ -1851,27 +1855,6 @@ struct ClaudeSessionPill: View {
         }
     }
 
-    private var stateDotColor: String {
-        // A scanned session is alive but silent — nothing says what it's doing,
-        // so the dot stays dim rather than claiming "working".
-        if session.provisional { return "#5F646D" }
-        return Self.stateDotColor(for: botTask.state)
-    }
-
-    /// Shared mapping so the overview's left card and the right-card pill
-    /// show the same status colour for the same session. Takes BotState
-    /// (already-mapped from SessionPhase inside `botTask`) so it lines up
-    /// with the overview card's `AgentTask.state` field too.
-    static func stateDotColor(for state: BotState) -> String {
-        switch state {
-        case .thinking:   return "#5EEAD4"  // cyan  (spawning)
-        case .working:    return claudeColor
-        case .finished:   return "#22C55E"  // green
-        case .idle:       return "#5F646D"  // dim   (stopped)
-        default:          return "#5F646D"  // searching / approval / question / error / ratelimit / sleeping / dizzy
-        }
-    }
-
     var body: some View {
         // A plain ZStack + tap gesture, not a Button: the ↗ jump button lives
         // inside the same view that owns the hover, so moving onto it can't
@@ -1940,12 +1923,12 @@ struct ClaudeSessionPill: View {
                     .padding(.top, 2)
                     .padding(.trailing, 4)
                 }
-
-                Circle()
-                    .fill(Color(hex: stateDotColor))
-                    .frame(width: 6, height: 6)
-                    .offset(x: 10, y: -4)
-                    .allowsHitTesting(false)
+                // No status dot here. The Mochi already carries one, drawn by
+                // BotEngine's badge: three pulsing dots while it's working, a
+                // single dot when finished. A second static dot told the same
+                // story with less information — it couldn't distinguish
+                // "moving" from "just finished" — and sat ~4px from the badge,
+                // so the two read as one confusing pair. Left to the character.
             }
         }
         .contentShape(Rectangle())
@@ -2042,15 +2025,17 @@ struct ClaudeSessionsListView: View {
     private static let columns = [GridItem(.flexible(), spacing: 4),
                                   GridItem(.flexible(), spacing: 4)]
 
-    /// The project's name over its sessions, tinted with the project's own
-    /// colour (`IslandConst.projectColors`, stable fallback otherwise) so the
-    /// grouping reads at a glance and matches any other place the project's
-    /// colour appears.
+    /// The project's name over its sessions.
+    ///
+    /// No colour dot: it used to take the project's colour from
+    /// IslandConst.colorForProject, which only knows a handful of projects and
+    /// falls back to a hash of the name for the rest — so for most projects it
+    /// was a random dot that meant nothing. Worse, the fallback green (#22C55E)
+    /// is also the "finished" state colour, so a green dot meant two different
+    /// things depending on where it sat. The heading text already says which
+    /// project this is.
     private func projectHeader(_ group: ProjectGroup) -> some View {
         HStack(spacing: 5) {
-            Circle()
-                .fill(Color(hex: IslandConst.colorForProject(group.name)))
-                .frame(width: 5, height: 5)
             Text(group.name)
                 // Deliberately smaller than the pill titles (10pt): the header
                 // organises the list, it isn't a thing to read first.
@@ -2158,6 +2143,17 @@ struct ClaudeSessionsListView: View {
         }
     }
 
+    /// What to call a hidden session. The raw uuid told the user nothing they
+    /// could act on — they can't tell which of a dozen sessions it is. Prefer
+    /// the snapshot taken when it was hidden, then whatever name we last knew,
+    /// and only fall back to the id when a restart has left us nothing else.
+    private func hiddenTitle(for sessionId: String) -> String {
+        if let saved = state.hiddenClaudeSessions[sessionId] {
+            return saved.displayName
+        }
+        return sessionId
+    }
+
     private var hiddenPopover: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(String(localized: "Hidden sessions"))
@@ -2170,11 +2166,23 @@ struct ClaudeSessionsListView: View {
             Divider().background(Color(hex: "#2A2C30"))
             ForEach(Array(state.hiddenClaudeSessionIds).sorted(), id: \.self) { sid in
                 HStack(spacing: 6) {
-                    Text(sid)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(Color(hex: "#A0A6AE"))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(hiddenTitle(for: sid))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color(hex: "#F5F6F8"))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        // Only shown when there's no snapshot to name the
+                        // session by — after a restart the snapshot is gone
+                        // (only ids are persisted) and the id is all we have.
+                        if hiddenTitle(for: sid) == sid {
+                            Text(sid)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(Color(hex: "#7B8089"))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
                     Spacer(minLength: 4)
                     Button(String(localized: "Resume")) {
                         state.unhideClaudeSession(sid)

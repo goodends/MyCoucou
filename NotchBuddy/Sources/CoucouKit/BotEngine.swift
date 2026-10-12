@@ -90,7 +90,12 @@ enum MochiConst {
 let BotStates: [BotState: BotStateCfg] = [
     .idle: BotStateCfg(
         color: CGColor(red:0.902,green:0.914,blue:0.933,alpha:1), tint:0,
-        eye:.pill, badge:nil,
+        // A dim dot, not nil. Idle used to be shown by a separate static dot
+        // beside the character in the session pill; that one is gone, and an
+        // idle session still has to say it's alive. Same #5F646D it always
+        // used, so nothing shifts colour — it just moved onto the character,
+        // where every other state's badge already lives.
+        eye:.pill, badge:.dot(CGColor(red:0.373,green:0.392,blue:0.427,alpha:1)),
         badgeColor: .white, glow: CGColor(red:1,green:1,blue:1,alpha:0.35), glowOpacity:0.25,
         bounces:false, scans:false, breathes:false, zz:false, sweat:false,
         look:nil, tilt:0, sound:nil),
