@@ -900,11 +900,14 @@ final class HookServer: @unchecked Sendable {
             arrivedAt: .now,
             deadline: .now.addingTimeInterval(waitTimeout)))
 
-        // Queued, not force-expanded: the bell tab is where the user goes for
-        // things waiting on them, and a request that opens the island from
-        // under them is the same interruption the queue was meant to remove.
-        // The pill badge keeps it visible from the overview.
+        // Queue it, then force the inbox open. Queued rather than displacing:
+        // a second request must not push the first back into its terminal. But
+        // it still opens the island — a permission prompt that stays invisible
+        // behind a collapsed notch is a prompt the user never sees, and the
+        // hook only stays open so long. The card itself is a row: answering
+        // takes one more click, in the full approval card.
         setPillBadge(id: pillId, badge: .approval)
+        expandIfNeeded(to: .finished)
 
         // Monitor fd: if the editor closes the connection (handled externally), drop this card.
         // The cancel handler closes the fd — never close it anywhere else.
@@ -1006,6 +1009,7 @@ final class HookServer: @unchecked Sendable {
             arrivedAt: .now, deadline: .now.addingTimeInterval(Self.questionTimeout)))
 
         setPillBadge(id: pillId, badge: .question)
+        expandIfNeeded(to: .finished)
 
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .main)
         source.setEventHandler { [weak self] in

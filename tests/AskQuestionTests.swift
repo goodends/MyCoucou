@@ -122,7 +122,9 @@ enum AskQuestionTests {
         ], multiSelect: true)
         checkTrue("chips only → no descriptions",          !shortQ.hasDescriptions)
         checkTrue("one description → vertical list",       longQ.hasDescriptions)
-        checkTrue("short question keeps the 160 pt floor", AskQuestion(questions: [shortQ]).estimatedIslandHeight == 160)
+        // Every question carries a navigation row now, so even the simplest one
+        // clears the 160 pt floor that the other state cards share.
+        checkTrue("short question clears the 160 pt floor", AskQuestion(questions: [shortQ]).estimatedIslandHeight > 160)
         let tall = AskQuestion(questions: [shortQ, longQ]).estimatedIslandHeight
         checkTrue("tallest question wins, within cap",     tall > 160 && tall <= 560)
 

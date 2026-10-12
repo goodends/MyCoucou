@@ -43,7 +43,9 @@ struct AskQuestion: Equatable {
             } else {
                 h += item.options.count >= 3 ? 74 : 40
             }
-            if item.multiSelect { h += 34 }
+            // Navigation row — Back/Next, or Cancel/Submit on the last question.
+            // Every question carries one now, not only multi-select ones.
+            h += 34
             return h
         }.max() ?? 160
         return min(max(tallest, 160), 560)

@@ -9,9 +9,17 @@ struct BotCanvasView: View {
     /// CGPoint in the same coord space as state.mousePosition (DesktopSpace, y-down).
     var lookOriginOverride: CGPoint? = nil
     /// Draw this session instead of whichever one the island would pick.
-    /// Each finished card owns a Mochi, so every card has to look like its
-    /// own session rather than the focused one.
+    /// Each inbox row owns a Mochi, so every card has to look like its own
+    /// session rather than the focused one.
     var sessionOverride: ClaudeSession? = nil
+    /// Draw this state instead of the island-wide one. Without it every card
+    /// in a stack follows `state.mainMochiState`, so a second notification
+    /// repainted the first one's badge — a pending question's "?" came back as
+    /// a finished dot the moment anything else finished.
+    var stateOverride: BotState? = nil
+    /// Fallback when there is no override and `mainMochiState` hasn't fired yet,
+    /// so the bot starts in the right pose instead of idling until the first event.
+    var initialState: BotState? = nil
 
     // One engine per view instance (main bot)
     @StateObject private var engine = BotEngine()
@@ -90,7 +98,17 @@ struct BotCanvasView: View {
                 engine.drawHandsAndExtras(context: ctx, size: size)
             }
         }
+        // Set outside the Canvas draw: setState starts tweens, schedules
+        // async work and emits particles, and mutating the engine while
+        // SwiftUI is mid-draw hung the island at ~40% CPU.
+        .onAppear {
+            if let s = stateOverride ?? initialState { engine.setState(s) }
+        }
+        .onChange(of: stateOverride) { _, newState in
+            if let s = newState ?? initialState { engine.setState(s) }
+        }
         .onChange(of: state.mainMochiState) { _, newState in
+            guard stateOverride == nil else { return }
             engine.setState(newState)
         }
         .onChange(of: state.mode) { _, newMode in

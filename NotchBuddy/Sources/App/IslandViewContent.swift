@@ -456,13 +456,13 @@ struct QuestionView: View {
                             .foregroundColor(Color(hex: "#F5F6F8"))
                             .focused($otherFieldFocused)
                             .onAppear { otherFieldFocused = true }
-                            .onSubmit { commitOtherAndProceed(q: q, qi: qi, isLast: isLast) }
+                            .onSubmit { commitOtherAndAdvance(qi: qi, isLast: isLast) }
                             .onExitCommand { if qi < showOther.count { showOther[qi] = false } }
                             .padding(.horizontal, 8).padding(.vertical, 5)
                             .background(Color.white.opacity(0.07))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             Button(isLast ? "Send" : "Next") {
-                                commitOtherAndProceed(q: q, qi: qi, isLast: isLast)
+                                commitOtherAndAdvance(qi: qi, isLast: isLast)
                             }
                             .buttonStyle(.plain)
                             .font(.system(size: 11, weight: .medium))
@@ -485,7 +485,7 @@ struct QuestionView: View {
                                     if isMulti {
                                         toggleSelection(qi: qi, label: opt.label)
                                     } else {
-                                        selectAndProceed(q: q, qi: qi, label: opt.label, isLast: isLast)
+                                        selectAndAdvance(q: q, qi: qi, label: opt.label, isLast: isLast)
                                     }
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
@@ -533,7 +533,7 @@ struct QuestionView: View {
                                     .keyboardShortcut(KeyEquivalent(Character(String(idx + 1))), modifiers: [])
                                 } else {
                                     SecondaryButton(verbatim: opt.label) {
-                                        selectAndProceed(q: q, qi: qi, label: opt.label, isLast: isLast)
+                                        selectAndAdvance(q: q, qi: qi, label: opt.label, isLast: isLast)
                                     }
                                     .keyboardShortcut(KeyEquivalent(Character(String(idx + 1))), modifiers: [])
                                 }
@@ -544,13 +544,28 @@ struct QuestionView: View {
                             }
                         }
                     }
-                    // Send/Next — only for multi-select (and not while "Other…" field is open)
-                    if isMulti && !curOther {
-                        PrimaryButton(isLast ? "Send" : "Next") {
-                            proceedFromQuestion(q: q, qi: qi, isLast: isLast)
+                    // Navigation. Picking an option only selects it — the card
+                    // used to submit the moment a single-select answer was
+                    // clicked, which left no way back and no way to change it.
+                    if !curOther {
+                        HStack(spacing: 8) {
+                            if isLast {
+                                SecondaryButton("Cancel") { HookServer.shared.sendQuestionAsk() }
+                            } else {
+                                SecondaryButton("Back") {
+                                    withAnimation { questionIndex = qi - 1 }
+                                }
+                                .disabled(qi == 0)
+                                .opacity(qi == 0 ? 0.4 : 1)
+                            }
+                            Spacer(minLength: 0)
+                            PrimaryButton(isLast ? "Submit" : "Next") {
+                                if isLast { sendAnswers(q: q) }
+                                else { withAnimation { questionIndex = qi + 1 } }
+                            }
+                            .disabled(!canProceed)
+                            .opacity(canProceed ? 1 : 0.4)
                         }
-                        .disabled(!canProceed)
-                        .opacity(canProceed ? 1 : 0.4)
                     }
                 }
                 .padding(.leading, 116)
@@ -582,28 +597,23 @@ struct QuestionView: View {
     }
 
     // Single-select: pick a label and immediately advance/send
-    private func selectAndProceed(q: AskQuestion, qi: Int, label: String, isLast: Bool) {
+    /// Pick a single-select answer and move on. The last question stops here
+    /// so its Submit is a deliberate act rather than the third click in a row.
+    private func selectAndAdvance(q: AskQuestion, qi: Int, label: String, isLast: Bool) {
         guard qi < selections.count else { return }
         selections[qi] = [label]
-        if isLast { sendAnswers(q: q) } else { withAnimation { questionIndex = qi + 1 } }
-    }
-
-    // Multi-select Send/Next button
-    private func proceedFromQuestion(q: AskQuestion, qi: Int, isLast: Bool) {
-        if isLast { sendAnswers(q: q) } else { withAnimation { questionIndex = qi + 1 } }
+        if !isLast { withAnimation { questionIndex = qi + 1 } }
     }
 
     // "Other…" confirm
-    private func commitOtherAndProceed(q: AskQuestion, qi: Int, isLast: Bool) {
+    /// Typed "Other…" answer: commit it and move on, same as picking a chip.
+    /// Stops on the last question, where Submit waits.
+    private func commitOtherAndAdvance(qi: Int, isLast: Bool) {
         let text = qi < otherTexts.count ? otherTexts[qi] : ""
         guard !text.isEmpty else { return }
         if qi < selections.count { selections[qi] = [text] }
-        if isLast {
-            sendAnswers(q: q)
-        } else {
-            if qi < showOther.count { showOther[qi] = false }
-            withAnimation { questionIndex = qi + 1 }
-        }
+        if qi < showOther.count { showOther[qi] = false }
+        if !isLast { withAnimation { questionIndex = qi + 1 } }
     }
 
     private func sendAnswers(q: AskQuestion) {
@@ -694,7 +704,7 @@ private struct QuestionInboxCard: View {
     }
 
     var body: some View {
-        InboxRow(state: state, pillId: question.pillId, sessionId: question.sessionId) {
+        InboxRow(state: state, pillId: question.pillId, sessionId: question.sessionId, botState: .question) {
             AgentWho(task: task, label: "Claude Code is asking")
             Text(question.question.questions.first?.question ?? String(localized: "Needs an answer"))
                 .font(.system(size: 15, weight: .semibold))
@@ -722,7 +732,7 @@ private struct ApprovalInboxCard: View {
     }
 
     var body: some View {
-        InboxRow(state: state, pillId: approval.info.pillId, sessionId: approval.info.sessionId) {
+        InboxRow(state: state, pillId: approval.info.pillId, sessionId: approval.info.sessionId, botState: .approval) {
             AgentWho(task: task, label: "needs permission")
             Text(approval.info.command)
                 .font(.system(size: 15, weight: .semibold))
@@ -746,6 +756,9 @@ private struct InboxRow<Content: View>: View {
     let state: AppState
     let pillId: String
     let sessionId: String
+    /// The state this row's Mochi wears. Passed in rather than derived from
+    /// AppState, which is shared by every row on screen.
+    let botState: BotState
     @ViewBuilder let content: () -> Content
 
     /// 58pt Mochi vs the text beside it — the same size the finished card uses.
@@ -759,7 +772,7 @@ private struct InboxRow<Content: View>: View {
     var body: some View {
         CardBackground(wash: nil) {
             HStack(alignment: .center, spacing: 0) {
-                BotCanvasView(state: state, sessionOverride: session)
+                BotCanvasView(state: state, sessionOverride: session, stateOverride: botState)
                     .frame(width: botDiameter / 0.6, height: botDiameter / 0.6)
                     .frame(width: botDiameter, height: botDiameter)
                     .padding(.leading, 28)
@@ -883,7 +896,8 @@ private struct FinishedCard: View {
     var body: some View {
         CardBackground(wash: .green) {
             HStack(alignment: .center, spacing: 0) {
-                BotCanvasView(state: state, sessionOverride: session)
+                BotCanvasView(state: state, sessionOverride: session,
+                              stateOverride: notification.kind == .error ? .error : .finished)
                     .frame(width: Self.botDiameter / 0.6, height: Self.botDiameter / 0.6)
                     .frame(width: Self.botDiameter, height: Self.botDiameter)
                     .padding(.leading, 28)
