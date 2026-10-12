@@ -446,8 +446,8 @@ struct IslandHeader: View {
                     // from any page.
                     TabButton(icon: "bell", view: .finished, state: state)
                         .overlay(alignment: .topTrailing) {
-                            if !state.notifications.isEmpty {
-                                NotificationBadge(count: state.notifications.count)
+                            if !state.inbox.isEmpty {
+                                NotificationBadge(count: state.inbox.count)
                                     .offset(x: 4, y: -3)
                             }
                         }

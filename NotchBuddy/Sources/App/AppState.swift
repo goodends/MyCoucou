@@ -278,14 +278,22 @@ final class AppState: ObservableObject {
         guard mode == .expanded else { return false }
         switch view {
         case .question, .error: return true
-        case .finished: return !notifications.isEmpty
+        // A queued question or permission holds a hook open on a clock, so the
+        // stack stays up while one is waiting even if every finished session
+        // below it has already been acknowledged.
+        case .finished: return !notifications.isEmpty || inboxHasBlockingItem
         default: return false
         }
     }
 
+    /// Rows in the inbox that hold a hook fd open and run on a deadline.
+    var inboxHasBlockingItem: Bool {
+        !pendingApprovals.isEmpty || !pendingQuestions.isEmpty
+    }
+
     /// The finished stack is on screen with something waiting on it.
     var isShowingNotification: Bool {
-        mode == .expanded && view == .finished && !notifications.isEmpty
+        mode == .expanded && view == .finished && !inbox.isEmpty
     }
 
     // Keyboard navigation — index of the selected item within the current card's list (nil = none)
@@ -408,13 +416,20 @@ final class AppState: ObservableObject {
     // Chat conversation history
     @Published var chatHistory: [ChatMessage] = []
 
-    // Pending approval request from Claude Code hook
-    @Published var pendingApproval: ApprovalInfo? = nil
-
-    // Pending AskUserQuestion from Claude Code hook
-    @Published var pendingQuestion: AskQuestion? = nil {
-        didSet { QuestionLayout.height = pendingQuestion?.estimatedIslandHeight }
+    // Requests holding a hook fd open, oldest first. Queued rather than
+    // single-slot: a second request used to write "ask" to the first one's fd
+    // and take the card, dropping the displaced session into its terminal with
+    // nothing on screen saying so. Each entry carries its own deadline.
+    @Published var pendingApprovals: [PendingApproval] = []
+    @Published var pendingQuestions: [PendingQuestion] = [] {
+        didSet { QuestionLayout.height = pendingQuestions.first?.question.estimatedIslandHeight }
     }
+
+    /// The request the island is showing. Derived from the head of each queue
+    /// so every existing reader — the FSM's hold, Desktop Mochi's alert face,
+    /// the views — keeps working against one item.
+    var pendingApproval: ApprovalInfo? { pendingApprovals.first?.info }
+    var pendingQuestion: AskQuestion? { pendingQuestions.first?.question }
 
     // Flat list of FileDiffs per scope, in order of reception.
     //
@@ -588,7 +603,33 @@ final class AppState: ObservableObject {
         return claudeSessions.first { $0.sessionId == id }
     }
 
-    // MARK: - Notification queue
+    // MARK: - Inbox
+
+    /// Everything waiting on the user — questions and permissions first (they
+    /// hold a hook open and run on a clock), finished sessions after.
+    var inbox: [InboxItem] {
+        InboxItem.ordered(approvals: pendingApprovals,
+                          questions: pendingQuestions,
+                          notifications: notifications)
+    }
+
+    /// Hands one inbox row back to whoever raised it. Once the inbox is empty
+    /// the finished view has nothing left to show and the island goes home.
+    func dismissInboxItem(_ item: InboxItem) {
+        switch item {
+        case .finished(let n):
+            dismissNotification(id: n.id)
+        case .question(let q):
+            HookServer.shared.releaseQuestion(id: q.id)
+        case .approval(let a):
+            HookServer.shared.releaseApproval(id: a.id)
+        }
+        if inbox.isEmpty && view == .finished {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                view = .overview
+            }
+        }
+    }
 
     /// A session finished: queue its notification. Re-finishing an already
     /// waiting session refreshes its row in place instead of duplicating it.

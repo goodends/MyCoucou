@@ -35,19 +35,31 @@ final class HookServer: @unchecked Sendable {
     private static let receiveTimeoutSeconds: Int = 5   // SO_RCVTIMEO on client sockets
     private static let maxConnections = 32              // concurrent connection ceiling
 
+    /// How long a question keeps its hook fd open before the island hands it
+    /// back. Matches the 130s `--ask` hook timeout with a little margin.
+    private static let questionTimeout: Double = 120
+
     private var serverFD: Int32 = -1
     private let connectionLock = NSLock()
     private var connectionCount = 0
-    private var pendingApprovalFD: Int32 = -1         // held open while user decides
-    private var approvalFDSource: (any DispatchSourceRead)? = nil  // monitors pendingApprovalFD
-    private var pendingQuestionFD: Int32 = -1         // held open while user answers AskUserQuestion
-    private var questionFDSource: (any DispatchSourceRead)? = nil  // monitors pendingQuestionFD
+    // Held hook requests, keyed by the id of their AppState queue entry.
+    // AppState owns the order and the content; this owns the fds.
+    private var heldApprovals: [String: HeldRequest] = [:]
+    private var heldQuestions: [String: HeldRequest] = [:]
 
-    /// True when a real nb-hook connection is holding the approval fd open.
-    @MainActor var hasRealPendingApproval: Bool { pendingApprovalFD >= 0 }
-    /// True when a real nb-hook connection is holding the question fd open.
-    @MainActor var hasRealPendingQuestion: Bool { pendingQuestionFD >= 0 }
-    private var questionPillId: String = ""           // pill that owns the pending question
+    /// A hook connection held open on the user's behalf. The fd stays valid
+    /// until the request is answered or handed back; `source`'s cancel handler
+    /// is the only thing that ever closes it.
+    private struct HeldRequest {
+        let fd: Int32
+        let source: any DispatchSourceRead
+        let pillId: String
+    }
+
+    /// True when a real nb-hook connection is holding an approval fd open.
+    @MainActor var hasRealPendingApproval: Bool { !heldApprovals.isEmpty }
+    /// True when a real nb-hook connection is holding a question fd open.
+    @MainActor var hasRealPendingQuestion: Bool { !heldQuestions.isEmpty }
     private var focusBeforeQuestion: String? = nil    // saved focus to restore after question
     private var activeSessionId: String? = nil        // current Claude Code session
     private var focusBeforeApproval: String? = nil    // saved focus to restore after approval
@@ -55,67 +67,66 @@ final class HookServer: @unchecked Sendable {
 
     private init() {}
 
-    // MARK: - Approval fd helpers
+    // MARK: - Held request queue
 
-    @MainActor
-    private func cancelApprovalFDSource() {
-        approvalFDSource?.cancel()
-        approvalFDSource = nil
-    }
+    private enum HeldKind { case approval, question }
 
-    /// Cancels the approval fd source (which closes the fd via its cancel handler), shows a
-    /// 3-second note, clears approval state, then collapses the island.
+    private static let askPayload = #"{"permissionDecision":"ask"}"#
+
+    /// Takes one queued request down: writes `json` to its fd, cancels the
+    /// source so its cancel handler closes the fd, and drops the AppState entry.
+    /// Never close an fd directly — Apple requires it in the cancel handler.
+    ///
+    /// Resetting the pill here is what keeps a released session from sitting in
+    /// `.approval` / `.question` forever: the queue used to displace, which
+    /// overwrote the owning pill id before anything could clear it.
     @MainActor
-    private func dismissApprovalCard(note: String) {
-        // cancelApprovalFDSource() triggers the cancel handler which closes the fd.
-        // Never close the fd here directly — Apple requires it to happen in the cancel handler.
-        cancelApprovalFDSource()
-        pendingApprovalFD = -1
+    @discardableResult
+    private func releaseHeldRequest(kind: HeldKind, id: String, json: String) -> String? {
         let state = AppState.shared
-        let pillId = state.pendingApproval?.pillId ?? "integration_claude"
-        state.pendingApproval = nil
-        state.isPinned = false
+        let held: HeldRequest?
+        switch kind {
+        case .approval:
+            held = heldApprovals.removeValue(forKey: id)
+            state.pendingApprovals.removeAll { $0.id == id }
+        case .question:
+            held = heldQuestions.removeValue(forKey: id)
+            state.pendingQuestions.removeAll { $0.id == id }
+        }
+        guard let held else { return nil }
+        let fd = held.fd
+        let source = held.source
+        let pillId = held.pillId
+        Task.detached { [weak self] in
+            self?.sendLine(fd: fd, text: json)
+            DispatchQueue.main.async { source.cancel() }
+        }
         state.updateTask(id: pillId, state: .working)
         clearPillBadge(id: pillId)
-        // Restore focus to the pill that was focused before the approval card appeared.
-        if let prev = focusBeforeApproval {
-            focusBeforeApproval = nil
-            if state.focusId == pillId, state.tasks.contains(where: { $0.id == prev }) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
-            }
-        }
-        state.noteMessage = note
-        state.view = .note
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            NotificationCenter.default.post(name: .islandCollapse, object: nil)
-        }
+        return pillId
     }
 
-    // MARK: - Question fd helpers
-
+    /// Where to land after a request leaves the queue. Requests are answered
+    /// from the bell tab rather than force-expanded, so the answer is the inbox
+    /// itself — whatever is still queued is one click away.
+    ///
+    /// `note` is what to say when the inbox has run dry ("Handled in Codex").
+    /// With something still queued it stays unsaid — the inbox is the more
+    /// useful thing to look at, and the note would only flash over it.
     @MainActor
-    private func cancelQuestionFDSource() {
-        questionFDSource?.cancel()
-        questionFDSource = nil
-    }
-
-    @MainActor
-    private func dismissQuestionCard(note: String) {
-        cancelQuestionFDSource()
-        pendingQuestionFD = -1
+    private func presentHeadRequest(note: String? = nil) {
         let state = AppState.shared
-        let pillId = questionPillId
-        state.pendingQuestion = nil
-        state.isPinned = false
-        state.updateTask(id: pillId, state: .working)
-        clearPillBadge(id: pillId)
-        if let prev = focusBeforeQuestion {
-            focusBeforeQuestion = nil
-            if state.focusId == pillId, state.tasks.contains(where: { $0.id == prev }) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
+        if state.inboxHasBlockingItem || !state.notifications.isEmpty {
+            if state.mode == .expanded {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    state.view = .finished
+                }
             }
+            return
         }
-        if !note.isEmpty {
+        state.isPinned = false
+        restoreFocusAfterRequest()
+        if let note, !note.isEmpty {
             state.noteMessage = note
             state.view = .note
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
@@ -126,57 +137,106 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
-    /// Called by QuestionView. Sends answers JSON and cleans up.
+    /// Restores whatever pill was focused before the first request came in.
+    @MainActor
+    private func restoreFocusAfterRequest() {
+        let state = AppState.shared
+        let prev = focusBeforeApproval ?? focusBeforeQuestion
+        focusBeforeApproval = nil
+        focusBeforeQuestion = nil
+        guard let prev, state.tasks.contains(where: { $0.id == prev }) else { return }
+        if let current = state.pendingApproval?.pillId ?? state.pendingQuestions.first?.pillId,
+           state.focusId == current {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
+        }
+    }
+
+    // MARK: - Approval
+
+    /// Answers the approval at the head of the queue and moves to whatever is next.
+    @MainActor
+    func sendApprovalDecision(_ decision: String) {
+        guard let head = AppState.shared.pendingApprovals.first else { return }
+        let json: String
+        switch decision {
+        case "allow":  json = #"{"permissionDecision":"allow"}"#
+        case "always": json = #"{"permissionDecision":"always"}"#
+        case "ask":    json = #"{"permissionDecision":"ask"}"#
+        default:       json = #"{"permissionDecision":"deny"}"#
+        }
+        releaseHeldRequest(kind: .approval, id: head.id, json: json)
+        presentHeadRequest()
+    }
+
+    /// Hands one approval back to its agent without answering it — the hook
+    /// times out, the editor's own prompt takes over, or the editor closed the
+    /// connection. Leaves the rest of the queue alone.
+    @MainActor
+    func resolveApproval(id: String, note: String) {
+        releaseHeldRequest(kind: .approval, id: id, json: Self.askPayload)
+        presentHeadRequest(note: note)
+    }
+
+    /// The inbox's "hand it back" button on an approval row — no note, since
+    /// the user asked for it rather than something resolving on its own.
+    @MainActor
+    func releaseApproval(id: String) {
+        guard heldApprovals[id] != nil else { return }
+        releaseHeldRequest(kind: .approval, id: id, json: Self.askPayload)
+    }
+
+    /// Same, for a question row.
+    @MainActor
+    func releaseQuestion(id: String) {
+        guard heldQuestions[id] != nil else { return }
+        releaseHeldRequest(kind: .question, id: id, json: Self.askPayload)
+    }
+
+    /// Moves the island to the detail view for one inbox row. The rows hold
+    /// their own fd, so answering there answers exactly that one.
+    @MainActor
+    func openInboxItem(_ item: InboxItem) {
+        let state = AppState.shared
+        switch item {
+        case .finished:
+            state.view = .finished
+        case .question:
+            if let pillId = state.pendingQuestions.first?.pillId { state.focusId = pillId }
+            state.view = .question
+        case .approval:
+            if let pillId = state.pendingApprovals.first?.info.pillId { state.focusId = pillId }
+            state.view = .approval
+        }
+    }
+
+    // MARK: - Question
+
+    /// Answers the question at the head of the queue and moves to whatever is next.
     @MainActor
     func sendQuestionAnswers(_ answers: [String: Any]) {
-        let fd = pendingQuestionFD
-        pendingQuestionFD = -1
-        let source = questionFDSource
-        questionFDSource = nil
-        if fd >= 0, let data = try? JSONSerialization.data(withJSONObject: ["permissionDecision": "answer", "answers": answers], options: .withoutEscapingSlashes),
-           let json = String(data: data, encoding: .utf8) {
-            Task.detached { [weak self] in
-                self?.sendLine(fd: fd, text: json)
-                DispatchQueue.main.async { source?.cancel() }
-            }
-        } else {
-            source?.cancel()
-        }
-        dismissQuestionCard(note: "")
+        guard let head = AppState.shared.pendingQuestions.first else { return }
+        let payload: [String: Any] = ["permissionDecision": "answer", "answers": answers]
+        let json = (try? JSONSerialization.data(withJSONObject: payload, options: .withoutEscapingSlashes))
+            .flatMap { String(data: $0, encoding: .utf8) }
+        releaseHeldRequest(kind: .question, id: head.id, json: json ?? Self.askPayload)
+        presentHeadRequest()
+    }
+
+    /// Called by QuestionView "Reply in terminal" — hands this one back and
+    /// lets the agent ask there instead.
+    @MainActor
+    func sendQuestionAsk() {
+        guard let head = AppState.shared.pendingQuestions.first else { return }
+        releaseHeldRequest(kind: .question, id: head.id, json: Self.askPayload)
+        presentHeadRequest()
     }
 
     /// Called by QuestionView.onDisappear — card left screen without an explicit answer.
     /// Sends "ask" immediately to unblock nb-hook; does NOT navigate (view already changed).
     @MainActor
     func releaseQuestionFD() {
-        guard pendingQuestionFD >= 0 else { return }
-        let fd = pendingQuestionFD
-        pendingQuestionFD = -1
-        let source = questionFDSource
-        questionFDSource = nil
-        AppState.shared.pendingQuestion = nil
-        Task.detached { [weak self] in
-            self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
-            DispatchQueue.main.async { source?.cancel() }
-        }
-    }
-
-    /// Called by QuestionView "Reply in terminal" button.
-    @MainActor
-    func sendQuestionAsk() {
-        let fd = pendingQuestionFD
-        pendingQuestionFD = -1
-        let source = questionFDSource
-        questionFDSource = nil
-        if fd >= 0 {
-            Task.detached { [weak self] in
-                self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
-                DispatchQueue.main.async { source?.cancel() }
-            }
-        } else {
-            source?.cancel()
-        }
-        dismissQuestionCard(note: "")
+        guard let head = AppState.shared.pendingQuestions.first else { return }
+        releaseHeldRequest(kind: .question, id: head.id, json: Self.askPayload)
     }
 
     /// Returns the tool_input serialized as sorted-keys JSON, "" if absent or empty.
@@ -427,14 +487,18 @@ final class HookServer: @unchecked Sendable {
                 // Other parallel tools finishing must not close the card.
                 if sessionId == pending.sessionId,
                    (payload["tool_name"] as? String ?? "") == pending.tool,
-                   Self.approvalInputKey(payload["tool_input"] as? [String: Any] ?? [:]) == pending.inputKey {
-                    dismissApprovalCard(note: handledNote)
+                   Self.approvalInputKey(payload["tool_input"] as? [String: Any] ?? [:]) == pending.inputKey,
+                   let entry = state.pendingApprovals.first(where: {
+                       $0.info.sessionId == pending.sessionId && $0.info.inputKey == pending.inputKey
+                   }) {
+                    resolveApproval(id: entry.id, note: handledNote)
                     resolved = true
                 }
             case "Stop", "StopFailure", "UserPromptSubmit", "SessionEnd", "Interrupt":
                 // Turn ended or session interrupted — the permission is moot.
-                if sessionId == pending.sessionId {
-                    dismissApprovalCard(note: handledNote)
+                if sessionId == pending.sessionId,
+                   let entry = state.pendingApprovals.first(where: { $0.info.sessionId == pending.sessionId }) {
+                    resolveApproval(id: entry.id, note: handledNote)
                     resolved = true
                 }
             default: break
@@ -815,40 +879,39 @@ final class HookServer: @unchecked Sendable {
 
         let command = toolInput["command"] as? String ?? tool
 
-        if pendingApprovalFD >= 0 {
-            // Displace the previous request: write "ask" then cancel its source.
-            // The cancel handler closes the old fd — never close it directly.
-            let old = pendingApprovalFD
-            let oldSource = approvalFDSource
-            approvalFDSource = nil
-            Task.detached { [weak self] in
-                // "ask" → nb-hook outputs nothing → Claude Code re-asks
-                self?.sendLine(fd: old, text: #"{"permissionDecision":"ask"}"#)
-                DispatchQueue.main.async { oldSource?.cancel() }
-            }
-        }
-        pendingApprovalFD = fd
         activeSessionId = sessionId
-
         upsertWorkspaceTask(id: pillId, projectName: projectName, cwd: cwd, hostApp: terminalHost?.bundleId, bundleId: bundleId)
         state.updateTask(id: pillId, state: .approval)
-        state.pendingApproval = ApprovalInfo(sessionId: sessionId, tool: tool,
-                                              command: command, inputKey: inputKey, pillId: pillId)
         state.isPinned = true
         SoundEngine.shared.play("approval")
 
-        // Approval always forces the island open — user must be able to respond.
-        // Save current focus so we can restore it when the card is dismissed.
-        if focusBeforeApproval == nil { focusBeforeApproval = state.focusId }
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = pillId }
-        expandIfNeeded(to: .approval)
+        // Queue, don't displace. A second request used to write "ask" to the
+        // first one's fd and take the card, dropping that session back into its
+        // terminal with nothing on screen saying so. Each one keeps its own fd
+        // and its own deadline; the clock starts now, so a request that waits
+        // its turn can still run out — the inbox shows what's left of it.
+        let id = "a\(fd)-\(UUID().uuidString.prefix(8))"
+        // Copilot/Muse use 110s (their relay waits 118s but their hook timeout is 120s, leaving little margin).
+        let waitTimeout: Double = (isCopilotRequest || isMuseRequest) ? 110 : 115
+        state.pendingApprovals.append(PendingApproval(
+            id: id,
+            info: ApprovalInfo(sessionId: sessionId, tool: tool, command: command,
+                               inputKey: inputKey, pillId: pillId),
+            arrivedAt: .now,
+            deadline: .now.addingTimeInterval(waitTimeout)))
 
-        // Monitor fd: if the editor closes the connection (handled externally), dismiss the card.
+        // Queued, not force-expanded: the bell tab is where the user goes for
+        // things waiting on them, and a request that opens the island from
+        // under them is the same interruption the queue was meant to remove.
+        // The pill badge keeps it visible from the overview.
+        setPillBadge(id: pillId, badge: .approval)
+
+        // Monitor fd: if the editor closes the connection (handled externally), drop this card.
         // The cancel handler closes the fd — never close it anywhere else.
         let capturedPillId = pillId
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .main)
         source.setEventHandler { [weak self] in
-            guard let self, self.pendingApprovalFD == fd else { return }
+            guard let self else { return }
             let note: String
             switch capturedPillId {
             case "agent_cursor":  note = "Handled in Cursor."
@@ -858,19 +921,18 @@ final class HookServer: @unchecked Sendable {
             case "agent_hermes":  note = "Handled in Hermes."
             default:              note = "Handled in \(self.claudeHostName)."
             }
-            self.dismissApprovalCard(note: note)
+            // Only this entry — anything waiting behind it stays queued.
+            self.releaseHeldRequest(kind: .approval, id: id, json: Self.askPayload)
+            self.presentHeadRequest(note: note)
         }
         source.setCancelHandler { close(fd) }
         source.resume()
-        approvalFDSource = source
+        heldApprovals[id] = HeldRequest(fd: fd, source: source, pillId: pillId)
 
-        // Safety timeout — show a note and cancel without sending a decision.
+        // Safety timeout — hand it back without deciding.
         // nb-hook reads EOF from the cancel handler's close and exits; Claude Code / Codex re-asks.
-        // Copilot/Muse use 110s (their relay waits 118s but their hook timeout is 120s, leaving little margin).
-        let waitTimeout: Double = (isCopilotRequest || isMuseRequest) ? 110 : 115
-        let captured = fd
         DispatchQueue.main.asyncAfter(deadline: .now() + waitTimeout) { [weak self] in
-            guard let self, self.pendingApprovalFD == captured else { return }
+            guard let self, self.heldApprovals[id] != nil else { return }
             let note: String
             switch capturedPillId {
             case "agent_cursor":  note = "Still waiting in Cursor."
@@ -880,52 +942,9 @@ final class HookServer: @unchecked Sendable {
             case "agent_hermes":  note = "Still waiting in Hermes."
             default:              note = "Still waiting in \(self.claudeHostName)."
             }
-            self.dismissApprovalCard(note: note)
+            self.releaseHeldRequest(kind: .approval, id: id, json: Self.askPayload)
+            self.presentHeadRequest(note: note)
         }
-    }
-
-    /// Called by ApprovalView buttons. Writes the decision to the waiting nb-hook and cleans up.
-    @MainActor
-    func sendApprovalDecision(_ decision: String) {
-        let fd = pendingApprovalFD
-        pendingApprovalFD = -1
-        // Capture source before nulling — we send the decision first, then cancel the source.
-        // The cancel handler closes the fd; never close it directly.
-        let source = approvalFDSource
-        approvalFDSource = nil
-
-        let json: String
-        switch decision {
-        case "allow":  json = #"{"permissionDecision":"allow"}"#
-        case "always": json = #"{"permissionDecision":"always"}"#
-        case "ask":    json = #"{"permissionDecision":"ask"}"#
-        default:       json = #"{"permissionDecision":"deny"}"#
-        }
-
-        if fd >= 0 {
-            Task.detached { [weak self] in
-                // Write decision while fd is still valid, then cancel source → cancel handler closes fd
-                self?.sendLine(fd: fd, text: json)
-                DispatchQueue.main.async { source?.cancel() }
-            }
-        } else {
-            source?.cancel()
-        }
-
-        let state = AppState.shared
-        let pillId = state.pendingApproval?.pillId ?? "integration_claude"
-        state.pendingApproval = nil
-        state.isPinned = false
-        state.updateTask(id: pillId, state: .working)
-        clearPillBadge(id: pillId)
-        // Restore focus to the pill that was focused before the approval card appeared.
-        if let prev = focusBeforeApproval {
-            focusBeforeApproval = nil
-            if state.focusId == pillId, state.tasks.contains(where: { $0.id == prev }) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = prev }
-            }
-        }
-        state.view = state.tasks.isEmpty ? .empty : .overview
     }
 
     // MARK: - Question request
@@ -972,52 +991,39 @@ final class HookServer: @unchecked Sendable {
             return
         }
 
-        // Displace any previous question waiting for an answer.
-        if pendingQuestionFD >= 0 {
-            let old = pendingQuestionFD
-            let oldSrc = questionFDSource
-            questionFDSource = nil
-            Task.detached { [weak self] in
-                self?.sendLine(fd: old, text: #"{"permissionDecision":"ask"}"#)
-                DispatchQueue.main.async { oldSrc?.cancel() }
-            }
-        }
-        pendingQuestionFD = fd
         activeSessionId = sessionId
-        questionPillId = pillId
-
         upsertWorkspaceTask(id: pillId, projectName: projectName, cwd: cwd, hostApp: terminalHost?.bundleId, bundleId: bundleId)
         state.updateTask(id: pillId, state: .question)
-        state.pendingQuestion = parsed
         state.isPinned = true
         SoundEngine.shared.play("approval")
 
-        if focusBeforeQuestion == nil { focusBeforeQuestion = state.focusId }
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.72)) { state.focusId = pillId }
-        expandIfNeeded(to: .question)
+        // Queue, don't displace — see processPermissionRequest. The 120s clock
+        // starts now, so a question that waits its turn can still run out; the
+        // inbox shows how much of it is left.
+        let id = "q\(fd)-\(UUID().uuidString.prefix(8))"
+        state.pendingQuestions.append(PendingQuestion(
+            id: id, question: parsed, pillId: pillId, sessionId: sessionId,
+            arrivedAt: .now, deadline: .now.addingTimeInterval(Self.questionTimeout)))
+
+        setPillBadge(id: pillId, badge: .question)
 
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .main)
         source.setEventHandler { [weak self] in
-            guard let self, self.pendingQuestionFD == fd else { return }
-            self.dismissQuestionCard(note: "")
+            guard let self else { return }
+            // The agent went away (interrupted, editor closed). Drop this entry
+            // only — anything queued behind it stays answerable.
+            self.releaseHeldRequest(kind: .question, id: id, json: Self.askPayload)
+            self.presentHeadRequest()
         }
         source.setCancelHandler { close(fd) }
         source.resume()
-        questionFDSource = source
+        heldQuestions[id] = HeldRequest(fd: fd, source: source, pillId: pillId)
 
-        let captured = fd
-        DispatchQueue.main.asyncAfter(deadline: .now() + 120) { [weak self] in
-            guard let self, self.pendingQuestionFD == captured else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.questionTimeout) { [weak self] in
+            guard let self, self.heldQuestions[id] != nil else { return }
             // Send "ask" so nb-hook exits cleanly; Claude Code re-asks in terminal.
-            let askFD = self.pendingQuestionFD
-            self.pendingQuestionFD = -1
-            let src = self.questionFDSource
-            self.questionFDSource = nil
-            Task.detached { [weak self] in
-                self?.sendLine(fd: askFD, text: #"{"permissionDecision":"ask"}"#)
-                DispatchQueue.main.async { src?.cancel() }
-            }
-            self.dismissQuestionCard(note: "")
+            self.releaseHeldRequest(kind: .question, id: id, json: Self.askPayload)
+            self.presentHeadRequest()
         }
     }
 

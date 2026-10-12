@@ -651,27 +651,169 @@ private func openClaudeDesktopApp() {
 
 // MARK: - Finished
 
-/// One card per session waiting to be acknowledged, newest on top. Each card
-/// carries its own Mochi, final line and "Open terminal" target, so several
-/// sessions finishing back to back stay independent instead of overwriting
-/// one shared slot.
+/// The island's inbox: everything waiting on the user, questions and
+/// permissions first (they hold a hook open on a clock), finished sessions
+/// after. Each row stands on its own — its own Mochi, its own text, its own
+/// buttons — so several sessions at once never overwrite one shared slot.
 struct FinishedView: View {
     @ObservedObject var state: AppState
 
     var body: some View {
         // Reachable from the bell tab too, so it has to stand on its own when
         // there is nothing waiting.
-        if state.notifications.isEmpty {
+        if state.inbox.isEmpty {
             EmptyNotificationsView()
         } else {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: NotificationLayout.cardSpacing) {
-                    ForEach(state.notifications) { n in
-                        FinishedCard(notification: n, state: state)
+                    ForEach(state.inbox) { item in
+                        switch item {
+                        case .finished(let n): FinishedCard(notification: n, state: state)
+                        case .question(let q):  QuestionInboxCard(question: q, state: state)
+                        case .approval(let a):  ApprovalInboxCard(approval: a, state: state)
+                        }
                     }
                 }
                 .padding(.vertical, NotificationLayout.listPadding)
             }
+        }
+    }
+}
+
+// MARK: - Inbox rows that hold a hook open
+
+/// A question waiting for an answer. Opens the full question UI rather than
+/// trying to squeeze options into a row — that view pages multi-part questions,
+/// has multi-select and a typed "Other…", and needs the whole card.
+private struct QuestionInboxCard: View {
+    let question: PendingQuestion
+    @ObservedObject var state: AppState
+
+    private var task: AgentTask? {
+        state.tasks.first { $0.id == question.pillId } ?? state.focusTask
+    }
+
+    var body: some View {
+        InboxRow(state: state, pillId: question.pillId, sessionId: question.sessionId) {
+            AgentWho(task: task, label: "Claude Code is asking")
+            Text(question.question.questions.first?.question ?? String(localized: "Needs an answer"))
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            InboxActions(
+                deadline: question.deadline,
+                moreCount: state.pendingQuestions.count - 1,
+                openLabel: String(localized: "Answer"),
+                onOpen: { HookServer.shared.openInboxItem(.question(question)) },
+                onHandBack: { state.dismissInboxItem(.question(question)) }
+            )
+        }
+    }
+}
+
+/// A permission request waiting to be allowed or denied. Same shape: a row that
+/// opens the real approval card, and a clock showing what's left of it.
+private struct ApprovalInboxCard: View {
+    let approval: PendingApproval
+    @ObservedObject var state: AppState
+
+    private var task: AgentTask? {
+        state.tasks.first { $0.id == approval.info.pillId } ?? state.focusTask
+    }
+
+    var body: some View {
+        InboxRow(state: state, pillId: approval.info.pillId, sessionId: approval.info.sessionId) {
+            AgentWho(task: task, label: "needs permission")
+            Text(approval.info.command)
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            InboxActions(
+                deadline: approval.deadline,
+                moreCount: state.pendingApprovals.count - 1,
+                openLabel: String(localized: "Review"),
+                onOpen: { HookServer.shared.openInboxItem(.approval(approval)) },
+                onHandBack: { state.dismissInboxItem(.approval(approval)) }
+            )
+        }
+    }
+}
+
+/// Shared chrome for the two blocking rows: the session's own Mochi on the
+/// left, whatever the row says on the right. The finished card draws its own
+/// bot, so it doesn't share this.
+private struct InboxRow<Content: View>: View {
+    let state: AppState
+    let pillId: String
+    let sessionId: String
+    @ViewBuilder let content: () -> Content
+
+    /// 58pt Mochi vs the text beside it — the same size the finished card uses.
+    private let botDiameter: CGFloat = 58
+
+    private var session: ClaudeSession? {
+        guard !sessionId.isEmpty else { return nil }
+        return state.claudeSessions.first { $0.sessionId == sessionId }
+    }
+
+    var body: some View {
+        CardBackground(wash: nil) {
+            HStack(alignment: .center, spacing: 0) {
+                BotCanvasView(state: state, sessionOverride: session)
+                    .frame(width: botDiameter / 0.6, height: botDiameter / 0.6)
+                    .frame(width: botDiameter, height: botDiameter)
+                    .padding(.leading, 28)
+                    .padding(.trailing, 30)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    content()
+                }
+                .padding(.trailing, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 6)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// Buttons plus the clock. The countdown is the point: a queued request runs
+/// out and falls back to its terminal, and the row is the only place that says
+/// how long is left.
+private struct InboxActions: View {
+    let deadline: Date
+    /// How many of the same kind are queued behind this one.
+    let moreCount: Int
+    let openLabel: String
+    let onOpen: () -> Void
+    let onHandBack: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            PrimaryButton(openLabel, action: onOpen)
+            SecondaryButton("Send back") { onHandBack() }
+            Spacer(minLength: 4)
+            if moreCount > 0 {
+                Text("+\(moreCount)")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(hex: "#6B7079"))
+            }
+            DeadlineChip(deadline: deadline)
+        }
+    }
+}
+
+/// Seconds left before the island hands this request back to its agent.
+private struct DeadlineChip: View {
+    let deadline: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            let left = max(0, Int(deadline.timeIntervalSinceNow.rounded(.up)))
+            Text(left > 0 ? "\(left)s" : "handing back")
+                .font(.system(size: 10, weight: .medium))
+                .monospacedDigit()
+                .foregroundColor(left <= 15 ? Color(hex: "#F4505E") : Color(hex: "#6B7079"))
         }
     }
 }
@@ -2687,6 +2829,7 @@ struct PillBadgeView: View {
     private var badgeColor: Color {
         switch badge {
         case .approval: return Color(hex: "#F5A524")
+        case .question: return Color(hex: "#22D3EE")
         case .finished: return Color(hex: "#22C55E")
         case .error:    return Color(hex: "#F4505E")
         }
@@ -2695,6 +2838,7 @@ struct PillBadgeView: View {
     private var icon: String {
         switch badge {
         case .approval: return "exclamationmark"
+        case .question: return "questionmark"
         case .finished: return "checkmark"
         case .error:    return "xmark"
         }

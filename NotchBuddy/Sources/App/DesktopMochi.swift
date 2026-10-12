@@ -430,11 +430,13 @@ final class DesktopMochiController {
     // MARK: - Alert observation (permanent — installed once at init)
 
     private func observeAlerts() {
+        // The queues, not the head: `pendingApproval` / `pendingQuestion` are
+        // derived from them now and have no publisher of their own.
         alertSubscription = Publishers.CombineLatest(
-            AppState.shared.$pendingApproval,
-            AppState.shared.$pendingQuestion
+            AppState.shared.$pendingApprovals,
+            AppState.shared.$pendingQuestions
         )
-        .map { a, q in a != nil || q != nil }
+        .map { approvals, questions in !approvals.isEmpty || !questions.isEmpty }
         .removeDuplicates()
         .dropFirst()
         .receive(on: DispatchQueue.main)
