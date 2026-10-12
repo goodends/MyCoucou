@@ -302,7 +302,6 @@ struct BotPlacement: View {
     private func botGlowOpacity(_ s: BotState) -> Double {
         switch s {
         case .idle, .sleeping: return 0.15
-        case .dizzy:           return 0.0
         default:               return 0.65
         }
     }
@@ -386,8 +385,6 @@ struct IslandContentView: View {
         VStack(spacing: 0) {
             IslandHeader(state: state)
                 .frame(height: 34)
-                .opacity(state.view == .confused ? 0 : 1)
-                .animation(.easeInOut(duration: 0.2), value: state.view == .confused)
 
             ZStack {
                 ForEach(IslandView.allCases, id: \.self) { v in

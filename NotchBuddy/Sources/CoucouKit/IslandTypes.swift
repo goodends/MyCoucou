@@ -10,7 +10,7 @@ enum IslandMode: String, CaseIterable {
 
 enum IslandView: String, CaseIterable {
     case overview, empty, approval, question, finished
-    case confused, prompt
+    case prompt
     case searching, result, note, greeting, wardrobe
     // Per-session file changes: the list of files one session edited, with
     // +N −M per file, newest first. Deeper than a home view, so it gets a
@@ -23,7 +23,7 @@ enum IslandView: String, CaseIterable {
 enum BotState: String, CaseIterable {
     case idle, working, thinking, searching
     case approval, question, error, finished
-    case ratelimit, sleeping, dizzy
+    case ratelimit, sleeping
 }
 
 // MARK: - Bot Emote
@@ -401,7 +401,6 @@ enum IslandConst {
         .approval:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
         .question:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
         .finished:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 58, agentMode: .column),
-        .confused:  ViewLayout(height: 160, botX: 76,  botY: nil, botDiameter: 66, agentMode: .column),
         .prompt:    ViewLayout(height: 160, botX: 52,  botY: nil, botDiameter: 44, agentMode: .column),
         .searching: ViewLayout(height: 160, botX: 52,  botY: nil, botDiameter: 44, agentMode: .column),
         .result:    ViewLayout(height: 160, botX: 52,  botY: nil, botDiameter: 44, agentMode: .column),
@@ -445,7 +444,6 @@ enum IslandConst {
         .approval:  "rgba(245,165,36,0.42)",
         .question:  "rgba(34,211,238,0.38)",
         .finished:  "rgba(52,211,153,0.5)",
-        .confused:  "rgba(244,114,182,0.55)",
         .searching: "rgba(99,102,241,0.5)",
         .result:    "rgba(52,211,153,0.22)",
         .prompt:    "rgba(99,102,241,0.22)",

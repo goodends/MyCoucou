@@ -20,9 +20,6 @@ final class IslandWindowController: NSWindowController {
     private var absenceSubscription: AnyCancellable?
     private var openOnHoverSubscription: AnyCancellable?
 
-    // Confused recovery timer (set by handleDizzy)
-    private var confusedRecoveryTimer: DispatchWorkItem?
-
     // Suppress peek sound on next reveal (e.g. musicReveal)
     var silentNextReveal = false
 
@@ -688,11 +685,6 @@ final class IslandWindowController: NSWindowController {
             }
         }
 
-        // .botDizzy — posted by BotEngine.slap() on 3rd hit; show confused view + recover after 3.3s
-        NotificationCenter.default.addObserver(forName: .botDizzy, object: nil, queue: .main) { [weak self] _ in
-            self?.handleDizzy()
-        }
-
         // Window attach drag.
         // Uses MainActor.assumeIsolated (synchronous) to avoid race with pollFrame().
         // Global mouseUp is the reliable fallback when cursor is outside our panel frame.
@@ -710,8 +702,8 @@ final class IslandWindowController: NSWindowController {
                 // Notch Mochi is invisible when on desktop — no drag, no slap
                 guard !self.state.mochiOnDesktop else { return }
                 // On the home view, a Mochi click opens the focused agent's chat
-                // instead of slapping — covers the user-reported case where clicking
-                // the left card triggered the dizzy/confused state.
+                // instead of slapping — clicking the left card should never be
+                // read as a poke at the character.
                 if self.state.mode == .expanded && self.state.view == .overview {
                     // Lock the chat to the session this card is showing. Without
                     // this the chat falls back to whatever tasks[] remembers, and
@@ -1045,26 +1037,6 @@ final class IslandWindowController: NSWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.2, execute: item)
     }
 
-    // MARK: - Dizzy recovery (triggered by BotEngine.slap via .botDizzy)
-
-    private func handleDizzy() {
-        let prevView = state.view
-        state.stateOverride = .dizzy
-        expand(to: .confused)
-        confusedRecoveryTimer?.cancel()
-        let recovery = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.state.stateOverride = nil
-            if self.state.view == .confused {
-                let fallback = self.state.tasks.isEmpty ? IslandView.empty : .overview
-                self.state.view = (prevView == .confused) ? fallback : prevView
-            }
-            NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.happy)
-        }
-        confusedRecoveryTimer = recovery
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.3, execute: recovery)
-    }
-
     // MARK: - Bot hit test (for slap trigger)
 
     private func isBotHit(_ windowPoint: CGPoint) -> Bool {
@@ -1202,7 +1174,6 @@ struct GhostBotView: View {
 extension Notification.Name {
     static let triggerEmote     = Notification.Name("notchBuddy.triggerEmote")
     static let triggerSlap      = Notification.Name("notchBuddy.triggerSlap")
-    static let botDizzy         = Notification.Name("notchBuddy.botDizzy")
     static let botGreet         = Notification.Name("notchBuddy.botGreet")
     static let botBlink         = Notification.Name("notchBuddy.botBlink")
     static let botSetTgEs       = Notification.Name("notchBuddy.botSetTgEs")

@@ -824,7 +824,7 @@ final class HookServer: @unchecked Sendable {
         let state = AppState.shared
         let isAlert: Bool
         switch view {
-        case .approval, .question, .finished, .confused: isAlert = true
+        case .approval, .question, .finished: isAlert = true
         default: isAlert = false
         }
         if state.mode == .expanded {

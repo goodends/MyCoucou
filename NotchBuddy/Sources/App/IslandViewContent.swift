@@ -18,7 +18,6 @@ struct IslandViewContent: View {
         case .approval:  ApprovalView(state: state)
         case .question:  QuestionView(state: state)
         case .finished:  FinishedView(state: state)
-        case .confused:  ConfusedView()
         case .prompt:    PromptView(state: state)
         case .searching: SearchingView(state: state)
         case .result:    ResultView(state: state)
@@ -86,6 +85,28 @@ enum AgentLauncher {
             #endif
         }
     }
+}
+
+/// Bring the user to the session's terminal: its Orca tab when Orca hosts it,
+/// otherwise the app the session runs in, otherwise any known terminal,
+/// otherwise Terminal.app. The jump only — the caller decides whether the
+/// notification is acknowledged, since the finished card's button clears it
+/// while a double-click on a waiting row must not.
+func openTerminalForSession(task: AgentTask?, sessionId: String?, state: AppState) {
+    #if !APPSTORE
+    Task { @MainActor in
+        // Orca hosts this session → jump to its exact tab. An empty id means
+        // "the focused session", which is the same thing the ↗ pills do.
+        let sid = sessionId.flatMap { $0.isEmpty ? nil : $0 }
+        if await state.jumpToOrcaTerminal(sessionId: sid) { return }
+        // Otherwise raise the app the session runs in (its terminal, or VS
+        // Code), then any known terminal.
+        if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
+           !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+        }
+    }
+    #endif
 }
 
 struct OverviewView: View {
@@ -675,7 +696,8 @@ private struct QuestionInboxCard: View {
     }
 
     var body: some View {
-        InboxRow(state: state, pillId: question.pillId, sessionId: question.sessionId, botState: .question) {
+        InboxRow(state: state, pillId: question.pillId, sessionId: question.sessionId, botState: .question,
+                 onDoubleTap: { openTerminalForSession(task: task, sessionId: question.sessionId, state: state) }) {
             AgentWho(task: task, label: "Claude Code is asking")
             Text(question.question.questions.first?.question ?? String(localized: "Needs an answer"))
                 .font(.system(size: 15, weight: .semibold))
@@ -702,7 +724,8 @@ private struct ApprovalInboxCard: View {
     }
 
     var body: some View {
-        InboxRow(state: state, pillId: approval.info.pillId, sessionId: approval.info.sessionId, botState: .approval) {
+        InboxRow(state: state, pillId: approval.info.pillId, sessionId: approval.info.sessionId, botState: .approval,
+                 onDoubleTap: { openTerminalForSession(task: task, sessionId: approval.info.sessionId, state: state) }) {
             AgentWho(task: task, label: "needs permission")
             Text(approval.info.command)
                 .font(.system(size: 15, weight: .semibold))
@@ -728,6 +751,10 @@ private struct InboxRow<Content: View>: View {
     /// The state this row's Mochi wears. Passed in rather than derived from
     /// AppState, which is shared by every row on screen.
     let botState: BotState
+    /// Double-click on the Mochi: take the user to the session's terminal.
+    /// It leaves the request waiting — "Send back" hands it to the agent,
+    /// this only takes the user there and back.
+    let onDoubleTap: () -> Void
     @ViewBuilder let content: () -> Content
 
     /// 58pt Mochi vs the text beside it — the same size the finished card uses.
@@ -746,6 +773,8 @@ private struct InboxRow<Content: View>: View {
                     .frame(width: botDiameter, height: botDiameter)
                     .padding(.leading, 28)
                     .padding(.trailing, 30)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) { onDoubleTap() }
 
                 VStack(alignment: .leading, spacing: 5) {
                     content()
@@ -858,6 +887,19 @@ private struct FinishedCard: View {
 
     private var isError: Bool { notification.kind == .error }
 
+    /// The "Open terminal" button's whole action: bind the jump to *this*
+    /// card's session — its sessionId is the one with a verified Orca handle
+    /// binding, and without it we fall through to the focused session, which
+    /// may be a different Claude session in the same worktree and lands on the
+    /// wrong Orca tab — focus it, drop the card, then jump.
+    private func openTerminalAndAcknowledge() {
+        let task = task
+        let sid = notification.sessionId
+        focusSession()
+        acknowledge()
+        openTerminalForSession(task: task, sessionId: sid, state: state)
+    }
+
     var body: some View {
         CardBackground(wash: isError ? .red : .green) {
             HStack(alignment: .center, spacing: 0) {
@@ -867,6 +909,18 @@ private struct FinishedCard: View {
                     .frame(width: Self.botDiameter, height: Self.botDiameter)
                     .padding(.leading, 28)
                     .padding(.trailing, 30)
+                    // Double-click jumps to the session's terminal. On a plain
+                    // finished card that's the whole of the "Open terminal"
+                    // button, so it clears the card too. A card that still
+                    // needs something — a failure to look at — stays: the jump
+                    // only takes the user there and back.
+                    .onTapGesture(count: 2) {
+                        if isError {
+                            openTerminalForSession(task: task, sessionId: notification.sessionId, state: state)
+                        } else {
+                            openTerminalAndAcknowledge()
+                        }
+                    }
 
                 VStack(alignment: .leading, spacing: 5) {
                     AgentWho(task: task, label: isError
@@ -886,26 +940,7 @@ private struct FinishedCard: View {
                         } else {
                             #if !APPSTORE
                             PrimaryButton("Open terminal") {
-                                let task = task
-                                // Bind the jump to *this* card's session — its
-                                // sessionId is the one with a verified Orca handle
-                                // binding. Without this we fall through to the
-                                // focused session, which may be a different Claude
-                                // session in the same worktree and lands on the
-                                // wrong Orca tab.
-                                let sid = notification.sessionId
-                                focusSession()
-                                acknowledge()
-                                Task { @MainActor in
-                                    // Orca hosts this session → jump to its exact tab.
-                                    if await state.jumpToOrcaTerminal(sessionId: sid) { return }
-                                    // Otherwise raise the app the session runs in
-                                    // (its terminal, or VS Code), then any known terminal.
-                                    if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
-                                       !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
-                                        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
-                                    }
-                                }
+                                openTerminalAndAcknowledge()
                             }
                             #endif
                         }
@@ -1229,24 +1264,6 @@ struct DiffLineRowView: View {
         }
         .background(bgColor)
         .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Confused
-
-struct ConfusedView: View {
-    var body: some View {
-        ZStack {
-            CardBackground(wash: .pink)
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Too many hits at once.").font(.system(size: 15, weight: .semibold))
-                Text("Give me a sec — back to work in three seconds.")
-                    .font(.system(size: 13)).foregroundColor(Color(hex: "#9398A1"))
-            }
-            .padding(.leading, 128)
-            .padding(.trailing, 18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
     }
 }
 
@@ -2396,6 +2413,9 @@ struct ClaudeSessionPill: View {
     let session: ClaudeSession
     @ObservedObject var state: AppState
     let onTap: () -> Void
+    /// Double-click: straight to this session's chat, without the detour
+    /// through the left card that a single click does.
+    let onDoubleTap: () -> Void
     @State private var isHovered = false
 
     private static let claudeColor = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
@@ -2506,6 +2526,11 @@ struct ClaudeSessionPill: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
+        // Single click stays "show me on the left"; the double click is the
+        // shortcut into the chat itself. SwiftUI fires the single-tap action
+        // for each click of the pair, so the focus still lands — then the
+        // chat opens on top of it.
+        .onTapGesture(count: 2) { onDoubleTap() }
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .brightness(isHovered ? 0.06 : 0)
         .onHover { newHover in
@@ -2650,7 +2675,9 @@ struct ClaudeSessionsListView: View {
                                           alignment: .leading,
                                           spacing: 4) {
                                     ForEach(group.sessions) { s in
-                                        ClaudeSessionPill(session: s, state: state) { select(s) }
+                                        ClaudeSessionPill(session: s, state: state,
+                                                          onTap: { select(s) },
+                                                          onDoubleTap: { openChat(s) })
                                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
                                     }
                                 }
@@ -2781,6 +2808,13 @@ struct ClaudeSessionsListView: View {
         SoundEngine.shared.play("blip")
         state.focusedSessionId = s.sessionId
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
+    }
+
+    /// Double-click: focus the session and open its chat in one go — the same
+    /// destination the left card opens, minus the extra click.
+    private func openChat(_ s: ClaudeSession) {
+        state.focusedSessionId = s.sessionId
+        state.view = .prompt
     }
 }
 

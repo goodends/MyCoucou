@@ -16,7 +16,6 @@ final class SoundEngine {
 }
 
 extension Notification.Name {
-    static let botDizzy          = Notification.Name("notchBuddy.botDizzy")
     static let botGreet          = Notification.Name("notchBuddy.botGreet")
     static let botBlink          = Notification.Name("notchBuddy.botBlink")
     static let botSetTgEs        = Notification.Name("notchBuddy.botSetTgEs")

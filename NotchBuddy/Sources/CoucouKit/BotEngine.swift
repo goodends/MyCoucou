@@ -162,13 +162,6 @@ let BotStates: [BotState: BotStateCfg] = [
         glow: CGColor(red:0.580,green:0.635,blue:0.722,alpha:1), glowOpacity:0.2,
         bounces:false, scans:false, breathes:true, zz:true, sweat:false,
         look:nil, tilt:0, sound:"sleep"),
-    .dizzy: BotStateCfg(
-        color: CGColor(red:0.957,green:0.447,blue:0.714,alpha:1), tint:0.7,
-        eye:.spiral, badge:nil,
-        badgeColor: .white,
-        glow: CGColor(red:0.957,green:0.447,blue:0.714,alpha:1), glowOpacity:0.55,
-        bounces:false, scans:false, breathes:false, zz:false, sweat:false,
-        look:nil, tilt:0, sound:"dizzy"),
 ]
 
 // MARK: - Bot engine
@@ -265,9 +258,6 @@ final class BotEngine: ObservableObject {
     var greetToken: Int = 0       // incremented to invalidate stale greet closures
     var lastAmbient: Double = 0
 
-    // Slap tracking (for dizzy on 3 slaps)
-    var slapTimes: [Double] = []
-
     // Dancing (Apple Music)
     var isDancing: Bool = false
     var dancingLevel: CGFloat = 0   // 0→1 over 0.3s, 1→0 over 0.5s
@@ -306,8 +296,6 @@ final class BotEngine: ObservableObject {
                 TweenKey(target: -0.2, duration: 150, ease: Ease.out),
                 TweenKey(target: 0,    duration: 300, ease: Ease.back),
             ])
-        case .dizzy:
-            doRoll(duration: 1300, turns: 2)
         case .question:
             blink()
         case .ratelimit:
@@ -380,28 +368,24 @@ final class BotEngine: ObservableObject {
         blink()
     }
 
-    // MARK: - Slap (dizzy mechanic)
+    // MARK: - Slap
 
+    /// A poke: the bot squashes and glares. It used to count three pokes in
+    /// 1.7s and go dizzy — an "easy there" card in the user's face, thrown by
+    /// whatever they happened to be double-clicking. Now every poke is just a
+    /// poke.
     func slap() {
         interruptGreet()
-        guard state != .dizzy else { return }
         let now = CACurrentMediaTime()
-        slapTimes = slapTimes.filter { now - $0 < 1.7 }
-        slapTimes.append(now)
         SoundEngine.shared.play("slap")
         squash()
         physVy -= 1.2
         physVx += Bool.random() ? 0.7 : -0.7
-        if slapTimes.count >= 3 {
-            slapTimes = []
-            NotificationCenter.default.post(name: .botDizzy, object: nil)
-        } else {
-            // Annoyed: line eyes for 800ms, annoyed sound after 60ms delay
-            eyeOverride = .line
-            eyeOverrideUntil = now + 0.8
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
-                SoundEngine.shared.play("annoyed")
-            }
+        // Annoyed: line eyes for 800ms, annoyed sound after 60ms delay
+        eyeOverride = .line
+        eyeOverrideUntil = now + 0.8
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            SoundEngine.shared.play("annoyed")
         }
     }
 
@@ -750,10 +734,9 @@ final class BotEngine: ObservableObject {
             tp = -0.06
         }
         if state == .sleeping { ty = 0; tp = -0.14 }
-        if state == .dizzy    { ty = sin(t * 9) * 0.25 }
 
         // Mini bots: override look with random wandering (never follows mouse)
-        if isMini && cfg.look == nil && !cfg.scans && state != .sleeping && state != .dizzy {
+        if isMini && cfg.look == nil && !cfg.scans && state != .sleeping {
             if now > miniLookNextTime {
                 miniLookTarget = CGPoint(
                     x: CGFloat.random(in: -0.88...0.88),
@@ -812,7 +795,7 @@ final class BotEngine: ObservableObject {
 
         // Blink
         if now > nextBlink {
-            if state != .sleeping && state != .dizzy {
+            if state != .sleeping {
                 blink()
                 if Double.random(in: 0...1) < 0.22 {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.23) { [weak self] in self?.blink() }
