@@ -545,17 +545,19 @@ struct QuestionView: View {
                     // used to submit the moment a single-select answer was
                     // clicked, which left no way back and no way to change it.
                     if !curOther {
+                        // Back is navigation, so it stays on its own at the far
+                        // left; Cancel and Submit are the two ways out of the
+                        // last question, so they sit together on the right.
                         HStack(spacing: 8) {
+                            SecondaryButton("Back") {
+                                withAnimation { questionIndex = qi - 1 }
+                            }
+                            .disabled(qi == 0)
+                            .opacity(qi == 0 ? 0.4 : 1)
+                            Spacer(minLength: 0)
                             if isLast {
                                 SecondaryButton("Cancel") { HookServer.shared.sendQuestionAsk() }
-                            } else {
-                                SecondaryButton("Back") {
-                                    withAnimation { questionIndex = qi - 1 }
-                                }
-                                .disabled(qi == 0)
-                                .opacity(qi == 0 ? 0.4 : 1)
                             }
-                            Spacer(minLength: 0)
                             PrimaryButton(isLast ? "Submit" : "Next") {
                                 if isLast { sendAnswers(q: q) }
                                 else { withAnimation { questionIndex = qi + 1 } }
