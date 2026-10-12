@@ -651,101 +651,129 @@ private func openClaudeDesktopApp() {
 
 // MARK: - Finished
 
+/// One card per session waiting to be acknowledged, newest on top. Each card
+/// carries its own Mochi, final line and "Open terminal" target, so several
+/// sessions finishing back to back stay independent instead of overwriting
+/// one shared slot.
 struct FinishedView: View {
     @ObservedObject var state: AppState
 
-    /// The task that *just completed* — not the user's currently focused
-    /// one. Without this, the card can show the wrong avatar / final line
-    /// when focus points at a different session than the one that stopped.
-    private var finishingTask: AgentTask? {
-        if let id = state.lastFinishedAgentId,
-           let idx = state.tasks.firstIndex(where: { $0.id == id }) {
-            return state.tasks[idx]
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: NotificationLayout.cardSpacing) {
+                ForEach(state.notifications) { n in
+                    FinishedCard(notification: n, state: state)
+                }
+            }
+            .padding(.vertical, NotificationLayout.listPadding)
         }
-        return state.focusTask
+    }
+}
+
+private struct FinishedCard: View {
+    let notification: AgentNotification
+    @ObservedObject var state: AppState
+
+    private static let botDiameter: CGFloat = 58
+
+    /// The task this notification's pill owns — used for the name, the colour
+    /// dot and the fallback final line.
+    private var task: AgentTask? {
+        state.tasks.first { $0.id == notification.agentId } ?? state.focusTask
     }
 
-    /// Make the just-finished session drive the home view's left card so
-    /// the user lands on the session they were just notified about, not
-    /// whatever was previously focused. Called by both the "Open terminal"
-    /// and "OK" buttons before switching the view.
-    private func focusFinishedSession() {
-        if let sid = state.lastFinishedSessionId, !sid.isEmpty {
+    /// The session this card is about, so its Mochi wears that session's own
+    /// body colour and outfit rather than the focused session's.
+    private var session: ClaudeSession? {
+        guard let sid = notification.sessionId, !sid.isEmpty else { return nil }
+        return state.claudeSessions.first { $0.sessionId == sid }
+    }
+
+    private var finalLine: String {
+        if !notification.finalLine.isEmpty { return notification.finalLine }
+        if let fl = task?.finalLine { return fl }
+        if let s = task?.steps.last(where: { !$0.isDiffStep }) { return s }
+        return String(localized: "Session finished")
+    }
+
+    /// Make this session drive the home view's left card, so wherever the user
+    /// lands next they're on the session they were just told about, not
+    /// whatever was focused before.
+    private func focusSession() {
+        if let sid = notification.sessionId, !sid.isEmpty {
             state.focusedSessionId = sid
         }
-        if let task = finishingTask {
-            state.setFocus(task.id)
+        state.setFocus(notification.agentId)
+    }
+
+    /// Drop just this card. The ones below close the gap; when the last one
+    /// goes, `dismissNotification` sends the island home.
+    private func acknowledge() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            state.dismissNotification(id: notification.id)
         }
     }
 
     var body: some View {
-        ZStack {
-            CardBackground(wash: .green)
-            VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: finishingTask, label: "Claude Code finished")
-                Text({
-                    if let fl = finishingTask?.finalLine { return fl }
-                    if let s = finishingTask?.steps.last(where: { !$0.isDiffStep }) { return s }
-                    return String(localized: "Session finished")
-                }())
-                    .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                HStack(spacing: 8) {
-                    if finishingTask?.id == "agent_claude-desktop" {
-                        // Sessions from the Claude desktop app live there, not in a terminal.
-                        PrimaryButton("Open Claude") {
-                            openClaudeDesktopApp()
-                            NotificationCenter.default.post(name: .islandCollapse, object: nil)
-                        }
-                    } else {
-                        #if !APPSTORE
-                        PrimaryButton("Open terminal") {
-                            let task = finishingTask
-                            // Bind the jump to the session that *just finished* —
-                            // its sessionId is the one with a verified Orca handle
-                            // binding. Without this we fall through to the focused
-                            // session, which may be a different Claude session in
-                            // the same worktree and lands on the wrong Orca tab.
-                            let finishingSid = state.lastFinishedSessionId
-                            // Make the just-finished session drive the home
-                            // view's left card, then pop back to home (so the
-                            // island animation kicks in within the click) and
-                            // launch the terminal in the background.
-                            focusFinishedSession()
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                state.view = .overview
+        CardBackground(wash: .green) {
+            HStack(alignment: .center, spacing: 0) {
+                BotCanvasView(state: state, sessionOverride: session)
+                    .frame(width: Self.botDiameter / 0.6, height: Self.botDiameter / 0.6)
+                    .frame(width: Self.botDiameter, height: Self.botDiameter)
+                    .padding(.leading, 28)
+                    .padding(.trailing, 30)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    AgentWho(task: task, label: "Claude Code finished")
+                    Text(finalLine)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    HStack(spacing: 8) {
+                        if task?.id == "agent_claude-desktop" {
+                            // Sessions from the Claude desktop app live there, not in a terminal.
+                            PrimaryButton("Open Claude") {
+                                openClaudeDesktopApp()
+                                NotificationCenter.default.post(name: .islandCollapse, object: nil)
                             }
-                            Task { @MainActor in
-                                // Orca hosts this session → jump to its exact tab.
-                                if await state.jumpToOrcaTerminal(sessionId: finishingSid) { return }
-                                // Otherwise raise the app the session runs in
-                                // (its terminal, or VS Code), then any known terminal.
-                                if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
-                                   !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
-                                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+                        } else {
+                            #if !APPSTORE
+                            PrimaryButton("Open terminal") {
+                                let task = task
+                                // Bind the jump to *this* card's session — its
+                                // sessionId is the one with a verified Orca handle
+                                // binding. Without this we fall through to the
+                                // focused session, which may be a different Claude
+                                // session in the same worktree and lands on the
+                                // wrong Orca tab.
+                                let sid = notification.sessionId
+                                focusSession()
+                                acknowledge()
+                                Task { @MainActor in
+                                    // Orca hosts this session → jump to its exact tab.
+                                    if await state.jumpToOrcaTerminal(sessionId: sid) { return }
+                                    // Otherwise raise the app the session runs in
+                                    // (its terminal, or VS Code), then any known terminal.
+                                    if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
+                                       !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
+                                        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+                                    }
                                 }
                             }
+                            #endif
                         }
-                        #endif
-                    }
-                    SecondaryButton("OK") {
-                        // Make the just-finished session drive the home view's
-                        // left card, then land back on home instead of
-                        // collapsing the whole island — the user just wants
-                        // to acknowledge.
-                        focusFinishedSession()
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            state.view = .overview
+                        SecondaryButton("OK") {
+                            focusSession()
+                            acknowledge()
                         }
                     }
                 }
+                .padding(.trailing, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.leading, 116)
-            .padding(.trailing, 16)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
         }
+        .frame(maxWidth: .infinity)
     }
 }
 

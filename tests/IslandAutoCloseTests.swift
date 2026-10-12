@@ -82,7 +82,24 @@ enum IslandAutoCloseTests {
         heldCountdown.mouseLeft()
         try await waitForCompact(heldCountdown, )
 
-        print("Island auto-close: 8 cases passed")
+        // A notification card (.finished / .error) never folds on the timer:
+        // the pointer moving off is not an acknowledgement.
+        let notified = openedMachine(delay: 0.05)
+        var showingNotification = true
+        notified.blocksAutoCollapse = { showingNotification }
+        notified.mouseLeft()
+        try await Task.sleep(for: .milliseconds(200))
+        precondition(notified.state == .home)
+        // A countdown started before the notification arrived must not survive it.
+        notified.homeToPetitDelay = 0.01
+        try await Task.sleep(for: .milliseconds(100))
+        precondition(notified.state == .home)
+        // Acknowledging it (OK / "Open terminal" / Esc) restores the normal close.
+        showingNotification = false
+        notified.mouseLeft()
+        try await waitForCompact(notified, )
+
+        print("Island auto-close: 9 cases passed")
     }
 
     @MainActor

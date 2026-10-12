@@ -287,6 +287,82 @@ struct HistoryEntry: Identifiable, Equatable {
     var content: String
 }
 
+// MARK: - Finished-session notifications
+
+/// One session that finished (or errored) and is waiting to be acknowledged.
+/// A queue, not a single slot: two sessions finishing back to back must both
+/// stay visible, each with its own avatar, final line and "Open terminal".
+struct AgentNotification: Identifiable, Equatable {
+    enum Kind: Equatable { case finished, error }
+
+    /// The session uuid when the hook carried one, else the pill id. Doubles
+    /// as the queue key: a session that finishes again replaces its own row
+    /// instead of stacking up duplicates.
+    let id: String
+    /// Pill the session belongs to ("integration_claude", "agent_codex", …).
+    let agentId: String
+    var sessionId: String?
+    var kind: Kind
+    /// The session's last assistant line, shown under its name.
+    var finalLine: String
+    var createdAt: Date = .now
+
+    init(agentId: String, sessionId: String?, kind: Kind, finalLine: String) {
+        self.id = (sessionId?.isEmpty == false) ? sessionId! : agentId
+        self.agentId = agentId
+        self.sessionId = (sessionId?.isEmpty == false) ? sessionId : nil
+        self.kind = kind
+        self.finalLine = finalLine
+    }
+}
+
+extension Array where Element == AgentNotification {
+    /// Newest first — the finished card lists them top-down, so a new
+    /// notification lands above the ones already waiting.
+    func pushing(_ n: AgentNotification) -> [AgentNotification] {
+        var out = filter { $0.id != n.id }
+        out.insert(n, at: 0)
+        return out
+    }
+
+    func removing(id: String) -> [AgentNotification] {
+        filter { $0.id != id }
+    }
+
+    /// The waiting notification raised by this session, if any.
+    func first(sessionId: String) -> AgentNotification? {
+        first { $0.sessionId == sessionId }
+    }
+}
+
+/// The finished view's height, driven by how many notifications are waiting.
+/// One notification keeps the 160pt every other state card uses; each extra
+/// adds a card. Past the point where the stack reaches the chat's height the
+/// island stops growing and the list scrolls instead.
+enum NotificationLayout {
+    nonisolated(unsafe) static var height: CGFloat?
+    /// IslandRootView chrome around the content: 8pt top + 34pt header + 10pt bottom.
+    static let chrome: CGFloat = 52
+    /// Breathing room under the last card. The stack reserves exactly what its
+    /// cards measure, so this stays the same whether one card or five — a
+    /// per-card constant would turn into a black band under the stack.
+    static let bottomAir: CGFloat = 8
+    /// 58pt Mochi vs ~71pt of text and buttons, plus the card's own padding —
+    /// what `FinishedCard` actually measures today.
+    static let cardHeight: CGFloat = 84
+    static let cardSpacing: CGFloat = 8
+    /// The stack's own vertical padding, see `FinishedView`.
+    static let listPadding: CGFloat = 4
+    /// Ceiling for the stack, the same as the chat view.
+    static let maxHeight: CGFloat = IslandConst.chatHeight
+
+    static func height(forCount count: Int) -> CGFloat {
+        let n = CGFloat(max(count, 1))
+        let content = n * cardHeight + (n - 1) * cardSpacing + listPadding
+        return min(chrome + content + bottomAir, maxHeight)
+    }
+}
+
 // MARK: - View dimensions (from VIEWS in prototype)
 
 struct ViewLayout {
@@ -307,6 +383,11 @@ enum IslandConst {
     static let notchWidth: CGFloat  = IslandScreenGeometry.fallbackNotchWidth
     static let notchHeight: CGFloat = 32
     static let expandedWidth: CGFloat = 640
+    /// Height of the chat (`.prompt`) view when expanded — taller than every
+    /// `viewLayouts` entry, because a conversation needs the room. The
+    /// notification stack is capped at the same height so a tall pile of
+    /// finished sessions never towers over the chat.
+    static let chatHeight: CGFloat = 500
     static let earRadius: CGFloat   = 14
     static let roundedCorner: CGFloat = 14    // hidden/peek/compact
     static let expandedCorner: CGFloat = 22

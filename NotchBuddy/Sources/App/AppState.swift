@@ -271,6 +271,14 @@ final class AppState: ObservableObject {
     // Pinned (alerts that stay open, never auto-close)
     var isPinned: Bool = false
 
+    /// `.finished` / `.error` are notifications, not something the user reads:
+    /// they stay until acknowledged (OK / Open terminal / Esc) or until the
+    /// session that raised them starts running again. The home → petit
+    /// auto-close must not fold them away just because the pointer moved off.
+    var isShowingNotification: Bool {
+        mode == .expanded && (view == .finished ? !notifications.isEmpty : view == .error)
+    }
+
     // Keyboard navigation — index of the selected item within the current card's list (nil = none)
     @Published var cardSelection: Int? = nil
     // Number of navigable items in the card currently on screen (0 = no list)
@@ -547,23 +555,49 @@ final class AppState: ObservableObject {
         return focusTask?.state ?? .idle
     }
 
-    /// Agent id of the most recent session that hit its Stop event.
-    /// `FinishedView` reads this so its avatar / final-line / "Open terminal"
-    /// all reflect the session that *just completed* — not the user's
-    /// currently focused task, which may be a different session entirely.
-    @Published var lastFinishedAgentId: String? = nil
-    /// Session id of the same event. `lastFinishedAgentId` is the task id
-    /// (e.g. "integration_claude") and can't tell two Claude sessions apart;
-    /// the session uuid can. Needed by the finished card to show this
-    /// session's outfit and jump to this session's terminal.
-    @Published var lastFinishedSessionId: String? = nil
+    /// Sessions that hit their Stop event and are waiting to be acknowledged,
+    /// newest first. A queue rather than a single slot: two sessions finishing
+    /// back to back must both stay visible with their own avatar, final line
+    /// and "Open terminal" target.
+    @Published var notifications: [AgentNotification] = [] {
+        didSet { NotificationLayout.height = NotificationLayout.height(forCount: notifications.count) }
+    }
 
-    /// The ClaudeSession that *just completed*, looked up by its uuid. nil
+    /// Agent id of the session at the head of the queue — the one that
+    /// completed most recently.
+    var lastFinishedAgentId: String? { notifications.first?.agentId }
+    /// Session uuid of that same event. The agent id (e.g.
+    /// "integration_claude") is shared by every Claude session in a project,
+    /// so it can't tell two of them apart; the uuid can.
+    var lastFinishedSessionId: String? { notifications.first?.sessionId }
+
+    /// The ClaudeSession at the head of the queue, looked up by its uuid. nil
     /// if the session has already been removed or the event didn't carry
     /// a session id. Drives the finished card's avatar and "Open terminal".
     var finishingSession: ClaudeSession? {
         guard let id = lastFinishedSessionId, !id.isEmpty else { return nil }
         return claudeSessions.first { $0.sessionId == id }
+    }
+
+    // MARK: - Notification queue
+
+    /// A session finished: queue its notification. Re-finishing an already
+    /// waiting session refreshes its row in place instead of duplicating it.
+    func pushNotification(agentId: String, sessionId: String?, kind: AgentNotification.Kind, finalLine: String) {
+        let n = AgentNotification(agentId: agentId, sessionId: sessionId, kind: kind, finalLine: finalLine)
+        notifications = notifications.pushing(n)
+    }
+
+    /// Acknowledge one notification. Once none are left, the finished view has
+    /// nothing to show and the island goes back home.
+    func dismissNotification(id: String) {
+        guard notifications.contains(where: { $0.id == id }) else { return }
+        notifications = notifications.removing(id: id)
+        if notifications.isEmpty && view == .finished {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                view = .overview
+            }
+        }
     }
 
     // MARK: - Task management

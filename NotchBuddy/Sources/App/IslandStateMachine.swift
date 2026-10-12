@@ -20,6 +20,13 @@ final class IslandStateMachine {
     /// When non-nil and returns true, timers and mouse-leave never auto-collapse or hide the island.
     var isHeldOpen: (() -> Bool)?
 
+    /// When non-nil and returns true, the island never auto-collapses on the
+    /// home → petit timer — but `collapse()` still works, so Esc and the view
+    /// buttons keep closing it. Used by the notification cards (`.finished` /
+    /// `.error`): they wait for the user to acknowledge them, or for the
+    /// session that raised them to start running again.
+    var blocksAutoCollapse: (() -> Bool)?
+
     /// home → petit delay (seconds), kept in sync with the auto-close preference.
     var homeToPetitDelay: TimeInterval = 15 {
         didSet {
@@ -182,9 +189,12 @@ final class IslandStateMachine {
     }
 
     private func scheduleHomeCollapse() {
+        guard !(blocksAutoCollapse?() ?? false) else { homeCollapseWork?.cancel(); return }
         homeCollapseWork?.cancel()
         let item = DispatchWorkItem { [weak self] in
-            guard let self, self.state == .home, !(self.isHeldOpen?() ?? false) else { return }
+            guard let self, self.state == .home,
+                  !(self.isHeldOpen?() ?? false),
+                  !(self.blocksAutoCollapse?() ?? false) else { return }
             self.openedByHover = false
             self.transition(to: .petit)
         }

@@ -443,6 +443,8 @@ final class HookServer: @unchecked Sendable {
             // Approval dismissed — fall through so the resolving event updates state normally.
         }
 
+        dismissNotificationIfSessionResumed(name: name, agentId: agentId, sessionId: sessionId)
+
         switch name {
 
         case "SessionStart":
@@ -547,17 +549,21 @@ final class HookServer: @unchecked Sendable {
                 }
                 appendHistory(id: agentId, role: .assistant, content: rawFinal)
             }
-            // Tag the just-finished task so FinishedView can show the right
-            // avatar / final-line / "Open terminal" — the focused task may
-            // be a different session entirely.
-            state.lastFinishedAgentId = agentId
+            // Queue the notification: the finished card shows every session
+            // that finished, each with its own avatar / final line /
+            // "Open terminal" target, instead of one slot the newest overwrites.
+            state.pushNotification(agentId: agentId,
+                                   sessionId: sessionId,
+                                   kind: .finished,
+                                   finalLine: finalText)
             if isClaudeSession {
-                state.lastFinishedSessionId = sessionId
                 updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             SoundEngine.shared.play("finish")
-            if focused {
+            // A background session must not yank the island open, but if the
+            // stack is already on screen this one belongs in it.
+            if focused || state.view == .finished {
                 expandIfNeeded(to: .finished)
             } else {
                 setPillBadge(id: agentId, badge: .finished)
@@ -667,6 +673,30 @@ final class HookServer: @unchecked Sendable {
     }
 
     // MARK: - Helpers
+
+    /// A `.finished` card is a notification, not something the user reads: it
+    /// closes when they acknowledge it (OK / "Open terminal" / Esc) or when the
+    /// very session that raised it starts running again. Only that session's own
+    /// row goes — the others in the stack keep waiting.
+    /// `expandIfNeeded` can't do it: work events aren't alerts, so they never
+    /// replace the card while the island is expanded.
+    @MainActor
+    private func dismissNotificationIfSessionResumed(name: String, agentId: String, sessionId: String) {
+        guard name == "UserPromptSubmit" || name == "PreToolUse" || name == "SessionStart" else { return }
+        let state = AppState.shared
+        guard state.isShowingNotification else { return }
+        // External agents have no session id on their events, so the pill is
+        // the only scope we can match on for them.
+        let stale: AgentNotification?
+        if !sessionId.isEmpty && sessionId != "unknown" {
+            stale = state.notifications.first(sessionId: sessionId)
+        } else {
+            stale = state.notifications.first { $0.agentId == agentId && $0.sessionId == nil }
+        }
+        guard let stale else { return }
+        state.setFocus(stale.agentId)
+        state.dismissNotification(id: stale.id)
+    }
 
     @MainActor
     private func expandIfNeeded(to view: IslandView) {

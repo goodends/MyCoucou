@@ -248,6 +248,7 @@ final class IslandWindowController: NSWindowController {
         }
 
         fsm.isHeldOpen = { AppState.shared.pendingApproval != nil }
+        fsm.blocksAutoCollapse = { AppState.shared.isShowingNotification }
     }
 
     // MARK: - Polling loop
@@ -1072,10 +1073,10 @@ final class IslandWindowController: NSWindowController {
         let panelW = window?.frame.width  ?? 720
         let (islandW, fixedH) = islandSize(mode: s.mode, view: s.view,
                                             nw: notchW, nh: notchH)
-        // Chat view uses a fixed height — must match IslandRootView.chatPromptHeight
+        // Chat view uses a fixed height of its own, taller than the layout table
         let islandH: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            islandH = 500
+            islandH = IslandConst.chatHeight
         } else {
             islandH = fixedH
         }
@@ -1170,7 +1171,7 @@ final class IslandPanel: NSPanel {
                                       nw: nw, nh: nh)
         let h: CGFloat
         if s.mode == .expanded && s.view == .prompt {
-            h = 500
+            h = IslandConst.chatHeight
         } else {
             h = fixedH
         }
@@ -1237,6 +1238,11 @@ func islandSize(mode: IslandMode, view: IslandView,
     case .expanded:
         let layout = IslandConst.viewLayouts[view]!
         if view == .question, let h = QuestionLayout.height {
+            return (IslandConst.expandedWidth, h)
+        }
+        // One finished notification keeps the standard card height; a stack of
+        // them grows the island up to the visible cap, then scrolls.
+        if view == .finished, let h = NotificationLayout.height {
             return (IslandConst.expandedWidth, h)
         }
         return (IslandConst.expandedWidth, layout.height)

@@ -8,6 +8,10 @@ struct BotCanvasView: View {
     /// When set, overrides island-based eye-tracking (used by desktop Mochi).
     /// CGPoint in the same coord space as state.mousePosition (DesktopSpace, y-down).
     var lookOriginOverride: CGPoint? = nil
+    /// Draw this session instead of whichever one the island would pick.
+    /// Each finished card owns a Mochi, so every card has to look like its
+    /// own session rather than the focused one.
+    var sessionOverride: ClaudeSession? = nil
 
     // One engine per view instance (main bot)
     @StateObject private var engine = BotEngine()
@@ -30,7 +34,8 @@ struct BotCanvasView: View {
                 // On the finished card, the avatar must reflect the session
                 // that *just completed* — otherwise the user sees the focused
                 // session's Mochi on a card describing someone else's finish.
-                let colorSession = (state.view == .finished) ? state.finishingSession : state.overviewSession
+                let colorSession = sessionOverride
+                    ?? ((state.view == .finished) ? state.finishingSession : state.overviewSession)
                 if let session = colorSession {
                     engine.bodyColor = cgColorFromHex(session.bodyColor)
                 } else {
@@ -44,14 +49,18 @@ struct BotCanvasView: View {
                 engine.setDancing(dancing)
                 let isWardrobe = state.mode == .expanded && state.view == .wardrobe
                 let isFocusMain = state.focusId == state.mainPillId || state.focusId == nil
-                let showOutfit = isFocusMain || state.mode != .expanded || isWardrobe
+                // A card's own Mochi always wears its session's outfit — the
+                // focused-pill rule exists for the single shared bot, and
+                // would leave every stacked card bare-headed.
+                let showOutfit = sessionOverride != nil || isFocusMain || state.mode != .expanded || isWardrobe
                 // Active session's outfit wins — always, no fallback to the
                 // user's stored preference. The old `resolvedOutfit` fallback
                 // made the main Mochi show a seasonal pumpkin while the right
                 // pill showed the session's actual outfit, which is exactly
                 // the inconsistency the user reported. On the finished card
                 // we mirror the finishing session, not the focused one.
-                let outfitSession = (state.view == .finished) ? state.finishingSession : state.overviewSession
+                let outfitSession = sessionOverride
+                    ?? ((state.view == .finished) ? state.finishingSession : state.overviewSession)
                 engine.setOutfit(showOutfit ? (outfitSession?.outfit ?? .none) : .none,
                                  animated: state.view != .wardrobe)
 

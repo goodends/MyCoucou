@@ -34,7 +34,6 @@ struct IslandContainer: View {
     /// `focusTask.history.count`, which made the island grow every time the
     /// user sent a message and didn't even account for `ChatSessionView` whose
     /// messages come from JSONL — so a long session rendered in a 240px stub.
-    private let chatPromptHeight: CGFloat = 500
 
     /// Pixels the content must be pushed down to clear the concave ear transparent area.
     /// = 0 in expanded mode (no ears), = earRadius in compact/notch mode.
@@ -95,7 +94,7 @@ struct IslandContainer: View {
             let tr: CGFloat = 0
             withAnimation(anim) {
                 islandWidth      = w
-                islandHeight     = (newMode == .expanded && state.view == .prompt) ? chatPromptHeight : h
+                islandHeight     = (newMode == .expanded && state.view == .prompt) ? IslandConst.chatHeight : h
                 cornerRadius     = cr
                 islandTopRadius  = tr
             }
@@ -106,18 +105,27 @@ struct IslandContainer: View {
                                     nw: state.notchWidth, nh: state.notchHeight)
             withAnimation(openSpring) {
                 islandWidth  = w
-                islandHeight = newView == .prompt ? chatPromptHeight : h
+                islandHeight = newView == .prompt ? IslandConst.chatHeight : h
             }
         }
         .onChange(of: state.focusTask?.history.count ?? 0) { _, _ in
             guard state.mode == .expanded, state.view == .prompt else { return }
-            withAnimation(openSpring) { islandHeight = chatPromptHeight }
+            withAnimation(openSpring) { islandHeight = IslandConst.chatHeight }
+        }
+        // Another session finishing stacks one more card onto the finished view
+        // without changing the view or the mode, so neither onChange above
+        // fires — without this the cards pile up behind a frozen height.
+        .onChange(of: state.notifications.count) { _, _ in
+            guard state.mode == .expanded, state.view == .finished else { return }
+            let (_, h) = islandSize(mode: .expanded, view: .finished,
+                                    nw: state.notchWidth, nh: state.notchHeight)
+            withAnimation(openSpring) { islandHeight = h }
         }
         .onAppear {
             let (w, h) = islandSize(mode: state.mode, view: state.view,
                                     nw: state.notchWidth, nh: state.notchHeight)
             islandWidth      = w
-            islandHeight     = state.view == .prompt ? chatPromptHeight : h
+            islandHeight     = state.view == .prompt ? IslandConst.chatHeight : h
             cornerRadius     = state.mode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             islandTopRadius  = 0
         }
@@ -129,7 +137,7 @@ struct IslandContainer: View {
             let (w, h) = islandSize(mode: state.mode, view: state.view,
                                     nw: state.notchWidth, nh: state.notchHeight)
             islandWidth  = w
-            islandHeight = (state.mode == .expanded && state.view == .prompt) ? chatPromptHeight : h
+            islandHeight = (state.mode == .expanded && state.view == .prompt) ? IslandConst.chatHeight : h
         }
     }
 
@@ -226,11 +234,21 @@ struct BotPlacement: View {
     let islandH: CGFloat
 
     var body: some View {
+        // Each finished card draws its own Mochi for its own session, so the
+        // single shared one would draw a duplicate on top of the stack.
+        if state.view == .finished && !state.notifications.isEmpty {
+            EmptyView()
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         let (cx, cy, diameter, opacity) = botPosition(mode: state.mode, view: state.view, islandW: islandW, islandH: islandH, hasNotch: state.hasNotch)
         let canvasSize = diameter / 0.6
         let overhang: CGFloat = 40
 
-        Group {
+        return Group {
             if state.mode == .expanded {
                 Circle()
                     .fill(RadialGradient(
@@ -338,7 +356,9 @@ struct CountdownBar: View {
     }
 
     private func updateBar() {
-        guard state.mode == .expanded && !state.isPinned else {
+        // A notification card doesn't auto-close, so counting down would promise
+        // a folding that never comes.
+        guard state.mode == .expanded && !state.isPinned && !state.isShowingNotification else {
             barWidth = 0
             return
         }
@@ -371,8 +391,9 @@ struct IslandContentView: View {
                     let active = state.view == v
                     // Views that fill available height instead of the fixed 98pt content frame:
                     // chat (prompt) and changes are always flexible; mail is flexible only when active so
-                    // it doesn't push the ZStack taller when inactive.
-                    let isTall = v == .prompt || v == .changes
+                    // it doesn't push the ZStack taller when inactive. The finished view is tall for
+                    // the same reason — its stack of notification cards scrolls past the cap.
+                    let isTall = v == .prompt || v == .changes || v == .finished
                     let anim: Animation = active
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)
