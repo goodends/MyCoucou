@@ -1464,11 +1464,13 @@ final class BotEngine: ObservableObject {
             var inner = Path()
             inner.addEllipse(in: CGRect(x: -R*0.23, y: -R*0.23, width: R*0.46, height: R*0.46))
             ctx.fill(inner, with: .color(Color(cgColor: col)))
-            if !isMini {
-                let text = badge == .bang(col) ? "!" : "?"
-                ctx.draw(Text(text).font(.system(size: R*0.32, weight: .black)).foregroundColor(.white),
-                         at: CGPoint(x: 0, y: R*0.02))
-            }
+            // Mini used to skip the glyph, which turned a question or approval
+            // badge into a bare coloured dot — indistinguishable from idle or
+            // finished, and different from the same session's full-size Mochi
+            // two inches away on the same page. Same proportion either way.
+            let text = badge == .bang(col) ? "!" : "?"
+            ctx.draw(Text(text).font(.system(size: R*0.34, weight: .black)).foregroundColor(.white),
+                     at: CGPoint(x: 0, y: R*0.02))
 
         case .dot(let col):
             var outer = Path()

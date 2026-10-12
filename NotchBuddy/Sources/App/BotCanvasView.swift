@@ -42,8 +42,7 @@ struct BotCanvasView: View {
                 // On the finished card, the avatar must reflect the session
                 // that *just completed* — otherwise the user sees the focused
                 // session's Mochi on a card describing someone else's finish.
-                let colorSession = sessionOverride
-                    ?? ((state.view == .finished) ? state.finishingSession : state.overviewSession)
+                let colorSession = sessionOverride ?? state.islandSession
                 if let session = colorSession {
                     engine.bodyColor = cgColorFromHex(session.bodyColor)
                 } else {
@@ -67,8 +66,7 @@ struct BotCanvasView: View {
                 // pill showed the session's actual outfit, which is exactly
                 // the inconsistency the user reported. On the finished card
                 // we mirror the finishing session, not the focused one.
-                let outfitSession = sessionOverride
-                    ?? ((state.view == .finished) ? state.finishingSession : state.overviewSession)
+                let outfitSession = sessionOverride ?? state.islandSession
                 engine.setOutfit(showOutfit ? (outfitSession?.outfit ?? .none) : .none,
                                  animated: state.view != .wardrobe)
 
@@ -101,9 +99,6 @@ struct BotCanvasView: View {
         // Set outside the Canvas draw: setState starts tweens, schedules
         // async work and emits particles, and mutating the engine while
         // SwiftUI is mid-draw hung the island at ~40% CPU.
-        .onAppear {
-            if let s = stateOverride ?? initialState { engine.setState(s) }
-        }
         .onChange(of: stateOverride) { _, newState in
             if let s = newState ?? initialState { engine.setState(s) }
         }
@@ -147,12 +142,22 @@ struct BotCanvasView: View {
         .onReceive(NotificationCenter.default.publisher(for: .botGreet)) { _ in
             engine.greet()
         }
+        // force:true means this wins over anything set earlier in onAppear, so
+        // an inbox row's own state used to be overwritten with the island-wide
+        // one here — every card's badge showed whatever the focused task was
+        // doing. A row that names a session keeps both its own state and its
+        // own outfit.
         .onAppear {
-            engine.setState(state.mainMochiState, force: true)
+            if let s = stateOverride {
+                engine.setState(s, force: true)
+            } else {
+                engine.setState(state.mainMochiState, force: true)
+            }
             let isWardrobe = state.mode == .expanded && state.view == .wardrobe
             let isFocusMain = state.focusId == state.mainPillId || state.focusId == nil
-            let showOutfit = isFocusMain || state.mode != .expanded || isWardrobe
-            engine.setOutfit(showOutfit ? state.resolvedOutfit : .none, animated: false)
+            let showOutfit = sessionOverride != nil || isFocusMain || state.mode != .expanded || isWardrobe
+            engine.setOutfit(showOutfit ? (sessionOverride?.outfit ?? state.resolvedOutfit) : .none,
+                             animated: false)
         }
     }
 
