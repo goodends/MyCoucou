@@ -1,4 +1,4 @@
-# Contributing to Coucou
+# Contributing to MyCoucou
 
 Thanks for wanting to help Mochi grow up! 🫶
 

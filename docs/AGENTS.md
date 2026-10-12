@@ -1,16 +1,16 @@
-# Coucou — third-party agent integration
+# MyCoucou — third-party agent integration
 
-Any tool that can write to a Unix domain socket (macOS, Linux) or a named pipe (Windows) can send events to Coucou and have its own pill next to Claude Code.
+Any tool that can write to a Unix domain socket (macOS, Linux) or a named pipe (Windows) can send events to MyCoucou and have its own pill next to Claude Code.
 
 ## The `coucou_agent` field
 
-Add the optional field `coucou_agent` to any hook JSON payload. Coucou will create a pill labelled with the agent name and route all events to it.
+Add the optional field `coucou_agent` to any hook JSON payload. MyCoucou will create a pill labelled with the agent name and route all events to it.
 
 **Validation:** the name must match `^[a-z0-9-]{1,24}$` (lowercase letters, digits and hyphens, 1–24 characters). An absent or invalid name routes the event to the Claude Code pill instead.
 
 ## Hook command (macOS)
 
-Configure your tool to call the Coucou relay with `--agent <your-name>` after the hook executable:
+Configure your tool to call the MyCoucou relay with `--agent <your-name>` after the hook executable:
 
 ```json
 {
@@ -22,7 +22,7 @@ Configure your tool to call the Coucou relay with `--agent <your-name>` after th
 }
 ```
 
-The shell wrapper passes `"$@"` to the Python relay, which extracts the agent name and injects it into the payload before forwarding to Coucou.
+The shell wrapper passes `"$@"` to the Python relay, which extracts the agent name and injects it into the payload before forwarding to MyCoucou.
 
 ## Payload format
 
@@ -83,10 +83,10 @@ Claude Desktop (`agent_claude-desktop`, every build) is there as well. Claude Co
 
 ### Gemini CLI (macOS)
 
-Coucou supports Gemini CLI out of the box via **Settings → Gemini CLI → Install hooks**.
+MyCoucou supports Gemini CLI out of the box via **Settings → Gemini CLI → Install hooks**.
 The installer writes to `~/.gemini/settings.json` and uses `--agent gemini` so
 Gemini sessions get their own pill. The relay translates Gemini event names to canonical
-Coucou events automatically.
+MyCoucou events automatically.
 
 | Gemini CLI event | Canonical event |
 |---|---|
@@ -99,7 +99,7 @@ Coucou events automatically.
 
 ### Antigravity — `agy` (macOS)
 
-Coucou supports Antigravity out of the box via **Settings → Antigravity → Install hooks**.
+MyCoucou supports Antigravity out of the box via **Settings → Antigravity → Install hooks**.
 The installer writes to `~/.gemini/config/hooks.json` (timeouts in seconds) and uses
 `--agent antigravity`. The relay translates `toolCall.name` / `conversationId` to the
 island's `tool_name` / `session_id`.
@@ -114,12 +114,12 @@ island's `tool_name` / `session_id`.
 
 ### GitHub Copilot CLI (macOS)
 
-Coucou supports Copilot CLI out of the box via **Settings → GitHub Copilot CLI Hooks → Install hooks**.
+MyCoucou supports Copilot CLI out of the box via **Settings → GitHub Copilot CLI Hooks → Install hooks**.
 The installer writes to `~/.copilot/hooks/coucou.json` and uses `--agent copilot`.
 Copilot CLI uses camelCase event names and `{"bash":"…","timeoutSec":N}` entries.
 Copilot CLI is fail-closed on `permissionRequest`: the relay always outputs valid JSON
 and returns `{"permissionDecision":"ask"}` on timeout so Copilot re-prompts in the terminal.
-Coucou shows a real Allow / Deny card for Copilot approval requests.
+MyCoucou shows a real Allow / Deny card for Copilot approval requests.
 
 | Copilot CLI event | Canonical event |
 |---|---|
@@ -134,9 +134,9 @@ Coucou shows a real Allow / Deny card for Copilot approval requests.
 
 ### Muse Code (macOS)
 
-Coucou supports Muse Code out of the box via **Settings → Muse Code Hooks → Install hooks**.
+MyCoucou supports Muse Code out of the box via **Settings → Muse Code Hooks → Install hooks**.
 The installer merges into `~/.config/muse/settings.json` and uses `--agent muse`.
-Muse uses PascalCase event names. Coucou shows a real Allow / Deny card for Muse approval requests.
+Muse uses PascalCase event names. MyCoucou shows a real Allow / Deny card for Muse approval requests.
 
 | Muse Code event | Canonical event |
 |---|---|
@@ -150,9 +150,9 @@ Muse uses PascalCase event names. Coucou shows a real Allow / Deny card for Muse
 
 ### OpenCode (macOS)
 
-Coucou supports OpenCode via **Settings → OpenCode Plugin → Install plugin**.
+MyCoucou supports OpenCode via **Settings → OpenCode Plugin → Install plugin**.
 The installer writes a JS plugin to `~/.config/opencode/plugins/coucou.js`.
-The plugin maps OpenCode event types to canonical Coucou names and forwards them fire-and-forget; OpenCode is never blocked.
+The plugin maps OpenCode event types to canonical MyCoucou names and forwards them fire-and-forget; OpenCode is never blocked.
 
 | OpenCode event | Canonical event |
 |---|---|
@@ -166,7 +166,7 @@ The plugin maps OpenCode event types to canonical Coucou names and forwards them
 
 ### Amp (macOS)
 
-Coucou supports Amp via **Settings → Amp Plugin → Install plugin**.
+MyCoucou supports Amp via **Settings → Amp Plugin → Install plugin**.
 The installer writes a TypeScript plugin to `~/.config/amp/plugins/coucou.ts`.
 The `tool.call` handler returns `{ action: 'allow' }` so Amp always proceeds; all events are forwarded display-only.
 
@@ -180,7 +180,7 @@ The `tool.call` handler returns `{ action: 'allow' }` so Amp always proceeds; al
 
 ### Hermes Agent (macOS)
 
-Coucou supports Hermes via **Settings → Agents → Hermes → Install plugin**.
+MyCoucou supports Hermes via **Settings → Agents → Hermes → Install plugin**.
 The installer writes a Python plugin to `~/.hermes/plugins/coucou/` and enables it in
 `~/.hermes/config.yaml`. The plugin uses `on_session_start` (sends the platform when running
 via the gateway), `post_llm_call` (sends the final response), and a `pre_approval_request`
@@ -201,7 +201,7 @@ Follow the generic pattern: call `nb-hook --agent <your-name> <EventName>` (macO
 
 ## Quick test
 
-With Coucou running:
+With MyCoucou running:
 
 ```sh
 echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"hello","coucou_agent":"demo"}' \

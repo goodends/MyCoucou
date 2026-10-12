@@ -247,7 +247,7 @@ Connexion à un serveur local compatible OpenAI. Aucune clé d'API requise.
 
 ### Connexion
 
-Réglages → Chat → Local models → **Connect**. Coucou envoie une requête `GET /v1/models` au serveur. Si le serveur répond avec des modèles, l'URL est sauvegardée et le fournisseur apparaît dans le sélecteur de modèle. Les modèles d'embedding (`nomic-embed-text`, `bge-*`, etc.) sont filtrés automatiquement.
+Réglages → Chat → Local models → **Connect**. MyCoucou envoie une requête `GET /v1/models` au serveur. Si le serveur répond avec des modèles, l'URL est sauvegardée et le fournisseur apparaît dans le sélecteur de modèle. Les modèles d'embedding (`nomic-embed-text`, `bge-*`, etc.) sont filtrés automatiquement.
 
 ### Streaming
 

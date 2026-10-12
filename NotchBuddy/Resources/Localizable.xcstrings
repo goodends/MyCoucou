@@ -2318,6 +2318,54 @@
             "state": "translated",
             "value": "名称为空，默认展示项目名"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Par défaut, le nom du projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De forma predeterminada, el nombre del proyecto"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الافتراضي: اسم المشروع"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ডিফল্ট: প্রকল্পের নাম"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "डिफ़ॉल्ट: प्रोजेक्ट का नाम"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bawaan: nama proyek"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por padrão, o nome do projeto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "По умолчанию — имя проекта"
+          }
         }
       }
     },
@@ -10769,390 +10817,6 @@
         }
       }
     },
-    "iphone.instruction.description": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "التعليمات المُرسَلة من iPhone تستخدم النموذج المفتوح حاليًا في الدردشة. يُطبَّق موجه النظام وتاريخ المحادثة. التعليمات المُرسَلة أثناء توقف Coucou تُضاف إلى قائمة الانتظار وتُنفَّذ عند التشغيل التالي."
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone থেকে পাঠানো নির্দেশনা চ্যাটে বর্তমানে খোলা মডেল ব্যবহার করে। সিস্টেম প্রম্পট এবং কথোপকথনের ইতিহাস প্রযোজ্য। Coucou চলছে না থাকলে পাঠানো নির্দেশনাগুলো কিউতে রাখা হয় এবং পরবর্তী চালুতে চালানো হয়।"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "An instruction sent from the iPhone uses the model open in chat. The system prompt and conversation history apply. Instructions sent when Coucou is not running are queued and executed on next launch."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Una instrucción enviada desde el iPhone usa el modelo abierto actualmente en el chat. Se aplican el prompt de sistema y el historial de conversación. Las instrucciones enviadas mientras Coucou no está en ejecución se ponen en cola y se ejecutan en el siguiente inicio."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Une instruction envoyée depuis l'iPhone utilise le modèle ouvert dans le chat. Le prompt système et l'historique de conversation s'appliquent. Les instructions envoyées quand Coucou ne tourne pas sont mises en file d'attente et exécutées au prochain démarrage."
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "iPhone से भेजा गया निर्देश चैट में वर्तमान में खुले मॉडल का उपयोग करता है। सिस्टम प्रॉम्प्ट और बातचीत का इतिहास लागू होता है। Coucou चल नहीं रहे होने पर भेजे गए निर्देश कतार में रखे जाते हैं और अगली बार चालू होने पर चलाए जाते हैं।"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Instruksi yang dikirim dari iPhone menggunakan model yang sedang terbuka di chat. Prompt sistem dan riwayat percakapan berlaku. Instruksi yang dikirim saat Coucou tidak berjalan dimasukkan ke antrean dan dijalankan saat peluncuran berikutnya."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uma instrução enviada pelo iPhone usa o modelo aberto no momento no chat. O prompt de sistema e o histórico de conversa se aplicam. Instruções enviadas enquanto o Coucou não está em execução ficam na fila e são executadas no próximo início."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Инструкция, отправленная с iPhone, использует модель, открытую в чате. Системный промпт и история разговора применяются. Инструкции, отправленные пока Coucou не запущен, ставятся в очередь и выполняются при следующем запуске."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "从 iPhone 发送的指令使用聊天中当前打开的模型。系统提示和对话历史适用。Coucou 未运行时发送的指令将排队，并在下次启动时执行。"
-          }
-        }
-      }
-    },
-    "iphone.instruction.toggle": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "السماح لـ iPhone بإرسال تعليمات إلى Claude Code"
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "আমার iPhone-কে Claude Code-এ নির্দেশ পাঠাতে দাও"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Let my iPhone send instructions to Claude Code"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Permitir que mi iPhone envíe instrucciones a Claude Code"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Laisser mon iPhone envoyer des instructions à Claude Code"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "मेरे iPhone को Claude Code को निर्देश भेजने दें"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Biarkan iPhone saya mengirim instruksi ke Claude Code"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deixar meu iPhone enviar instruções ao Claude Code"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Позволять iPhone отправлять инструкции в Claude Code"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "允许我的 iPhone 向 Claude Code 发送指令"
-          }
-        }
-      }
-    },
-    "iphone.live-activity.description": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "يمر عبر ريلاي Coucou إلى خدمة Apple للإشعارات. يُرسَل فقط اسم الوكيل وحالته: لا اسم مشروع ولا أمر ولا مسار."
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apple-এর পুশ সার্ভিসে Coucou রিলের মাধ্যমে যায়। শুধুমাত্র এজেন্টের নাম এবং অবস্থা পাঠানো হয়: কোনো প্রজেক্ট নাম, কমান্ড বা পাথ নয়।"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Goes through the Coucou relay to Apple's push service. Only the agent name and state are sent: no project name, command, or path."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pasa por el relay de Coucou al servicio push de Apple. Solo se envían el nombre y el estado del agente: sin nombre de proyecto, comando ni ruta."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Passe par le relais Coucou vers le service push d'Apple. Seuls le nom et l'état de l'agent sont envoyés : aucun nom de projet, commande ou chemin."
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Coucou रिले के माध्यम से Apple के पुश सर्विस से जाता है। केवल एजेंट का नाम और स्थिति भेजी जाती है: कोई प्रोजेक्ट नाम, कमांड या पाथ नहीं।"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Melewati relay Coucou ke layanan push Apple. Hanya nama dan status agen yang dikirim: tanpa nama proyek, perintah, atau jalur."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Passa pelo relay do Coucou para o serviço push da Apple. Apenas o nome e o estado do agente são enviados: sem nome de projeto, comando ou caminho."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Проходит через ретранслятор Coucou к сервису push Apple. Отправляются только имя и состояние агента: без имени проекта, команды или пути."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "通过 Coucou 中继传至 Apple 推送服务。仅发送 Agent 的名称和状态：不含项目名称、命令或路径。"
-          }
-        }
-      }
-    },
-    "iphone.live-activity.toggle": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "نقل Mochi إلى Dynamic Island في iPhone عند إغلاق Mac"
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mac লক থাকলে Mochi-কে আমার iPhone-এর Dynamic Island-এ নিয়ে যান"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Move Mochi to my iPhone's Dynamic Island when my Mac is locked"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mover a Mochi a la Dynamic Island de mi iPhone cuando mi Mac esté bloqueado"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Déplacer Mochi vers la Dynamic Island de mon iPhone quand mon Mac est verrouillé"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mac लॉक होने पर Mochi को मेरे iPhone की Dynamic Island पर ले जाएं"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pindahkan Mochi ke Dynamic Island iPhone saya saat Mac terkunci"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mover o Mochi para a Dynamic Island do meu iPhone quando meu Mac estiver bloqueado"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Переносить Mochi на Dynamic Island моего iPhone, когда Mac заблокирован"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mac 锁定时将 Mochi 移至我 iPhone 的灵动岛"
-          }
-        }
-      }
-    },
-    "iphone.sync.description": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "يُرسل جلساتك إلى iCloud الخاص بك لتطبيق Coucou على iPhone. تُشفَّر أسماء المشاريع والأوامر والأسئلة بمفاتيح iCloud الخاصة بك. إيقاف التشغيل يحذفها من iCloud."
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Coucou iPhone অ্যাপের জন্য আপনার সেশনগুলো আপনার প্রাইভেট iCloud-এ পাঠায়। প্রজেক্টের নাম, কমান্ড এবং প্রশ্নগুলো আপনার iCloud কী দিয়ে এনক্রিপ্ট করা হয়। বন্ধ করলে iCloud থেকে মুছে যাবে।"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sends your sessions to your private iCloud for the Coucou app on iPhone. Project names, commands, and questions are encrypted with your iCloud keys. Disabling removes data from iCloud."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Envía tus sesiones a tu iCloud privado para la app Coucou de iPhone. Los nombres de proyecto, comandos y preguntas se cifran con tus claves de iCloud. Desactivarlo las elimina de iCloud."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Envoie tes sessions sur ton iCloud privé pour l'app Coucou sur iPhone. Les noms de projets, commandes et questions sont chiffrés avec tes clés iCloud. Désactiver supprime les données d'iCloud."
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Coucou iPhone ऐप के लिए आपके सेशन आपके प्राइवेट iCloud में भेजता है। प्रोजेक्ट नाम, कमांड और सवाल आपकी iCloud कुंजियों से एन्क्रिप्ट किए जाते हैं। बंद करने पर iCloud से हटा दिए जाते हैं।"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mengirim sesi Anda ke iCloud pribadi Anda untuk aplikasi Coucou iPhone. Nama proyek, perintah, dan pertanyaan dienkripsi dengan kunci iCloud Anda. Mematikannya menghapusnya dari iCloud."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Envia suas sessões para seu iCloud privado para o app Coucou no iPhone. Nomes de projetos, comandos e perguntas são criptografados com suas chaves do iCloud. Desativar remove-os do iCloud."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Отправляет твои сессии в личный iCloud для приложения Coucou на iPhone. Имена проектов, команды и вопросы шифруются твоими ключами iCloud. Отключение удаляет их из iCloud."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "将你的会话发送到私有 iCloud，供 Coucou iPhone 应用使用。项目名称、命令和问题使用你的 iCloud 密钥加密。关闭后将从 iCloud 中删除。"
-          }
-        }
-      }
-    },
-    "iphone.sync.toggle": {
-      "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "عرض جلسات الوكيل على iPhone"
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "আমার iPhone-এ আমার এজেন্ট সেশন দেখান"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show my agent sessions on my iPhone"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostrar mis sesiones de agente en mi iPhone"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Afficher mes sessions d'agent sur mon iPhone"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "मेरे iPhone पर मेरे एजेंट सेशन दिखाएं"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tampilkan sesi agen saya di iPhone saya"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostrar minhas sessões de agente no meu iPhone"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Показывать мои сессии агента на iPhone"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在我的 iPhone 上显示我的 Agent 会话"
-          }
-        }
-      }
-    },
     "min without movement": {
       "localizations": {
         "ar": {
@@ -15057,190 +14721,6 @@
         }
       }
     },
-    "status.local.connected %lld": {
-      "localizations": {
-        "ar": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ متصل · نموذج %lld"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ متصل · %lld نماذج"
-                }
-              }
-            }
-          }
-        },
-        "bn": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ সংযুক্ত · %lld টি মডেল"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ সংযুক্ত · %lld টি মডেল"
-                }
-              }
-            }
-          }
-        },
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Connected · %lld model"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Connected · %lld models"
-                }
-              }
-            }
-          }
-        },
-        "es": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Conectado · %lld modelo"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Conectado · %lld modelos"
-                }
-              }
-            }
-          }
-        },
-        "fr": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Connecté · %lld modèle"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Connecté · %lld modèles"
-                }
-              }
-            }
-          }
-        },
-        "hi": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ कनेक्ट हो गया · %lld मॉडल"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ कनेक्ट हो गया · %lld मॉडल"
-                }
-              }
-            }
-          }
-        },
-        "id": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Terhubung · %lld model"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Terhubung · %lld model"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Conectado · %lld modelo"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Conectado · %lld modelos"
-                }
-              }
-            }
-          }
-        },
-        "ru": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Подключено · %lld модель"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ Подключено · %lld модели"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ 已连接 · %lld 个模型"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "✓ 已连接 · %lld 个模型"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "status.local.lmstudio-disconnected": {
       "localizations": {
         "ar": {
@@ -18071,6 +17551,54 @@
             "state": "translated",
             "value": "停止监控"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter la surveillance"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dejar de supervisar"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إيقاف المراقبة"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "মনিটরিং বন্ধ করুন"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "निगरानी रोकें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hentikan pemantauan"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar de monitorar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Прекратить наблюдение"
+          }
         }
       }
     },
@@ -18086,6 +17614,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "已隐藏 · %d"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masqués · %d"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultos · %d"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مخفية · %d"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লুকানো · %d"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "छिपे · %d"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tersembunyi · %d"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultas · %d"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрыто · %d"
           }
         }
       }
@@ -18103,6 +17679,54 @@
             "state": "translated",
             "value": "已隐藏的会话"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessions masquées"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesiones ocultas"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جلسات مخفية"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "লুকানো সেশন"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "छिपे सत्र"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi tersembunyi"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessões ocultas"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрытые сеансы"
+          }
         }
       }
     },
@@ -18119,6 +17743,54 @@
             "state": "translated",
             "value": "这些会话不在列表中。点 Resume 重新监控。"
           }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ces sessions ne sont pas affichées dans la liste. Reprenez-les pour les surveiller de nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estas sesiones no se muestran en la lista. Reanúdalas para volver a supervisarlas."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذه الجلسات غير معروضة في القائمة. استأنفها لإعادة مراقبتها."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এই সেশনগুলো তালিকায় দেখানো হয় না। পুনরায় নিগরান করতে Resume করুন।"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ये सत्र सूची में नहीं दिखाए जाते। उन्हें फिर से मॉनिटर करने के लिए Resume करें।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi ini tidak ditampilkan di daftar. Lanjutkan untuk memantau kembali."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estas sessões não aparecem na lista. Retome para monitorá-las novamente."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Эти сеансы не показаны в списке. Возобновите их, чтобы снова следить за ними."
+          }
         }
       }
     },
@@ -18134,6 +17806,758 @@
           "stringUnit": {
             "state": "translated",
             "value": "恢复"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reanudar"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استئناف"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "পুনরায় শুরু করুন"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फिर से शुरू करें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lanjutkan"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retomar"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Возобновить"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تلقائي"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "স্বয়ংক্রিয়"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automático"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatique"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "स्वचालित"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otomatis"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automático"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Автоматически"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        }
+      }
+    },
+    "Dictate (right-click to choose the language)": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإملاء الصوتي (انقر بالزر الأيمن لاختيار اللغة)"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ডিকটেট করুন (ভাষা বেছে নিতে ডান-ক্লিক করুন)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dictate (right-click to choose the language)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dictar (clic derecho para elegir el idioma)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dicter (clic droit pour choisir la langue)"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "डिक्टेट करें (भाषा चुनने के लिए राइट-क्लिक करें)"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte (klik kanan untuk memilih bahasa)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ditar (clique com o botão direito para escolher o idioma)"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Диктовать (правый клик — выбрать язык)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "听写（右键点击可选择语言）"
+          }
+        }
+      }
+    },
+    "Dictation language": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لغة الإملاء الصوتي"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ডিকটেশনের ভাষা"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dictation language"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma de dictado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue de dictée"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "डिक्टेशन भाषा"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bahasa dikte"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma da ditagem"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Язык диктовки"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "听写语言"
+          }
+        }
+      }
+    },
+    "Hide island": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إخفاء الجزيرة"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "দ্বীপটি লুকান"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide island"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar la isla"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquer l'île"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "द्वीप छिपाएँ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sembunyikan pulau"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar a ilha"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрыть островок"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏岛"
+          }
+        }
+      }
+    },
+    "No Orca projects found. Open one in Orca first.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يتم العثور على مشاريع Orca. افتح مشروعًا في Orca أولاً."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "কোনো Orca প্রকল্প পাওয়া যায়নি। প্রথমে Orca-তে একটি খুলুন।"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Orca projects found. Open one in Orca first."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontraron proyectos de Orca. Abre primero uno en Orca."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun projet Orca trouvé. Ouvrez d'abord un projet dans Orca."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "कोई Orca प्रोजेक्ट नहीं मिला। पहले Orca में एक खोलें।"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tidak ada proyek Orca ditemukan. Buka satu di Orca dulu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum projeto do Orca encontrado. Abra um no Orca primeiro."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проекты Orca не найдены. Сначала откройте проект в Orca."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 Orca 项目。请先在 Orca 中打开一个。"
+          }
+        }
+      }
+    },
+    "Other languages": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لغات أخرى"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "অন্যান্য ভাষা"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other languages"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otros idiomas"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autres langues"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अन्य भाषाएँ"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bahasa lain"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outros idiomas"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Другие языки"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他语言"
+          }
+        }
+      }
+    },
+    "Pick a project": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اختر مشروعًا"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "একটি প্রকল্প বেছে নিন"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a project"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir un proyecto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir un projet"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "एक प्रोजेक्ट चुनें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih proyek"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher um projeto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Выбрать проект"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择项目"
+          }
+        }
+      }
+    },
+    "Start Claude Code in…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ابدأ Claude Code في…"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "এতে Claude Code শুরু করুন…"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Claude Code in…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar Claude Code en…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lancer Claude Code dans…"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "…में Claude Code शुरू करें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mulai Claude Code di…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar o Claude Code em…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запустить Claude Code в…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在…中启动 Claude Code"
+          }
+        }
+      }
+    },
+    "Start a Claude Code session in a project": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ابدأ جلسة Claude Code في مشروع"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "একটি প্রকল্পে একটি Claude Code সেশন শুরু করুন"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a Claude Code session in a project"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar una sesión de Claude Code en un proyecto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer une session Claude Code dans un projet"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "एक प्रोजेक्ट में Claude Code सत्र शुरू करें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mulai sesi Claude Code di sebuah proyek"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar uma sessão do Claude Code em um projeto"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Начать сеанс Claude Code в проекте"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在项目中启动 Claude Code 会话"
+          }
+        }
+      }
+    },
+    "Started · no events yet": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بدأ · لا توجد أحداث بعد"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "শুরু হয়েছে · এখনো কোনো ইভেন্ট নেই"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Started · no events yet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciado · aún sin eventos"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarré · aucun événement pour l'instant"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "शुरू हुआ · अभी तक कोई इवेंट नहीं"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimulai · belum ada aktivitas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciado · nenhum evento ainda"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запущено · событий пока нет"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已启动 · 暂无事件"
+          }
+        }
+      }
+    },
+    "Stop dictation": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إيقاف الإملاء الصوتي"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ডিকটেশন বন্ধ করুন"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop dictation"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detener el dictado"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter la dictée"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "डिक्टेशन रोकें"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hentikan dikte"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar a ditagem"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остановить диктовку"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止听写"
           }
         }
       }

@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="NotchBuddy/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="Coucou icon">
+<img src="NotchBuddy/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="MyCoucou icon">
 
-# Coucou
+# MyCoucou
 
 **A tiny friend that lives in your Mac's notch and keeps an eye on your AI coding agent sessions.**
 
@@ -15,7 +15,7 @@ Approve permissions, watch your agents work, drop a file, chat with Claude — a
 ![Code: MIT](https://img.shields.io/badge/code-MIT-green)
 ![GitHub stars](https://img.shields.io/github/stars/Louis-CFM/coucou?style=social)
 
-<img src="docs/media/demo.gif" width="760" alt="Coucou in action">
+<img src="docs/media/demo.gif" width="760" alt="MyCoucou in action">
 
 </div>
 
@@ -24,7 +24,7 @@ Approve permissions, watch your agents work, drop a file, chat with Claude — a
 ## Why
 
 Some studios showed off gorgeous notch companions… and never let anyone use them.
-**Coucou is the open version.** Every line of code is open source under the MIT License: read it, fork it, learn from it. The Coucou name, Mochi and the sounds stay © Louis Raillé (see [License](#license)).
+**MyCoucou is the open version.** Every line of code is open source under the MIT License: read it, fork it, learn from it. The MyCoucou name, Mochi and the sounds stay © Louis Raillé (see [License](#license)).
 
 Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch, waves hello, follows your cursor with its eyes, gets annoyed when you poke it (and dizzy if you insist), and tells you the moment Claude Code needs you.
 
@@ -48,10 +48,10 @@ Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch
 - ⌨️ **Keyboard shortcuts** — open the chat, jump to an alert or a terminal, switch pills, mute, send Mochi to the desktop or open the wardrobe from anywhere; all customizable in Settings → Shortcuts.
 - 🎭 **A real character** — idle breathing, blinks, eyes on a sphere that follow your mouse, emotes, 28 handcrafted sounds, a greeting on launch.
 - 🔊 **Your own sounds** — drop a file named like one of Mochi's sounds (`finish.wav`, `approval.mp3`…) in Settings → General → Sound → **Open sounds folder** to replace it.
-- 🎙️ **Dictate in the chat** *(GitHub build)* — click the mic next to the chat field and talk in any of your languages (Coucou picks the one you spoke, or right-click the mic to choose); speech recognition runs on your Mac when it supports it.
+- 🎙️ **Dictate in the chat** *(GitHub build)* — click the mic next to the chat field and talk in any of your languages (MyCoucou picks the one you spoke, or right-click the mic to choose); speech recognition runs on your Mac when it supports it.
 - 🫥 **Invisible when idle** — hides away when nothing is running, peeks out when you hover the notch.
 - 🖥️ **Any Mac, notch or not** — on an iMac, a Mac mini, or a MacBook with its lid closed on an external display, Mochi sits in a small bar at the top of the screen. With several displays, pick his screen in Settings → General, or let him follow your mouse.
-- 📅 **Weekly recap** — every Monday morning Coucou shows a summary of the past week: time coding, sessions, files, lines changed, commands, permissions, top agent and project, busiest day and longest session. Share it as a 1080 × 1920 image with Mochi — project names optional. All local, no sync.
+- 📅 **Weekly recap** — every Monday morning MyCoucou shows a summary of the past week: time coding, sessions, files, lines changed, commands, permissions, top agent and project, busiest day and longest session. Share it as a 1080 × 1920 image with Mochi — project names optional. All local, no sync.
 - 🌍 **10 languages** — English, 中文, हिन्दी, Español, العربية, Français, বাংলা, Português, Русский, Bahasa Indonesia. Pick one in Settings → General → Language; community translations welcome.
 - 🔒 **Private by design** — no telemetry, no account. Keys live in your macOS Keychain. The app only talks to the services you plug in.
 
@@ -94,15 +94,15 @@ macOS releases are published as `v*` tags. See [CHANGELOG.md](CHANGELOG.md) for 
 
 ### App Store
 
-Coucou is coming to the **Mac App Store**: one click to install, automatic updates. The link will be here as soon as Apple publishes it.
+MyCoucou is coming to the **Mac App Store**: one click to install, automatic updates. The link will be here as soon as Apple publishes it.
 
 The App Store build of the Mac app runs in Apple's sandbox, so a few features stay in the GitHub build: Claude plan usage, the Apple Music pill and attaching the front window to the chat.
 
 ### Download for macOS
 
-1. Grab the latest `Coucou.zip` from [Releases](https://github.com/Louis-CFM/coucou/releases).
-2. Unzip and move **Coucou.app** to `/Applications`.
-3. Launch it, and click **Open** when macOS asks you to confirm. Updating from 0.1.0? macOS may ask you, once for each key you saved, to let Coucou use it: enter your Mac password and click **Always Allow**.
+1. Grab the latest `MyCoucou.zip` from [Releases](https://github.com/Louis-CFM/coucou/releases).
+2. Unzip and move **MyCoucou.app** to `/Applications`.
+3. Launch it, and click **Open** when macOS asks you to confirm. Updating from 0.1.0? macOS may ask you, once for each key you saved, to let MyCoucou use it: enter your Mac password and click **Always Allow**.
 
 ### Build from source
 
@@ -118,11 +118,11 @@ open NotchBuddy.xcodeproj   # then ⌘R
 
 ## Setup
 
-Click the Coucou icon in the menu bar → **Settings…**
+Click the MyCoucou icon in the menu bar → **Settings…**
 
 | What | Why | Where the key goes |
 |---|---|---|
-| **Claude Code hooks** | live sessions and approvals | **Install hooks** — Coucou backs up `~/.claude/settings.json`, merges its hooks and shows you the diff before writing anything |
+| **Claude Code hooks** | live sessions and approvals | **Install hooks** — MyCoucou backs up `~/.claude/settings.json`, merges its hooks and shows you the diff before writing anything |
 | **Claude plan** *(GitHub build)* | Plan usage gauge in the notch header | **Install relay** in Settings → Agents → Plan usage, then enable "Show in the notch" |
 | **Gemini CLI hooks** | Gemini CLI sessions in the island | **Install hooks** in Settings → Gemini CLI — backs up `~/.gemini/settings.json` |
 | **Antigravity (agy) hooks** | agy sessions in the island | **Install hooks** in Settings → Antigravity — backs up `~/.gemini/config/hooks.json` |
@@ -134,7 +134,7 @@ Click the Coucou icon in the menu bar → **Settings…**
 | **Active pills** | choose which tools and agents appear in the island | Settings → Active pills |
 | Stripe, n8n, GitHub, Vercel, Resend, Notion, Cal.com | the service pills | Keychain, all optional |
 
-If Coucou isn't running, the hook exits immediately: **Claude Code is never blocked.**
+If MyCoucou isn't running, the hook exits immediately: **Claude Code is never blocked.**
 
 ### Supported agents
 
@@ -152,7 +152,7 @@ If Coucou isn't running, the hook exits immediately: **Claude Code is never bloc
 | Hermes | Plugin — **Settings → Agents → Hermes → Install** |
 | Any other | `--agent <name>` flag; see [`docs/AGENTS.md`](docs/AGENTS.md) |
 
-OpenCode, Amp and Hermes use a plugin model rather than a hook command. Coucou installs the plugin file into `~/.config/opencode/plugins/`, `~/.config/amp/plugins/` and `~/.hermes/plugins/coucou/` respectively.
+OpenCode, Amp and Hermes use a plugin model rather than a hook command. MyCoucou installs the plugin file into `~/.config/opencode/plugins/`, `~/.config/amp/plugins/` and `~/.hermes/plugins/coucou/` respectively.
 
 ## Things to try
 

@@ -1,6 +1,6 @@
-# Coucou — guide for AI coding agents
+# MyCoucou — guide for AI coding agents
 
-Coucou is a native macOS app (`NotchBuddy/`). Mochi, a small animated character living in the MacBook notch, shows AI coding agent sessions (Claude Code, Gemini CLI, Antigravity and more) and a few integrations, and lets the user approve, answer and chat from the notch.
+MyCoucou is a native macOS app (`NotchBuddy/`). Mochi, a small animated character living in the MacBook notch, shows AI coding agent sessions (Claude Code, Gemini CLI, Antigravity and more) and a few integrations, and lets the user approve, answer and chat from the notch.
 
 ## Where things are
 - `NotchBuddy/Sources/App/` — Mac-only Swift code. `NotchBuddy/Sources/CoucouKit/` — shared models, pills, diff, Mochi engine. `NotchBuddy/Resources/sounds/` — the 28 WAV sounds.
