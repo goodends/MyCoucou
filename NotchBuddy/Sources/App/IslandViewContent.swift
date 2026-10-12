@@ -2430,6 +2430,29 @@ struct ClaudeSessionPill: View {
     /// through the left card that a single click does.
     let onDoubleTap: () -> Void
     @State private var isHovered = false
+    /// When the click before this one landed, 0 when there isn't one. The
+    /// double-click is counted here rather than with `onTapGesture(count: 2)`:
+    /// SwiftUI holds a single tap back until the double-click window closes, so
+    /// asking for both on the same view made *every* click land ~0.3s late.
+    @State private var lastTapAt: CFTimeInterval = 0
+
+    /// Window two clicks must fall inside to read as a double-click. Matches
+    /// the platform's own double-click interval.
+    private static let doubleClickWindow: CFTimeInterval = 0.3
+
+    /// A single click moves the character to the left card; a second one
+    /// inside the window opens the chat instead. The pair is consumed, so a
+    /// third click starts a fresh single.
+    private func handleTap() {
+        let now = CACurrentMediaTime()
+        if lastTapAt > 0, now - lastTapAt < Self.doubleClickWindow {
+            lastTapAt = 0
+            onDoubleTap()
+        } else {
+            lastTapAt = now
+            onTap()
+        }
+    }
 
     private static let claudeColor = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
 
@@ -2538,12 +2561,7 @@ struct ClaudeSessionPill: View {
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture { onTap() }
-        // Single click stays "show me on the left"; the double click is the
-        // shortcut into the chat itself. SwiftUI fires the single-tap action
-        // for each click of the pair, so the focus still lands — then the
-        // chat opens on top of it.
-        .onTapGesture(count: 2) { onDoubleTap() }
+        .onTapGesture { handleTap() }
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .brightness(isHovered ? 0.06 : 0)
         .onHover { newHover in
