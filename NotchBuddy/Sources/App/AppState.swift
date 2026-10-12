@@ -420,9 +420,14 @@ final class AppState: ObservableObject {
     // single-slot: a second request used to write "ask" to the first one's fd
     // and take the card, dropping the displaced session into its terminal with
     // nothing on screen saying so. Each entry carries its own deadline.
-    @Published var pendingApprovals: [PendingApproval] = []
+    @Published var pendingApprovals: [PendingApproval] = [] {
+        didSet { updateInboxHeight() }
+    }
     @Published var pendingQuestions: [PendingQuestion] = [] {
-        didSet { QuestionLayout.height = pendingQuestions.first?.question.estimatedIslandHeight }
+        didSet {
+            QuestionLayout.height = pendingQuestions.first?.question.estimatedIslandHeight
+            updateInboxHeight()
+        }
     }
 
     /// The request the island is showing. Derived from the head of each queue
@@ -584,7 +589,7 @@ final class AppState: ObservableObject {
     /// back to back must both stay visible with their own avatar, final line
     /// and "Open terminal" target.
     @Published var notifications: [AgentNotification] = [] {
-        didSet { NotificationLayout.height = NotificationLayout.height(forCount: notifications.count) }
+        didSet { updateInboxHeight() }
     }
 
     /// Agent id of the session at the head of the queue — the one that
@@ -611,6 +616,14 @@ final class AppState: ObservableObject {
         InboxItem.ordered(approvals: pendingApprovals,
                           questions: pendingQuestions,
                           notifications: notifications)
+    }
+
+    /// The finished view's height follows the whole inbox, not just the
+    /// finished sessions — a question row is as tall as a finished card, and
+    /// sizing off one of the three arrays left the stack clipped when the
+    /// other two grew.
+    private func updateInboxHeight() {
+        NotificationLayout.height = NotificationLayout.height(forCount: inbox.count)
     }
 
     /// Hands one inbox row back to whoever raised it. Once the inbox is empty
