@@ -128,20 +128,33 @@ struct OverviewView: View {
                 // Title row + ticker stacked
                 if let agent = agent {
                     VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: 6) {
-                            // No status dot beside the name. The Mochi beside
-                            // this row already carries one — BotEngine's badge,
-                            // three pulsing dots while working, a single dot
-                            // when finished or idle. This one repeated the same
-                            // state in a second place, and the two could even
-                            // disagree: the badge follows `mainMochiState`,
-                            // this followed `agent.state`.
-                            Text(agent.name)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Color(hex: "#F5F6F8"))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .layoutPriority(1)
+                        // Two lines: the name with its step count, the source
+                        // under it. Sharing one line meant the source lost —
+                        // "Claude Code" came out as "Claude C…" on every
+                        // session whose name was more than a few characters.
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                // No status dot beside the name. The Mochi beside
+                                // this row already carries one — BotEngine's badge,
+                                // three pulsing dots while working, a single dot
+                                // when finished or idle. This one repeated the same
+                                // state in a second place, and the two could even
+                                // disagree: the badge follows `mainMochiState`,
+                                // this followed `agent.state`.
+                                Text(agent.name)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(Color(hex: "#F5F6F8"))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .layoutPriority(1)
+                                Spacer(minLength: 2)
+                                if agent.steps.count > 1 {
+                                    Text("\(min(agent.stepIndex + 1, agent.steps.count))/\(agent.steps.count)")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Color(hex: "#6B7079"))
+                                        .fixedSize()
+                                }
+                            }
                             Text({ () -> String in
                                 switch agent.source {
                                 case .claudeCode: return "Claude Code"
@@ -153,13 +166,6 @@ struct OverviewView: View {
                                 .foregroundColor(Color(hex: "#8E939C"))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                            Spacer(minLength: 2)
-                            if agent.steps.count > 1 {
-                                Text("\(min(agent.stepIndex + 1, agent.steps.count))/\(agent.steps.count)")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(Color(hex: "#6B7079"))
-                                    .fixedSize()
-                            }
                         }
                         .padding(.top, 6)
                         .padding(.leading, 108)
