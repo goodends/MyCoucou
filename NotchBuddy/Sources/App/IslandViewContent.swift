@@ -785,6 +785,18 @@ private struct InboxRow<Content: View>: View {
                     .padding(.trailing, 30)
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) { onDoubleTap() }
+                    // Right-click dresses *this* row's session. The wardrobe
+                    // reads `state.overviewSession`, which follows
+                    // `focusedSessionId`, so without binding first it would
+                    // dress whichever session the island happens to be on.
+                    .modifier(ContextMenuIf(enabled: session != nil) {
+                        Button {
+                            state.focusedSessionId = sessionId
+                            state.view = .wardrobe
+                        } label: {
+                            Label("Change outfit…", systemImage: "tshirt")
+                        }
+                    })
 
                 VStack(alignment: .leading, spacing: 5) {
                     content()
@@ -813,6 +825,22 @@ private struct InboxActions: View {
             SecondaryButton("Send back") { onHandBack() }
             Spacer(minLength: 4)
             DeadlineChip(deadline: deadline)
+        }
+    }
+}
+
+/// Applies a context menu only when there is one to show. A menu with nothing
+/// in it still pops an empty panel on right-click, which reads as a broken row.
+private struct ContextMenuIf<Menu: View>: ViewModifier {
+    let enabled: Bool
+    @ViewBuilder let menu: () -> Menu
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.contextMenu { menu() }
+        } else {
+            content
         }
     }
 }
