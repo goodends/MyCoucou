@@ -312,9 +312,16 @@ enum IslandConst {
     static let expandedCorner: CGFloat = 22
 
     static let viewLayouts: [IslandView: ViewLayout] = [
-        // Home is the reference: height 160
-        .overview:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .pills),
-        // All non-chat views match home height (150) — law
+        // Home is the reference height for everything else — with one
+        // exception. Its left card spends the height on text: the title row
+        // plus a ticker split two lines of history over five lines of
+        // current step, because the steps are whole sentences (a shell
+        // command, an assistant's reply) and one line cut them off
+        // mid-thought. 240 is that stack (title + 7 lines of ticker) with
+        // room to spare; the right card is what most of the rest buys —
+        // another row of sessions instead of a clipped one.
+        .overview:  ViewLayout(height: 240, botX: 68,  botY: nil, botDiameter: 58, agentMode: .pills),
+        // The rest of the state cards share one height — law
         .empty:     ViewLayout(height: 160, botX: 70,  botY: nil, botDiameter: 62, agentMode: .none),
         .approval:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
         .question:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),

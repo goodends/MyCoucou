@@ -172,7 +172,6 @@ struct OverviewView: View {
                         TickerView(task: agent, onDiffTap: { diffIdx in
                             withAnimation(.easeIn(duration: 0.16)) { activeDiffId = diffIdx }
                         })
-                            .frame(height: 44)
                             .padding(.top, 6)
                             .padding(.leading, 108)
                             .padding(.trailing, 12)
@@ -1878,6 +1877,20 @@ private struct StatRow: View {
 
 // MARK: - Stripe Card View
 
+/// How tall the history row laid out, so the current row can sit a fixed gap
+/// below it. Reserving a fixed two-line slot instead left a full empty line
+/// wherever the shorter of the two rows ended — above a one-line history,
+/// under a one-line current step — and the two looked worse together than the
+/// truncation that reserving it was meant to avoid.
+private struct TickerHistoryHeightKey: PreferenceKey {
+    // 22 = one ticker line; a literal because the protocol's defaultValue is
+    // nonisolated and TickerView's own statics are main-actor bound.
+    nonisolated(unsafe) static var defaultValue: CGFloat = 22
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct TickerView: View {
     let task: AgentTask?
     var onDiffTap: ((Int) -> Void)? = nil
@@ -1888,15 +1901,30 @@ struct TickerView: View {
 
     @State private var rowAOffset: CGFloat = 0
     @State private var rowAOpacity: Double = 1
-    @State private var rowBOffset: CGFloat = 22
+    @State private var rowBOffset: CGFloat = 0
     @State private var rowBPhase:  Double  = 0   // 0=current, 1=completed (drives X+scale)
-    @State private var rowCOffset: CGFloat = 44
+    @State private var rowCOffset: CGFloat = Self.height
     @State private var rowCOpacity: Double = 0
+    /// Measured, not assumed — see TickerHistoryHeightKey.
+    @State private var historyHeight: CGFloat = Self.lineHeight
 
     @State private var displayIndex: Int = -1
     @State private var isTransitioning = false
 
     private let completedScale: CGFloat = 11.5 / 13   // 0.885 — matches completed font size
+
+    /// One text line of the ticker.
+    static let lineHeight: CGFloat = 22
+    /// The history row may use two, the current row below it five. Both are
+    /// caps on the text, not slots it has to fill — a short step just takes
+    /// fewer lines and the rows close up.
+    static let historyLines = 2
+    static let currentLines = 5
+    /// Reading between the two rows. Same rhythm as the title above them.
+    private static let rowGap: CGFloat = 8
+    /// Enough for the tallest the ticker can get, and what the incoming row
+    /// slides up from.
+    static var height: CGFloat { lineHeight * CGFloat(historyLines + currentLines) }
 
     var steps: [String] {
         let raw = task?.steps ?? []
@@ -1911,33 +1939,50 @@ struct TickerView: View {
         ZStack(alignment: .topLeading) {
             Color.clear
 
-            // Row A: completed row — always rendered at phase=1 + completedScale
-            TickerRowView(text: rowA, phase: 1.0, isActive: isActive, onDiffTap: rowADiffTap)
-                .scaleEffect(completedScale, anchor: .leading)
-                .offset(x: -10, y: rowAOffset)
-                .opacity(rowAOpacity)
+            // Rows A and B stack, so the current row always sits one gap under
+            // the history row no matter how many lines that one took. Offsets
+            // still work for the animation: they move a row without moving
+            // the other one.
+            VStack(alignment: .leading, spacing: Self.rowGap) {
+                // Row A: completed row — always rendered at phase=1 + completedScale
+                TickerRowView(text: rowA, phase: 1.0, isActive: isActive,
+                              lines: Self.historyLines, onDiffTap: rowADiffTap)
+                    .scaleEffect(completedScale, anchor: .leading)
+                    .offset(x: -10, y: rowAOffset)
+                    .opacity(rowAOpacity)
+                    .background {
+                        GeometryReader { geo in
+                            Color.clear.preference(key: TickerHistoryHeightKey.self,
+                                                   value: geo.size.height)
+                        }
+                    }
 
-            // Row B: current step → animates diagonally up-left, phase 0→1, scale 1→completedScale
-            TickerRowView(text: rowB, phase: rowBPhase, isActive: isActive, onDiffTap: rowBDiffTap)
-                .scaleEffect(1 - rowBPhase * (1 - completedScale), anchor: .leading)
-                .offset(x: -rowBPhase * 10, y: rowBOffset)
+                // Row B: current step → animates diagonally up-left, phase 0→1, scale 1→completedScale
+                TickerRowView(text: rowB, phase: rowBPhase, isActive: isActive,
+                              lines: Self.currentLines, onDiffTap: rowBDiffTap)
+                    .scaleEffect(1 - rowBPhase * (1 - completedScale), anchor: .leading)
+                    .offset(x: -rowBPhase * 10, y: rowBOffset)
+            }
 
             // Row C: incoming new step — slides in from below at phase=0
             TickerRowView(text: rowC, phase: 0.0, isActive: isActive)
                 .offset(y: rowCOffset)
                 .opacity(rowCOpacity)
         }
-        .frame(height: 44)
+        .frame(height: Self.height)
         .clipped()
         .mask(LinearGradient(
             stops: [
                 .init(color: .clear, location: 0),
-                .init(color: .black, location: 0.12),
-                .init(color: .black, location: 0.85),
+                // Fades span a fixed few points at each edge, so the taller
+                // ticker still reads fully opaque across its current row.
+                .init(color: .black, location: 0.05),
+                .init(color: .black, location: 0.95),
                 .init(color: .clear, location: 1)
             ],
             startPoint: .top, endPoint: .bottom
         ))
+        .onPreferenceChange(TickerHistoryHeightKey.self) { historyHeight = $0 }
         .onAppear {
             let idx = task?.stepIndex ?? -1
             displayIndex = idx
@@ -1963,24 +2008,29 @@ struct TickerView: View {
     private func tickerAnimate(to newIdx: Int) {
         isTransitioning = true
         rowC = steps[min(newIdx, steps.count - 1)]
-        rowCOffset = 44
+        rowCOffset = Self.height
         rowCOpacity = 0
+
+        // How far up "becomes the completed row" is: the history row's own
+        // height plus the gap under it, which is exactly where row B already
+        // sits and exactly where row C has to land.
+        let travel = historyHeight + Self.rowGap
 
         // Old completed (rowA): fades + slides further up
         withAnimation(.easeOut(duration: 0.28)) {
-            rowAOffset  = -22
+            rowAOffset  = -travel
             rowAOpacity = 0
         }
 
         // Current (rowB): moves diagonally up-left + shrinks to completed size
         withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.38)) {
-            rowBOffset = 0
+            rowBOffset = -travel
             rowBPhase  = 1
         }
 
         // New current (rowC): slides in from below
         withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: 0.38)) {
-            rowCOffset  = 22
+            rowCOffset  = travel
             rowCOpacity = 1
         }
 
@@ -1990,9 +2040,9 @@ struct TickerView: View {
             self.rowAOffset      = 0
             self.rowAOpacity     = 1
             self.rowB            = self.rowC
-            self.rowBOffset      = 22
+            self.rowBOffset      = 0
             self.rowBPhase       = 0
-            self.rowCOffset      = 44
+            self.rowCOffset      = Self.height
             self.rowCOpacity     = 0
             self.isTransitioning = false
         }
@@ -2003,6 +2053,10 @@ struct TickerRowView: View {
     let text: String
     let phase: Double   // 0 = current (shimmer, large), 1 = completed (dim, scaled down by caller)
     var isActive: Bool = true
+    /// How many lines the text may wrap to. It is a cap, not a slot: the row is
+    /// as tall as the text actually needs, so the current row can sit directly
+    /// under the history row whatever height that one came out at.
+    var lines: Int = 1
     var onDiffTap: (() -> Void)? = nil
 
     var body: some View {
@@ -2013,7 +2067,7 @@ struct TickerRowView: View {
         let staticColor = (!isActive && phase < 0.5) ? Color(hex: "#C9CDD4") : Color(hex: "#6B7079")
 
         if let dp = text.parseDiffStep() {
-            HStack(spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
                 ZStack {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .medium))
@@ -2028,12 +2082,12 @@ struct TickerRowView: View {
                 // Filename + counts
                 HStack(spacing: 0) {
                     ZStack(alignment: .leading) {
-                        TickerShimmerText(text: dp.filename)
+                        TickerShimmerText(text: dp.filename, lines: lines)
                             .opacity(shimmerOpacity)
                         Text(dp.filename)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(staticColor)
-                            .lineLimit(1).truncationMode(.tail)
+                            .lineLimit(lines).truncationMode(.tail)
                             .opacity(staticOpacity)
                     }
                     if dp.added > 0 {
@@ -2050,12 +2104,11 @@ struct TickerRowView: View {
                     }
                 }
             }
-            .frame(height: 22, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { onDiffTap?() }
         } else {
-            HStack(spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
                 // Icon: chevron fades out first half, checkmark fades in second half
                 ZStack {
                     Image(systemName: "chevron.right")
@@ -2071,16 +2124,15 @@ struct TickerRowView: View {
 
                 // Text: shimmer fades out, dim completed text fades in (overlapping cross-fade)
                 ZStack(alignment: .leading) {
-                    TickerShimmerText(text: text)
+                    TickerShimmerText(text: text, lines: lines)
                         .opacity(shimmerOpacity)
                     Text(text)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(staticColor)
-                        .lineLimit(1).truncationMode(.tail)
+                        .lineLimit(lines).truncationMode(.tail)
                         .opacity(staticOpacity)
                 }
             }
-            .frame(height: 22, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -2088,6 +2140,7 @@ struct TickerRowView: View {
 
 struct TickerShimmerText: View {
     let text: String
+    var lines: Int = 1
 
     var body: some View {
         TimelineView(.animation) { tl in
@@ -2097,7 +2150,7 @@ struct TickerShimmerText: View {
             let phase = p * 1.2 - 0.1
             Text(text)
                 .font(.system(size: 13, weight: .medium))
-                .lineLimit(1)
+                .lineLimit(lines)
                 .truncationMode(.tail)
                 .foregroundStyle(LinearGradient(stops: [
                     .init(color: Color(hex: "#7c818a"), location: max(0, phase - 0.3)),
