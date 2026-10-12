@@ -716,6 +716,12 @@ final class IslandWindowController: NSWindowController {
                 // instead of slapping — covers the user-reported case where clicking
                 // the left card triggered the dizzy/confused state.
                 if self.state.mode == .expanded && self.state.view == .overview {
+                    // Lock the chat to the session this card is showing. Without
+                    // this the chat falls back to whatever tasks[] remembers, and
+                    // two sessions in one folder can end up on the wrong one.
+                    if let s = self.state.overviewSession {
+                        self.state.focusedSessionId = s.sessionId
+                    }
                     if let task = self.state.focusTask, PillCatalog.isChatablePill(id: task.id) {
                         self.state.view = .prompt
                     }
@@ -736,6 +742,15 @@ final class IslandWindowController: NSWindowController {
                         self.state.view = .overview
                         self.botClickCount = 0
                     }
+                    return
+                }
+                // In the changes view the avatar opens the chat for the session
+                // whose files are listed — the other half of the split, so the
+                // avatar means "talk to it" wherever it is drawn. Single tap,
+                // no double-tap guard: this view has no text field to misfire
+                // against, unlike the chat.
+                if self.state.mode == .expanded && self.state.view == .changes {
+                    self.state.view = .prompt
                     return
                 }
                 self.attachDragStart = NSEvent.mouseLocation

@@ -410,7 +410,6 @@ final class AppState: ObservableObject {
     // replacing the whole dictionary — `sessionDiffs[key]!.append(…)` does not
     // even trigger willSet.
     @Published var sessionDiffs: [String: [FileDiff]] = [:]
-    private var sessionDiffTimers: [String: DispatchWorkItem] = [:]
     // Monotonically increasing — never reset, not even in clearSessionDiffs.
     private var nextDiffId: Int = 0
 
@@ -437,11 +436,8 @@ final class AppState: ObservableObject {
               dict.values.reduce(0, { $0 + $1.count }) > Self.maxDiffsTotal,
               let oldestKey = dict.min(by: { ($0.value.last?.id ?? 0) < ($1.value.last?.id ?? 0) })?.key {
             dict[oldestKey] = nil
-            sessionDiffTimers[oldestKey]?.cancel()
-            sessionDiffTimers.removeValue(forKey: oldestKey)
         }
         sessionDiffs = dict
-        resetSessionDiffTimer(for: scopeKey)
         return d.id
     }
 
@@ -464,22 +460,26 @@ final class AppState: ObservableObject {
         DiffLedger.fileChanges(from: diffs(for: scopeKey))
     }
 
-    func clearSessionDiffs(for scopeKey: String) {
-        sessionDiffTimers[scopeKey]?.cancel()
-        sessionDiffTimers.removeValue(forKey: scopeKey)
-        sessionDiffs.removeValue(forKey: scopeKey)
-        // nextDiffId intentionally NOT reset — ids remain unique across sessions
+    /// Added / removed lines for one scope, summed over its files. Derived from
+    /// `fileChanges`, so a badge showing these can never disagree with the rows
+    /// the changes list draws from the same rollup.
+    func changeTotals(for scopeKey: String) -> (added: Int, removed: Int) {
+        fileChanges(for: scopeKey).reduce(into: (added: 0, removed: 0)) {
+            $0.added += $1.added
+            $0.removed += $1.removed
+        }
     }
 
-    private func resetSessionDiffTimer(for scopeKey: String) {
-        sessionDiffTimers[scopeKey]?.cancel()
-        // The closure is MainActor-isolated (AppState is @MainActor): it must run on the main
-        // queue. Scheduled on a global queue, Swift 6's isolation check traps and the app quits.
-        let work = DispatchWorkItem { [weak self] in
-            self?.clearSessionDiffs(for: scopeKey)
-        }
-        sessionDiffTimers[scopeKey] = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3600, execute: work)
+    /// Forget everything recorded for one scope. Called when the session ends
+    /// or dies, and from the changes view's reset action.
+    ///
+    /// There is deliberately no idle timeout. An hour of silence silently
+    /// rewriting the user's numbers is worse than numbers that keep counting:
+    /// a session that keeps working should keep its running total, and the user
+    /// can reset it whenever they want a fresh count.
+    func clearSessionDiffs(for scopeKey: String) {
+        sessionDiffs.removeValue(forKey: scopeKey)
+        // nextDiffId intentionally NOT reset — ids remain unique across sessions
     }
 
     // MARK: - Init (loads persisted settings)

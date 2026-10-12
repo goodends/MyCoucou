@@ -93,11 +93,30 @@ struct OverviewView: View {
     @ObservedObject var state: AppState
     @State private var activeDiffId: Int? = nil
 
+    /// Open the changes list for whatever session the left card is showing.
+    /// Needs a session to key on: a card showing an agent with no Claude
+    /// session behind it has no diffs of its own, so there is nothing to show
+    /// and the tap is left alone rather than opening an empty list.
+    private func openChangesForOverview() {
+        guard let s = state.overviewSession else { return }
+        state.focusedSessionId = s.sessionId
+        state.view = .changes
+    }
+
     /// Left card shows the most-recently-active Claude session when there is
     /// one. Falls back to the focus task for the no-Claude-session case.
     var agent: AgentTask? {
         if let s = state.overviewSession { return state.overviewTask(for: s) }
         return state.focusTask
+    }
+
+    /// Whether this card's session has changed any file. Single source for
+    /// "show the capsule" and "make room for it" — two separate conditions
+    /// would drift, and the failure is silent: a name truncated by a space
+    /// nothing occupies.
+    private var hasChangeTotals: Bool {
+        guard let sid = agent?.sessionId else { return false }
+        return !state.fileChanges(for: sid).isEmpty
     }
 
     var body: some View {
@@ -144,7 +163,11 @@ struct OverviewView: View {
                         }
                         .padding(.top, 6)
                         .padding(.leading, 108)
-                        .padding(.trailing, 36)
+                        // Room for the jump arrow alone, plus the diff capsule
+                        // when there is one. A fixed wide value would shorten the
+                        // session name even on sessions that have never touched a
+                        // file, for a badge that is not there.
+                        .padding(.trailing, hasChangeTotals ? 96 : 36)
 
                         TickerView(task: agent, onDiffTap: { diffIdx in
                             withAnimation(.easeIn(duration: 0.16)) { activeDiffId = diffIdx }
@@ -170,25 +193,78 @@ struct OverviewView: View {
                         .transition(.opacity)
                 }
 
-                // ↗ jump button — last in ZStack so it renders on top; hidden while any detail is open
+                // ↗ jump + diff buttons — last in ZStack so they render on top; hidden
+                // while a diff is open. Buttons, not part of the card's tap
+                // gesture: a Button's gesture wins over the ancestor's, so each
+                // one is clickable without also opening the chat.
                 let hideJumpButton = activeDiffId != nil
                 if !hideJumpButton {
-                    Button(action: { AgentLauncher.open(agent, state: state) }) {
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundColor(Color(hex: "#5F646D"))
-                            .frame(width: 16, height: 16)
-                            .background(Color.white.opacity(0.07))
-                            .clipShape(Circle())
+                    HStack(spacing: 4) {
+                        // The session's running totals, as the way in to its
+                        // changes — the numbers say what changed and the
+                        // capsule says it opens something. Shown only once the
+                        // session has actually touched a file; until then it
+                        // could only open an empty list.
+                        if hasChangeTotals, let sid = agent?.sessionId {
+                            let totals = state.changeTotals(for: sid)
+                            Button(action: { openChangesForOverview() }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "doc.text.magnifyingglass")
+                                        .font(.system(size: 8, weight: .medium))
+                                        .foregroundColor(Color(hex: "#5F646D"))
+                                    if totals.added > 0 {
+                                        Text("+\(totals.added)")
+                                            .font(.system(size: 9, weight: .medium).monospaced())
+                                            .foregroundColor(Color(hex: "#22C55E"))
+                                    }
+                                    if totals.removed > 0 {
+                                        Text("−\(totals.removed)")
+                                            .font(.system(size: 9, weight: .medium).monospaced())
+                                            .foregroundColor(Color(hex: "#F4505E"))
+                                    }
+                                }
+                                .padding(.horizontal, 6)
+                                .frame(height: 16)
+                                .background(Color.white.opacity(0.07))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .help(String(localized: "Files this session changed"))
+                            // Right-click resets, so a fresh count is one move
+                            // away without entering the list first. Context menu
+                            // rather than a second button: two controls on a
+                            // card this size start colliding with the name.
+                            .contextMenu {
+                                Button {
+                                    state.clearSessionDiffs(for: sid)
+                                } label: {
+                                    Label(String(localized: "Reset the counts"),
+                                          systemImage: "arrow.counterclockwise")
+                                }
+                                .disabled(!hasChangeTotals)
+                            }
+                        }
+                        Button(action: { AgentLauncher.open(agent, state: state) }) {
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(Color(hex: "#5F646D"))
+                                .frame(width: 16, height: 16)
+                                .background(Color.white.opacity(0.07))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     .padding(.top, 8)
                     .padding(.trailing, 10)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
+            .frame(width: 322)
             .contentShape(Rectangle())
             .onTapGesture {
+                // The whole card opens the chat, as it always has. What the
+                // session changed is one click away, on the Diff button beside
+                // the jump arrow.
                 if let task = state.focusTask, PillCatalog.isChatablePill(id: task.id) {
                     // Mirror right-card pill tap: lock the chat to the current
                     // overview session so its host shows in the bottom-right label
@@ -197,7 +273,6 @@ struct OverviewView: View {
                     state.view = .prompt
                 }
             }
-            .frame(width: 322)
 
             // Right card: agent pills
             CardBackground(wash: nil) {
@@ -838,8 +913,27 @@ struct SessionChangesView: View {
                     .font(.system(size: 10, weight: .medium).monospaced())
                     .foregroundColor(Color(hex: "#F4505E"))
             }
-            // Straight to the chat this session was reached from, so the
-            // changes view is never a dead end.
+            // Start the count over. The numbers are cumulative for the life of
+            // the session, so without this they only ever grow — there is
+            // otherwise no way to ask "what did it change since I last looked?"
+            // while the session keeps running.
+            if let scopeKey, !changes.isEmpty {
+                Button {
+                    state.clearSessionDiffs(for: scopeKey)
+                    openDiffId = nil
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(Color(hex: "#5F646D"))
+                        .frame(width: 14, height: 14)
+                        .background(Color.white.opacity(0.07))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Reset the counts and clear this list"))
+            }
+            // Straight to the chat for this session, so the changes view is
+            // never a dead end.
             Button {
                 state.view = .prompt
             } label: {
@@ -1003,6 +1097,7 @@ struct PromptView: View {
     @FocusState private var focused: Bool
     @State private var showNotWiredToast = false
     @State private var chipHovered = false
+    @State private var changesChipHovered = false
 
     // Project picker — shown instead of the host chip when there's no live
     // session to jump to or type into. Picking a worktree starts a Claude Code
@@ -1203,6 +1298,47 @@ struct PromptView: View {
                             .lineLimit(1)
                             .truncationMode(.tail)
                         Spacer(minLength: 0)
+                        // The way to this session's files from the chat — the
+                        // same capsule the home card carries, same numbers and
+                        // same colours, so the two never look like two things.
+                        if let sid = state.focusedClaudeSession?.sessionId,
+                           !state.fileChanges(for: sid).isEmpty {
+                            let totals = state.changeTotals(for: sid)
+                            Button {
+                                state.view = .changes
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "doc.text.magnifyingglass")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundColor(Color(hex: "#5F646D"))
+                                    if totals.added > 0 {
+                                        Text("+\(totals.added)")
+                                            .font(.system(size: 10, weight: .medium).monospaced())
+                                            .foregroundColor(Color(hex: "#22C55E"))
+                                    }
+                                    if totals.removed > 0 {
+                                        Text("−\(totals.removed)")
+                                            .font(.system(size: 10, weight: .medium).monospaced())
+                                            .foregroundColor(Color(hex: "#F4505E"))
+                                    }
+                                }
+                                .padding(.horizontal, 7)
+                                .frame(height: 18)
+                                .background(Color.white.opacity(changesChipHovered ? 0.13 : 0.07))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .onHover { changesChipHovered = $0 }
+                            .help(String(localized: "Files this session changed"))
+                            .contextMenu {
+                                Button {
+                                    state.clearSessionDiffs(for: sid)
+                                } label: {
+                                    Label(String(localized: "Reset the counts"),
+                                          systemImage: "arrow.counterclockwise")
+                                }
+                            }
+                        }
                     }
                     .padding(.horizontal, 4)
                     .padding(.bottom, 2)
@@ -1980,10 +2116,7 @@ struct TickerShimmerText: View {
 struct ClaudeSessionPill: View {
     let session: ClaudeSession
     @ObservedObject var state: AppState
-    /// Opens the session's file changes.
     let onTap: () -> Void
-    /// Opens the session's chat, from the 💬 in the corner.
-    let onChatTap: () -> Void
     @State private var isHovered = false
 
     private static let claudeColor = PillCatalog.definition(for: "integration_claude")?.color ?? "#F5F6F8"
@@ -2064,7 +2197,7 @@ struct ClaudeSessionPill: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.leading, 34)
-                    .padding(.trailing, 40)
+                    .padding(.trailing, 24)
                     .allowsHitTesting(false)
                 }
                 .frame(maxWidth: .infinity)
@@ -2075,33 +2208,21 @@ struct ClaudeSessionPill: View {
                 // to appear on hover, but that flickered in and out while a
                 // session was running, so its presence never depends on hover.
                 .overlay(alignment: .topTrailing) {
-                    // Two controls in one overlay: a Button's gesture wins over
-                    // the ancestor onTapGesture, which is why the ↗ has always
-                    // been clickable without also opening the card.
-                    HStack(spacing: 2) {
-                        Button {
-                            onChatTap()
-                        } label: {
-                            Image(systemName: "bubble.left")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(Color(hex: "#5F646D"))
-                                .frame(width: 16, height: 16)
-                                .background(Color.white.opacity(0.07))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        Button {
-                            AgentLauncher.open(state.overviewTask(for: session), state: state)
-                        } label: {
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(Color(hex: "#5F646D"))
-                                .frame(width: 16, height: 16)
-                                .background(Color.white.opacity(0.07))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
+                    // A Button's gesture wins over the ancestor onTapGesture,
+                    // which is why the ↗ has always been clickable without also
+                    // opening the card. The card itself opens the chat, so no
+                    // second control is needed here.
+                    Button {
+                        AgentLauncher.open(state.overviewTask(for: session), state: state)
+                    } label: {
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(Color(hex: "#5F646D"))
+                            .frame(width: 16, height: 16)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
                     }
+                    .buttonStyle(.plain)
                     .padding(.top, 2)
                     .padding(.trailing, 4)
                 }
@@ -2259,9 +2380,7 @@ struct ClaudeSessionsListView: View {
                                           alignment: .leading,
                                           spacing: 4) {
                                     ForEach(group.sessions) { s in
-                                        ClaudeSessionPill(session: s, state: state,
-                                                     onTap: { openChanges(s) },
-                                                     onChatTap: { openChat(s) })
+                                        ClaudeSessionPill(session: s, state: state) { openChat(s) }
                                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
                                     }
                                 }
@@ -2382,23 +2501,8 @@ struct ClaudeSessionsListView: View {
         .background(Color(hex: "#141518"))
     }
 
-    /// Tapping a session opens what it changed. Chat moved to the 💬 because a
-/// session's edits are the thing worth seeing first — they are also the only
-/// part that is per-session: `sessionDiffs` is keyed by session id, whereas
-/// the chat pane reads a shared history keyed by pill.
-    private func openChanges(_ s: ClaudeSession) {
-        guard !swapping else { return }
-        swapping = true
-        SoundEngine.shared.play("blip")
-        state.focusedSessionId = s.sessionId
-        state.view = .changes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { swapping = false }
-    }
-
-    /// Open the chat for this session. PromptView swaps its in-memory history for
-    /// ChatSessionView's JSONL stream when focusedClaudeSession is set. A scanned
-    /// session has no transcript yet, so its chat opens empty and fills in once
-    /// the first hook event adopts it.
+    /// Tapping a session opens its chat. The files it changed are on the left
+/// card's ticker half, and from the chat itself.
     private func openChat(_ s: ClaudeSession) {
         guard !swapping else { return }
         swapping = true

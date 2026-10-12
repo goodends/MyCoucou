@@ -42,6 +42,7 @@ Sessions are matched by their **real identity**, not by guesswork: the id, cwd a
 - 🙈 **Hide and resume.** Park a session you don't care about; bring it back with Resume. If it died while hidden it returns marked stopped.
 - ✅ **Approve from the notch.** Claude Code permission requests show **Allow / Deny** right in the island. `AskUserQuestion` prompts render in place, up to four questions, single or multi-select.
 - 🩹 **Live diffs, per session.** Tap a session to see every file *it* edited, with +N −M each, newest first — tap a row for the full diff. In the ticker, tap the step itself to open that diff in place.
+  - Diffs are filed under the session that made them, so two sessions editing at once never mix — and ⌘E opens the *current* session's last change, not whichever arrived most recently.
 - 💬 **Read and reply to a session.** The chat pane loads the session's own transcript. Sending types into the terminal that hosts it — so sending needs **Orca**; jumping works from any host.
 - 🪟 **Jump to where it runs.** Orca, Warp, Terminal, iTerm, Ghostty, cmux, or an editor — clicked straight from the session card.
 - 🎙️ **Dictate.** Click the mic and talk; MyCoucou picks the language you spoke, or right-click to choose.
