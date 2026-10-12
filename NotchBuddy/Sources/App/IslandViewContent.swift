@@ -181,7 +181,7 @@ struct OverviewView: View {
                             // Breathing room between the title and the step
                             // below it. The ticker sizes itself to its text, so
                             // this is the only thing setting that gap.
-                            .padding(.top, 10)
+                            .padding(.top, 0)
                             .padding(.leading, 108)
                             .padding(.trailing, 12)
                     }
@@ -291,6 +291,12 @@ struct OverviewView: View {
                 ClaudeSessionsListView(state: state)
             }
         }
+        // Air above and below both cards. The cards sit flush against the
+        // icon row above them and the window edge below (the island stacks
+        // header + content with no spacing), so the text inside read as
+        // crowded against the chrome. The height budget pays for this:
+        // TickerView.currentLines gives back what these two add.
+        .padding(.vertical, 6)
         .onChange(of: state.focusId) { _, _ in
             activeDiffId = nil
         }
@@ -1496,7 +1502,6 @@ struct PromptView: View {
             .padding(.top, 12)
             .padding(.bottom, 14)
         }
-        .padding(.bottom, 10)
         .onAppear {
             focused = true
             if let id = state.focusId { state.scheduleReloadHistoryFromJSONL(for: id) }
@@ -1928,11 +1933,14 @@ struct TickerView: View {
 
     /// One text line of the ticker.
     static let lineHeight: CGFloat = 22
-    /// The history row may use two, the current row below it five. Both are
+    /// The history row may use two, the current row below it four. Both are
     /// caps on the text, not slots it has to fill — a short step just takes
-    /// fewer lines and the rows close up.
+    /// fewer lines and the rows close up. The current row's cap is four rather
+    /// than five so the card can carry 6pt of air above and below it without
+    /// growing: the ticker's height is fixed from these two numbers, and the
+    /// card is the tallest state by far, its top edge crowding the icons.
     static let historyLines = 2
-    static let currentLines = 5
+    static let currentLines = 4
     /// Reading between the two rows. Same rhythm as the title above them.
     private static let rowGap: CGFloat = 8
     /// How far the soft edge at each end of the mask reaches, in points.

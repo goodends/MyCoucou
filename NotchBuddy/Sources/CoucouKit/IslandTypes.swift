@@ -313,14 +313,14 @@ enum IslandConst {
 
     static let viewLayouts: [IslandView: ViewLayout] = [
         // Home is the reference height for everything else — with one
-        // exception. Its left card spends the height on text: the title row
-        // plus a ticker split two lines of history over five lines of
-        // current step, because the steps are whole sentences (a shell
+        // exception. Its left card spends the height on text: a two-line
+        // title, then a ticker split two lines of history over four lines
+        // of current step, because the steps are whole sentences (a shell
         // command, an assistant's reply) and one line cut them off
-        // mid-thought. 240 is that stack (title + 7 lines of ticker) with
-        // room to spare; the right card is what most of the rest buys —
-        // another row of sessions instead of a clipped one.
-        .overview:  ViewLayout(height: 240, botX: 68,  botY: nil, botDiameter: 58, agentMode: .pills),
+        // mid-thought. The card is the tallest one by far, and it sits flush
+        // against the icon row above it — the height below buys the 6pt of
+        // air at each end that OverviewView pads in.
+        .overview:  ViewLayout(height: 230, botX: 68,  botY: nil, botDiameter: 58, agentMode: .pills),
         // The rest of the state cards share one height — law
         .empty:     ViewLayout(height: 160, botX: 70,  botY: nil, botDiameter: 62, agentMode: .none),
         .approval:  ViewLayout(height: 160, botX: 62,  botY: nil, botDiameter: 56, agentMode: .column),
