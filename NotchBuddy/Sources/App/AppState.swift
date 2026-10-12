@@ -3,6 +3,23 @@ import SwiftUI
 import Combine
 
 
+/// What a session's character looks like and what the user called it: the
+/// wardrobe's name, outfit and body colour, kept per session id.
+///
+/// These live on `ClaudeSession`, which is rebuilt from scratch on every launch
+/// — the process scan and the hook events are what populate it — so without a
+/// record of its own a restart silently renamed the session back to its folder
+/// and restyled the character. Keyed on the session id alone: Claude Code mints
+/// a new id per session, so a name does not follow the project to the next one.
+struct SavedLook: Codable {
+    var name: String = ""
+    var outfit: String = Outfit.none.rawValue
+    var color: String = "#F5F6F8"
+
+    var outfitValue: Outfit { Outfit(rawValue: outfit) ?? .none }
+}
+
+
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
@@ -47,6 +64,27 @@ final class AppState: ObservableObject {
     /// back. Only the ids are persisted — after a restart a resumed session
     /// relies on the process scan (or its next hook event) to return.
     var hiddenClaudeSessions: [String: ClaudeSession] = [:]
+
+    /// Wardrobe choices per session id, so a restart doesn't undo them. Written
+    /// on every change, including the random look a session is born with —
+    /// otherwise the colours and hats would reshuffle each launch even for a
+    /// session nobody touched.
+    ///
+    /// Never pruned: a session that dies (or gets hidden) must keep its name
+    /// for when that id comes back, and ids are cheap — a few dozen bytes each.
+    @Published private(set) var savedLooks: [String: SavedLook] = AppState.loadSavedLooks() {
+        didSet {
+            guard let data = try? JSONEncoder().encode(savedLooks) else { return }
+            UserDefaults.standard.set(data, forKey: "claudeSessionLooks")
+        }
+    }
+
+    private static func loadSavedLooks() -> [String: SavedLook] {
+        guard let data = UserDefaults.standard.data(forKey: "claudeSessionLooks"),
+              let decoded = try? JSONDecoder().decode([String: SavedLook].self, from: data)
+        else { return [:] }
+        return decoded
+    }
 
     /// Per-session step log (rolling window of ~20). Populated by HookServer so the
     /// overview's left ticker can show real-time activity even when the focus task
@@ -758,7 +796,13 @@ final class AppState: ObservableObject {
             // chat silently loses its session and never fills in.
             if focusedSessionId == s.sessionId { focusedSessionId = sessionId }
             appendAppLog("nb.log", "adopt scanned session pid=\(pid) → \(sessionId) cwd=\(cwd) name=\(projectName)")
+            if savedLooks[sessionId] != nil {
+                restoreLook(sessionId)
+            } else {
+                rememberLook(sessionId)
+            }
             return
+
         }
 
         claudeSessions.upsert(
@@ -766,6 +810,7 @@ final class AppState: ObservableObject {
             sessionBundleId: sessionBundleId, projectName: projectName,
             state: state, eventTime: eventTime, pid: pid
         )
+        applySavedLook(sessionId)
     }
 
     /// Orca-managed worktrees, loaded when the project picker opens. nil until
@@ -872,6 +917,7 @@ final class AppState: ObservableObject {
                     at: 0
                 )
                 appendAppLog("nb.log", "scan: pid=\(p.pid) sid=\(sid) cwd=\(cwd) status=\(d.status ?? "?")")
+                applySavedLook(sid)
             } else {
                 // No registry entry — an older Claude Code, or the file wasn't
                 // readable. Fall back to a placeholder that a hook will adopt.
@@ -881,6 +927,18 @@ final class AppState: ObservableObject {
                 )
                 appendAppLog("nb.log", "scan: pid=\(p.pid) cwd=\(cwd) (provisional)")
             }
+        }
+    }
+
+    /// A session the scan just found arrives with a freshly randomised look.
+    /// Put its saved one back if it has one — a restart must not restyle the
+    /// character or drop the name the user gave it — and record the random one
+    /// otherwise, so even an untouched session keeps its colours.
+    private func applySavedLook(_ sessionId: String) {
+        if savedLooks[sessionId] != nil {
+            restoreLook(sessionId)
+        } else {
+            rememberLook(sessionId)
         }
     }
 
@@ -981,6 +1039,7 @@ final class AppState: ObservableObject {
     func setSessionOutfit(_ sessionId: String, _ outfit: Outfit) {
         guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
         claudeSessions[idx].outfit = outfit
+        rememberLook(sessionId, outfit: outfit)
     }
 
     /// Set the body colour for a Claude session's Mochi, from the wardrobe's
@@ -989,6 +1048,7 @@ final class AppState: ObservableObject {
     func setSessionBodyColor(_ sessionId: String, _ hex: String) {
         guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
         claudeSessions[idx].bodyColor = hex
+        rememberLook(sessionId, color: hex)
     }
 
     /// Set the name shown on the home view for a Claude session, from the
@@ -996,6 +1056,33 @@ final class AppState: ObservableObject {
     func setSessionName(_ sessionId: String, _ name: String) {
         guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
         claudeSessions[idx].customName = name
+        rememberLook(sessionId, name: name)
+    }
+
+    /// Persist one part of a session's look, leaving the other two as they are
+    /// on the session itself. Called on every wardrobe change and on creation,
+    /// so the record always matches what is on screen.
+    private func rememberLook(_ sessionId: String,
+                              name: String? = nil,
+                              outfit: Outfit? = nil,
+                              color: String? = nil) {
+        guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
+        let s = claudeSessions[idx]
+        savedLooks[sessionId] = SavedLook(name: name ?? s.customName,
+                                          outfit: (outfit ?? s.outfit).rawValue,
+                                          color: color ?? s.bodyColor)
+    }
+
+    /// Put a session's saved look back on it. Called right after a session
+    /// enters `claudeSessions` — from a hook event or from the process scan,
+    /// both of which arrive with a freshly randomised look.
+    private func restoreLook(_ sessionId: String) {
+        guard let saved = savedLooks[sessionId],
+              let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId })
+        else { return }
+        claudeSessions[idx].customName = saved.name
+        claudeSessions[idx].outfit = saved.outfitValue
+        claudeSessions[idx].bodyColor = saved.color
     }
 
     func setFocus(_ id: String) {
