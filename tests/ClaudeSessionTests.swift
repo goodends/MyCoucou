@@ -20,14 +20,14 @@ enum ClaudeSessionTests {
             hostApp: "dev.warp.Warp-Stable",
             sessionBundleId: "dev.warp.Warp-Stable",
             projectName: "proj-a",
-            phase: .spawning,
+            state: .thinking,
             eventTime: Date(timeIntervalSince1970: 1000)
         )
         check("creates a new entry",
               sessions.count == 1 &&
               sessions.first?.sessionId == "sid-a" &&
               sessions.first?.projectName == "proj-a" &&
-              sessions.first?.state == .spawning,
+              sessions.first?.state == .thinking,
               failures: &failures)
 
         // Insert a second session.
@@ -37,7 +37,7 @@ enum ClaudeSessionTests {
             hostApp: nil,
             sessionBundleId: "com.microsoft.VSCode",
             projectName: "proj-b",
-            phase: .working,
+            state: .working,
             eventTime: Date(timeIntervalSince1970: 1001)
         )
         check("two sessions, most-recent first",
@@ -45,14 +45,14 @@ enum ClaudeSessionTests {
               sessions.first?.sessionId == "sid-b",
               failures: &failures)
 
-        // Update an existing session → promote to front, update cwd/phase.
+        // Update an existing session → promote to front, update cwd/state.
         sessions.upsert(
             sessionId: "sid-a",
             cwd: "/Users/me/proj-a-renamed",
             hostApp: "dev.warp.Warp-Stable",
             sessionBundleId: "dev.warp.Warp-Stable",
             projectName: "proj-a-renamed",
-            phase: .finished,
+            state: .finished,
             eventTime: Date(timeIntervalSince1970: 1002)
         )
         check("updates in place and promotes to front",
@@ -67,12 +67,12 @@ enum ClaudeSessionTests {
         sessions.upsert(
             sessionId: "",
             cwd: "/x", hostApp: nil, sessionBundleId: nil,
-            projectName: "x", phase: .working, eventTime: .now
+            projectName: "x", state: .working, eventTime: .now
         )
         sessions.upsert(
             sessionId: "unknown",
             cwd: "/x", hostApp: nil, sessionBundleId: nil,
-            projectName: "x", phase: .working, eventTime: .now
+            projectName: "x", state: .working, eventTime: .now
         )
         check("empty / \"unknown\" session id is a no-op",
               sessions.count == 2,
@@ -102,7 +102,7 @@ enum ClaudeSessionTests {
             hostApp: nil,
             sessionBundleId: "com.microsoft.VSCode",
             projectName: "proj-c",
-            phase: .working,
+            state: .working,
             eventTime: Date(timeIntervalSince1970: 2000)
         )
         let newSession = sessions.first { $0.sessionId == "sid-c" }
@@ -122,7 +122,7 @@ enum ClaudeSessionTests {
             hostApp: nil,
             sessionBundleId: "com.microsoft.VSCode",
             projectName: "proj-c-renamed",
-            phase: .finished,
+            state: .finished,
             eventTime: Date(timeIntervalSince1970: 2001)
         )
         let afterReUpsert = sessions.first { $0.sessionId == "sid-c" }
@@ -141,7 +141,7 @@ enum ClaudeSessionTests {
             hostApp: nil,
             sessionBundleId: "com.microsoft.VSCode",
             projectName: "proj-c",
-            phase: .working,
+            state: .working,
             eventTime: Date(timeIntervalSince1970: 2002)
         )
         let afterRemoveAndReAdd = sessions.first { $0.sessionId == "sid-c" }

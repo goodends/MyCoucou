@@ -683,7 +683,6 @@ private struct QuestionInboxCard: View {
                 .truncationMode(.tail)
             InboxActions(
                 deadline: question.deadline,
-                moreCount: state.pendingQuestions.count - 1,
                 openLabel: String(localized: "Answer"),
                 onOpen: { HookServer.shared.openInboxItem(.question(question)) },
                 onHandBack: { state.dismissInboxItem(.question(question)) }
@@ -711,7 +710,6 @@ private struct ApprovalInboxCard: View {
                 .truncationMode(.tail)
             InboxActions(
                 deadline: approval.deadline,
-                moreCount: state.pendingApprovals.count - 1,
                 openLabel: String(localized: "Review"),
                 onOpen: { HookServer.shared.openInboxItem(.approval(approval)) },
                 onHandBack: { state.dismissInboxItem(.approval(approval)) }
@@ -766,8 +764,6 @@ private struct InboxRow<Content: View>: View {
 /// how long is left.
 private struct InboxActions: View {
     let deadline: Date
-    /// How many of the same kind are queued behind this one.
-    let moreCount: Int
     let openLabel: String
     let onOpen: () -> Void
     let onHandBack: () -> Void
@@ -777,11 +773,6 @@ private struct InboxActions: View {
             PrimaryButton(openLabel, action: onOpen)
             SecondaryButton("Send back") { onHandBack() }
             Spacer(minLength: 4)
-            if moreCount > 0 {
-                Text("+\(moreCount)")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color(hex: "#6B7079"))
-            }
             DeadlineChip(deadline: deadline)
         }
     }
@@ -2417,7 +2408,7 @@ struct ClaudeSessionPill: View {
             id: "session:\(session.sessionId)",
             name: session.projectName,
             color: session.bodyColor,
-            state: botState(for: session.state),
+            state: session.state,
             steps: [],
             source: .claudeCode,
             outfit: session.outfit
@@ -2431,15 +2422,6 @@ struct ClaudeSessionPill: View {
     private var subtitle: String {
         if session.provisional { return String(localized: "Started · no events yet") }
         return ClaudeHost.label(for: session)
-    }
-
-    private func botState(for phase: SessionPhase) -> BotState {
-        switch phase {
-        case .spawning: return .thinking
-        case .working:  return .working
-        case .finished: return .finished
-        case .stopped:  return .idle
-        }
     }
 
     var body: some View {

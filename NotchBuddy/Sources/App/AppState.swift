@@ -203,6 +203,23 @@ final class AppState: ObservableObject {
         return claudeSessions.first
     }
 
+    /// The session the island is representing *right now*. The shared Mochi
+    /// reads this, so the character standing next to an answer card is the
+    /// character of the session that asked — not whichever session happens to
+    /// be focused, which with two sessions running is somebody else entirely.
+    var islandSession: ClaudeSession? {
+        func session(_ id: String?) -> ClaudeSession? {
+            guard let id, !id.isEmpty else { return nil }
+            return claudeSessions.first { $0.sessionId == id }
+        }
+        switch view {
+        case .question: return session(pendingQuestions.first?.sessionId)
+        case .approval: return session(pendingApprovals.first?.info.sessionId)
+        case .finished: return finishingSession
+        default: return overviewSession
+        }
+    }
+
     /// Whether the overview has something real to show.
     ///
     /// `integration_claude` is a permanent catalog placeholder — it means
@@ -221,13 +238,9 @@ final class AppState: ObservableObject {
     /// ticker / pill views that take an AgentTask. Source is always `.claudeCode`;
     /// `id` carries the sessionId so list lookups still work.
     func overviewTask(for session: ClaudeSession) -> AgentTask {
-        let botState: BotState
-        switch session.state {
-        case .spawning: botState = .thinking
-        case .working:  botState = .working
-        case .finished: botState = .finished
-        case .stopped:  botState = .idle
-        }
+        // No mapping: a session's state is already a BotState, and this is the
+        // pill the home view renders it through.
+        let botState = session.state
         let steps = claudeSessionSteps[session.sessionId] ?? []
         return AgentTask(
             id: "claude:\(session.sessionId)",
@@ -582,15 +595,7 @@ final class AppState: ObservableObject {
     /// reads as the same character that just finished its work.
     var mainMochiState: BotState {
         if let override = stateOverride { return override }
-        let session = (view == .finished) ? finishingSession : overviewSession
-        if let session {
-            switch session.state {
-            case .spawning: return .thinking
-            case .working:  return .working
-            case .finished: return .finished
-            case .stopped:  return .idle
-            }
-        }
+        if let session = islandSession { return session.state }
         return focusTask?.state ?? .idle
     }
 
@@ -723,7 +728,7 @@ final class AppState: ObservableObject {
         hostApp: String?,
         sessionBundleId: String?,
         projectName: String,
-        phase: SessionPhase,
+        state: BotState,
         eventTime: Date,
         pid: Int32? = nil
     ) {
@@ -740,7 +745,7 @@ final class AppState: ObservableObject {
             s = ClaudeSession(
                 id: sessionId, sessionId: sessionId,
                 cwd: cwd, hostApp: hostApp, sessionBundleId: sessionBundleId,
-                projectName: projectName, state: phase,
+                projectName: projectName, state: state,
                 startedAt: s.startedAt, lastEventAt: eventTime,
                 pid: pid, bodyColor: s.bodyColor, outfit: s.outfit,
                 sessionName: s.sessionName, customName: s.customName,
@@ -759,7 +764,7 @@ final class AppState: ObservableObject {
         claudeSessions.upsert(
             sessionId: sessionId, cwd: cwd, hostApp: hostApp,
             sessionBundleId: sessionBundleId, projectName: projectName,
-            phase: phase, eventTime: eventTime, pid: pid
+            state: state, eventTime: eventTime, pid: pid
         )
     }
 
@@ -861,7 +866,7 @@ final class AppState: ObservableObject {
                     .scanned(sessionId: sid, pid: p.pid, cwd: cwd,
                               projectName: projectName,
                               sessionName: d.name ?? "",
-                              phase: Self.phase(forClaudeStatus: d.status),
+                              state: Self.state(forClaudeStatus: d.status),
                               startedAt: d.startedAt.map { Date(timeIntervalSince1970: $0 / 1000) } ?? .now,
                               hostApp: hostApp),
                     at: 0
@@ -883,8 +888,11 @@ final class AppState: ObservableObject {
     /// anything else (notably "idle", the common state — sitting at the prompt
     /// waiting for you) renders as the dim stopped dot rather than green, which
     /// would wrongly read as "look, it just finished something".
-    private static func phase(forClaudeStatus status: String?) -> SessionPhase {
-        status == "busy" ? .working : .stopped
+    /// Claude's own `status` field says busy or not; `BotState` is the single
+    /// vocabulary every surface reads, so the scan lands on the same two states
+    /// the hook events use.
+    private static func state(forClaudeStatus status: String?) -> BotState {
+        status == "busy" ? .working : .idle
     }
 
     /// True while the session's agent process is still running.
@@ -940,11 +948,11 @@ final class AppState: ObservableObject {
         hiddenClaudeSessionIds.remove(sessionId)
         guard let saved = hiddenClaudeSessions.removeValue(forKey: sessionId) else { return }
         var s = saved
-        if let pid = s.pid, !isClaudeSessionAlive(s) { s.state = .stopped }
+        if let pid = s.pid, !isClaudeSessionAlive(s) { s.state = .idle }
         claudeSessions.upsert(
             sessionId: s.sessionId, cwd: s.cwd, hostApp: s.hostApp,
             sessionBundleId: s.sessionBundleId, projectName: s.projectName,
-            phase: s.state, eventTime: .now, pid: s.pid
+            state: s.state, eventTime: .now, pid: s.pid
         )
         // Carry the colour and outfit across too — a re-scan would pick new
         // ones, so resuming and restarting would otherwise restyle the Mochi.

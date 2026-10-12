@@ -102,6 +102,41 @@ final class HookServer: @unchecked Sendable {
         return pillId
     }
 
+    /// Where a freshly queued question or permission opens the island.
+    ///
+    /// The only thing that decides it is whether the user is on an answer card
+    /// right now. If they are, the arrival queues silently. If they aren't, it
+    /// opens directly, however many rows are sitting unopened in the inbox.
+    ///
+    /// Errors have no detail card of their own — they live in the inbox as a
+    /// red row — so they always land there.
+    @MainActor
+    private func presentNewRequest(asApproval: Bool) {
+        let state = AppState.shared
+        // Only defer when there is a *different* request already on screen.
+        //
+        // Three things have to line up, and missing any one of them swallowed
+        // the arrival:
+        //  - the island has to be expanded. `view` survives a collapse, so a
+        //    folded notch still *says* .question.
+        //  - the view has to be the matching kind.
+        //  - the queue has to hold more than the one just appended. This one
+        //    is already in by now, so a single entry means the card on screen
+        //    is this request, not another one to protect.
+        //
+        // The third check is what saves it: holdsIslandOpen keeps an answer
+        // card from ever auto-collapsing, so the island can sit on .question
+        // indefinitely and would otherwise block every later question.
+        let queue = asApproval ? state.pendingApprovals.count : state.pendingQuestions.count
+        let showingAnother = state.mode == .expanded && queue > 1
+            && (asApproval ? state.view == .approval : state.view == .question)
+        guard !showingAnother else { return }
+        // Otherwise it opens straight away. How many are stacked unopened in
+        // the inbox is not a reason to make someone click through to a fresh
+        // one — a pile nobody has touched costs nothing to leave there.
+        expandIfNeeded(to: asApproval ? .approval : .question)
+    }
+
     /// Where to land after a request leaves the queue. Requests are answered
     /// from the bell tab rather than force-expanded, so the answer is the inbox
     /// itself — whatever is still queued is one click away.
@@ -193,13 +228,25 @@ final class HookServer: @unchecked Sendable {
     @MainActor
     func openInboxItem(_ item: InboxItem) {
         let state = AppState.shared
+        // The detail card always shows the head of a queue, and it is the head
+        // that answering consumes. So the row the user clicked moves to the
+        // front — otherwise tapping the second row opened the first row's
+        // question, which is not what they asked for.
         switch item {
         case .finished:
             state.view = .finished
-        case .question:
+        case .question(let q):
+            if let idx = state.pendingQuestions.firstIndex(where: { $0.id == q.id }) {
+                let entry = state.pendingQuestions.remove(at: idx)
+                state.pendingQuestions.insert(entry, at: 0)
+            }
             if let pillId = state.pendingQuestions.first?.pillId { state.focusId = pillId }
             state.view = .question
-        case .approval:
+        case .approval(let a):
+            if let idx = state.pendingApprovals.firstIndex(where: { $0.id == a.id }) {
+                let entry = state.pendingApprovals.remove(at: idx)
+                state.pendingApprovals.insert(entry, at: 0)
+            }
             if let pillId = state.pendingApprovals.first?.info.pillId { state.focusId = pillId }
             state.view = .approval
         }
@@ -510,7 +557,7 @@ final class HookServer: @unchecked Sendable {
 
         case "SessionStart":
             activeSessionId = sessionId
-            if isClaudeSession { updateClaudeSession(phase: .spawning, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
+            if isClaudeSession { updateClaudeSession(state: .thinking, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
             if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId, sessionId: sessionId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                 state.tasks[idx].finalLine = nil
@@ -528,7 +575,7 @@ final class HookServer: @unchecked Sendable {
 
         case "UserPromptSubmit":
             activeSessionId = sessionId
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
+            if isClaudeSession { updateClaudeSession(state: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
             if isExternalAgent { upsertExternalAgent(id: agentId, name: validAgent!) } else { upsertWorkspaceTask(id: agentId, projectName: projectName, cwd: cwd, hostApp: hostApp, bundleId: bundleId, sessionId: sessionId) }
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) { state.tasks[idx].finalLine = nil }
             state.updateTask(id: agentId, state: .thinking)
@@ -551,7 +598,7 @@ final class HookServer: @unchecked Sendable {
             let input = payload["tool_input"] as? [String: Any] ?? [:]
             let step = localizedStep(tool: tool, input: input)
             appendStep(id: agentId, step: step, sessionId: sessionId)
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
+            if isClaudeSession { updateClaudeSession(state: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
             nbLog("PreToolUse \(tool)")
 
         case "PostToolUse":
@@ -577,12 +624,12 @@ final class HookServer: @unchecked Sendable {
                     appendStep(id: agentId, step: step, sessionId: sessionId)
                 }
             }
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
+            if isClaudeSession { updateClaudeSession(state: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "PostToolUseFailure":
             state.updateTask(id: agentId, state: .working)
             appendStep(id: agentId, step: "⚠ failed", sessionId: sessionId)
-            if isClaudeSession { updateClaudeSession(phase: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
+            if isClaudeSession { updateClaudeSession(state: .working, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "Notification":
             let message = payload["message"] as? String ?? ""
@@ -618,7 +665,7 @@ final class HookServer: @unchecked Sendable {
                                    kind: .finished,
                                    finalLine: finalText)
             if isClaudeSession {
-                updateClaudeSession(phase: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid)
+                updateClaudeSession(state: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             SoundEngine.shared.play("finish")
@@ -647,20 +694,26 @@ final class HookServer: @unchecked Sendable {
                                    sessionId: sessionId,
                                    kind: .error,
                                    finalLine: DiffEngine.toOneLine((payload["message"] as? String) ?? ""))
+            state.updateTask(id: agentId, state: .error)
+            if isClaudeSession {
+                updateClaudeSession(state: .error, sessionId: sessionId, cwd: cwd,
+                                    hostApp: hostApp, bundleId: bundleId,
+                                    projectName: projectName, pid: agentPid)
+            }
             SoundEngine.shared.play("error")
             if focused || state.view == .finished {
                 expandIfNeeded(to: .finished)
             } else {
                 setPillBadge(id: agentId, badge: .error)
             }
-            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
+            if isClaudeSession { updateClaudeSession(state: .idle, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "Interrupt":
             // Codex: user stopped the turn
             activeSessionId = nil
             state.updateTask(id: agentId, state: .idle)
             clearPillBadge(id: agentId)
-            if isClaudeSession { updateClaudeSession(phase: .stopped, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
+            if isClaudeSession { updateClaudeSession(state: .idle, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
         case "SessionEnd":
             activeSessionId = nil
@@ -904,14 +957,25 @@ final class HookServer: @unchecked Sendable {
             arrivedAt: .now,
             deadline: .now.addingTimeInterval(waitTimeout)))
 
-        // Queue it, then force the inbox open. Queued rather than displacing:
-        // a second request must not push the first back into its terminal. But
-        // it still opens the island — a permission prompt that stays invisible
-        // behind a collapsed notch is a prompt the user never sees, and the
-        // hook only stays open so long. The card itself is a row: answering
-        // takes one more click, in the full approval card.
+        // Queue it, then open it. Queued rather than displacing: a second
+        // request must not push the first back into its terminal.
+        //
+        // Where it opens depends on how much is waiting. On its own it goes
+        // straight to the approval card — routing a lone prompt through the
+        // bell tab added a click for nothing. With others queued the inbox is
+        // the right landing, because one card shows the whole queue. And a
+        // request that arrives mid-answer stays behind the card being worked
+        // on rather than yanking it away.
+        // Mirror the state onto the session so the home page and the chat page
+        // show the same badge the inbox card does. Only Claude Code sessions
+        // are tracked there — a Codex / Copilot pill has no ClaudeSession.
+        if pillId == "integration_claude" || pillId == "agent_cursor" {
+            updateClaudeSession(state: .approval, sessionId: sessionId, cwd: cwd,
+                                hostApp: terminalHost?.bundleId, bundleId: bundleId,
+                                projectName: projectName)
+        }
         setPillBadge(id: pillId, badge: .approval)
-        expandIfNeeded(to: .finished)
+        presentNewRequest(asApproval: true)
 
         // Monitor fd: if the editor closes the connection (handled externally), drop this card.
         // The cancel handler closes the fd — never close it anywhere else.
@@ -1012,8 +1076,16 @@ final class HookServer: @unchecked Sendable {
             id: id, question: parsed, pillId: pillId, sessionId: sessionId,
             arrivedAt: .now, deadline: .now.addingTimeInterval(Self.questionTimeout)))
 
+        // Opens it directly when nothing else is waiting, the same way an
+        // approval does — see processPermissionRequest.
+        // Same mirroring as processPermissionRequest — see the note there.
+        if pillId == "integration_claude" || pillId == "agent_cursor" {
+            updateClaudeSession(state: .question, sessionId: sessionId, cwd: cwd,
+                                hostApp: terminalHost?.bundleId, bundleId: bundleId,
+                                projectName: projectName)
+        }
         setPillBadge(id: pillId, badge: .question)
-        expandIfNeeded(to: .finished)
+        presentNewRequest(asApproval: false)
 
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .main)
         source.setEventHandler { [weak self] in
@@ -1080,7 +1152,7 @@ final class HookServer: @unchecked Sendable {
     /// Centralises the per-event bookkeeping so each case body only chooses the phase.
     @MainActor
     private func updateClaudeSession(
-        phase: SessionPhase,
+        state: BotState,
         sessionId: String,
         cwd: String,
         hostApp: String?,
@@ -1095,7 +1167,7 @@ final class HookServer: @unchecked Sendable {
             hostApp: hostApp,
             sessionBundleId: bundleId,
             projectName: projectName,
-            phase: phase,
+            state: state,
             eventTime: .now,
             pid: pid
         )

@@ -98,7 +98,11 @@ struct ClaudeSession: Identifiable, Equatable {
     var hostApp: String?            // bundle id of the terminal running the session; nil = VS Code / editor
     var sessionBundleId: String?    // bundle id of the app hosting the session (always set by the hook)
     var projectName: String         // cwd.lastPathComponent, after aliasProjectName
-    var state: SessionPhase
+    /// The one state every surface reads. It used to be a narrower
+    /// `SessionPhase` (spawning/working/finished/stopped) with a hand-written
+    /// map into `BotState`, so a session with a question pending showed its
+    /// question badge on the notification card and blue dots everywhere else.
+    var state: BotState
     var startedAt: Date
     var lastEventAt: Date           // fallback GC for sessions that never reported a pid
     /// PID of the agent process running this session, reported by the hook relay.
@@ -156,15 +160,6 @@ struct ClaudeSession: Identifiable, Equatable {
     ]
 }
 
-/// Visual phase of a session in the right-side list. Distinct from `BotState` so the
-/// pill dot can stay simple (cyan/green/dim) regardless of the focus pill's many states.
-enum SessionPhase: String, Equatable {
-    case spawning   // SessionStart just received
-    case working    // UserPromptSubmit / PreToolUse / PostToolUse
-    case finished   // Stop (turn complete, badge shown for 5s)
-    case stopped    // StopFailure / Interrupt
-}
-
 extension ClaudeSession {
     /// Every outfit except `.auto` (a picker sentinel) and `.none` (the default).
     static var avatarOutfits: [Outfit] {
@@ -179,16 +174,15 @@ extension ClaudeSession {
     static func isProvisionalId(_ sessionId: String) -> Bool { sessionId.hasPrefix("pid-") }
 
     /// A session discovered by scanning the process table. Real pid and cwd,
-    /// honest about everything else: `.stopped` (which renders as the dim
-    /// "idle" dot — we know it exists, not what it's doing), no steps, no
-    /// transcript — until a hook event reports that pid and
-    /// `AppState.upsertClaudeSession` adopts it.
+    /// honest about everything else: `.idle` (the dim dot — we know it exists,
+    /// not what it's doing), no steps, no transcript — until a hook event
+    /// reports that pid and `AppState.upsertClaudeSession` adopts it.
     static func provisional(pid: Int32, cwd: String, projectName: String, hostApp: String?) -> ClaudeSession {
         let id = provisionalId(pid)
         return ClaudeSession(
             id: id, sessionId: id,
             cwd: cwd, hostApp: hostApp, sessionBundleId: nil, projectName: projectName,
-            state: .stopped, startedAt: .now, lastEventAt: .now,
+            state: .idle, startedAt: .now, lastEventAt: .now,
             pid: pid,
             bodyColor: ClaudeSession.palette.randomElement()?.hex ?? "#F5F6F8",
             outfit: avatarOutfits.randomElement() ?? .none,
@@ -198,7 +192,7 @@ extension ClaudeSession {
 
     /// A session the process scan found *with* a registry entry, so we have
     /// its real session id and can read its transcript immediately — no waiting
-    /// for a hook event. `phase` comes from Claude's own `status` field, so
+    /// for a hook event. `state` comes from Claude's own `status` field, so
     /// the dot reflects what the agent is actually doing.
     static func scanned(
         sessionId: String,
@@ -206,14 +200,14 @@ extension ClaudeSession {
         cwd: String,
         projectName: String,
         sessionName: String,
-        phase: SessionPhase,
+        state: BotState,
         startedAt: Date,
         hostApp: String?
     ) -> ClaudeSession {
         ClaudeSession(
             id: sessionId, sessionId: sessionId,
             cwd: cwd, hostApp: hostApp, sessionBundleId: nil, projectName: projectName,
-            state: phase, startedAt: startedAt, lastEventAt: .now,
+            state: state, startedAt: startedAt, lastEventAt: .now,
             pid: pid,
             bodyColor: ClaudeSession.palette.randomElement()?.hex ?? "#F5F6F8",
             outfit: avatarOutfits.randomElement() ?? .none,
@@ -235,7 +229,7 @@ extension Array where Element == ClaudeSession {
         hostApp: String?,
         sessionBundleId: String?,
         projectName: String,
-        phase: SessionPhase,
+        state: BotState,
         eventTime: Date,
         pid: Int32? = nil
     ) {
@@ -246,7 +240,7 @@ extension Array where Element == ClaudeSession {
             s.hostApp = hostApp
             s.sessionBundleId = sessionBundleId
             s.projectName = projectName
-            s.state = phase
+            s.state = state
             s.lastEventAt = eventTime
             // Keep the last known pid when an event omits it — an older relay
             // reporting no pid must not demote a session we can already track.
@@ -260,7 +254,7 @@ extension Array where Element == ClaudeSession {
                 ClaudeSession(
                     id: sessionId, sessionId: sessionId,
                     cwd: cwd, hostApp: hostApp, sessionBundleId: sessionBundleId,
-                    projectName: projectName, state: phase,
+                    projectName: projectName, state: state,
                     startedAt: eventTime, lastEventAt: eventTime,
                     pid: pid,
                     bodyColor: bodyColor, outfit: outfit
