@@ -35,10 +35,6 @@ final class IslandWindowController: NSWindowController {
     private var botHovering: Bool = false
     private var lastLoveTime: Double = 0
     private var botHoverStartPos: CGPoint = .zero
-    /// Triple-tap detector for the chat→home gesture. Both reset when the
-    /// gap between clicks exceeds 1 s.
-    private var lastBotClickTime: Double = 0
-    private var botClickCount: Int = 0
 
     // Window attach drag (M8)
     private var attachDragStart: NSPoint? = nil
@@ -727,21 +723,9 @@ final class IslandWindowController: NSWindowController {
                     }
                     return
                 }
-                // In the chat view, a quick double click on Mochi goes back home —
-                // single tap is too easy to hit by accident while typing, so we
-                // require a deliberate double-tap within ~1 s.
+                // In the chat view, a single click on Mochi goes back home.
                 if self.state.mode == .expanded && self.state.view == .prompt {
-                    let now = CACurrentMediaTime()
-                    if now - self.lastBotClickTime < 1.0 {
-                        self.botClickCount += 1
-                    } else {
-                        self.botClickCount = 1
-                    }
-                    self.lastBotClickTime = now
-                    if self.botClickCount >= 2 {
-                        self.state.view = .overview
-                        self.botClickCount = 0
-                    }
+                    self.state.view = .overview
                     return
                 }
                 // In the changes view the avatar opens the chat for the session
