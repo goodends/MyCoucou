@@ -271,12 +271,21 @@ final class AppState: ObservableObject {
     // Pinned (alerts that stay open, never auto-close)
     var isPinned: Bool = false
 
-    /// `.finished` / `.error` are notifications, not something the user reads:
-    /// they stay until acknowledged (OK / Open terminal / Esc) or until the
-    /// session that raised them starts running again. The home → petit
-    /// auto-close must not fold them away just because the pointer moved off.
+    /// Views that must not fold away on the auto-close timer: the question card
+    /// is blocked waiting for an answer, the notification cards are waiting to
+    /// be acknowledged. A pointer moving off the island is neither of those.
+    var holdsIslandOpen: Bool {
+        guard mode == .expanded else { return false }
+        switch view {
+        case .question, .error: return true
+        case .finished: return !notifications.isEmpty
+        default: return false
+        }
+    }
+
+    /// The finished stack is on screen with something waiting on it.
     var isShowingNotification: Bool {
-        mode == .expanded && (view == .finished ? !notifications.isEmpty : view == .error)
+        mode == .expanded && view == .finished && !notifications.isEmpty
     }
 
     // Keyboard navigation — index of the selected item within the current card's list (nil = none)

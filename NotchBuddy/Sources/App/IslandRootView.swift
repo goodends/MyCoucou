@@ -356,9 +356,9 @@ struct CountdownBar: View {
     }
 
     private func updateBar() {
-        // A notification card doesn't auto-close, so counting down would promise
-        // a folding that never comes.
-        guard state.mode == .expanded && !state.isPinned && !state.isShowingNotification else {
+        // A card that doesn't auto-close must not show a countdown promising a
+        // folding that never comes.
+        guard state.mode == .expanded && !state.isPinned && !state.holdsIslandOpen else {
             barWidth = 0
             return
         }

@@ -248,7 +248,7 @@ final class IslandWindowController: NSWindowController {
         }
 
         fsm.isHeldOpen = { AppState.shared.pendingApproval != nil }
-        fsm.blocksAutoCollapse = { AppState.shared.isShowingNotification }
+        fsm.blocksAutoCollapse = { AppState.shared.holdsIslandOpen }
     }
 
     // MARK: - Polling loop
