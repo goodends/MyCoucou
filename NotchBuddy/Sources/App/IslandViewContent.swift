@@ -706,7 +706,8 @@ private struct QuestionInboxCard: View {
 
     var body: some View {
         InboxRow(state: state, pillId: question.pillId, sessionId: question.sessionId, botState: .question,
-                 onDoubleTap: { openTerminalForSession(task: task, sessionId: question.sessionId, state: state) }) {
+                 onDoubleTap: { openTerminalForSession(task: task, sessionId: question.sessionId, state: state) },
+                 wash: nil) {
             AgentWho(task: task, label: "Claude Code is asking")
             Text(question.question.questions.first?.question ?? String(localized: "Needs an answer"))
                 .font(.system(size: 15, weight: .semibold))
@@ -722,10 +723,10 @@ private struct QuestionInboxCard: View {
     }
 }
 
-/// A permission request waiting to be allowed or denied. The row answers it
-/// outright — same Deny / Allow / Always the detail card has — so nothing has
-/// to be opened first, and "Send back" is the way out for a request the user
-/// would rather answer in the terminal. The clock says what's left of it.
+/// A permission request waiting to be allowed or denied. The row is the
+/// approval card itself — amber wash, the command in a code block, the same
+/// Deny / Allow / Always — so a request waiting in the list looks like the
+/// thing that answers it, and nothing has to be opened first.
 private struct ApprovalInboxCard: View {
     let approval: PendingApproval
     @ObservedObject var state: AppState
@@ -736,19 +737,12 @@ private struct ApprovalInboxCard: View {
 
     var body: some View {
         InboxRow(state: state, pillId: approval.info.pillId, sessionId: approval.info.sessionId, botState: .approval,
-                 onDoubleTap: { openTerminalForSession(task: task, sessionId: approval.info.sessionId, state: state) }) {
+                 onDoubleTap: { openTerminalForSession(task: task, sessionId: approval.info.sessionId, state: state) },
+                 wash: .amber) {
             AgentWho(task: task, label: "needs permission")
-            Text(approval.info.command)
-                .font(.system(size: 15, weight: .semibold))
-                .lineLimit(1)
-                .truncationMode(.tail)
-            HStack(spacing: 8) {
-                ApprovalDecisionButtons(info: approval.info) {
-                    HookServer.shared.answerApproval(id: approval.id, decision: $0)
-                }
-                SecondaryButton("Send back") { state.dismissInboxItem(.approval(approval)) }
-                Spacer(minLength: 4)
-                DeadlineChip(deadline: approval.deadline)
+            CodeBlock(text: approval.info.command)
+            ApprovalDecisionButtons(info: approval.info) {
+                HookServer.shared.answerApproval(id: approval.id, decision: $0)
             }
         }
     }
@@ -765,9 +759,12 @@ private struct InboxRow<Content: View>: View {
     /// AppState, which is shared by every row on screen.
     let botState: BotState
     /// Double-click on the Mochi: take the user to the session's terminal.
-    /// It leaves the request waiting — "Send back" hands it to the agent,
-    /// this only takes the user there and back.
+    /// It leaves the request waiting — this only takes the user there and back.
     let onDoubleTap: () -> Void
+    /// The colour wash behind the row. The permission row wears the same amber
+    /// the approval card does, so a request waiting in the list looks like the
+    /// card it answers.
+    var wash: CardWash?
     @ViewBuilder let content: () -> Content
 
     /// 58pt Mochi vs the text beside it — the same size the finished card uses.
@@ -779,7 +776,7 @@ private struct InboxRow<Content: View>: View {
     }
 
     var body: some View {
-        CardBackground(wash: nil) {
+        CardBackground(wash: wash) {
             HStack(alignment: .center, spacing: 0) {
                 BotCanvasView(state: state, sessionOverride: session, stateOverride: botState)
                     .frame(width: botDiameter / 0.6, height: botDiameter / 0.6)
@@ -3315,13 +3312,16 @@ private func drawOutfitIcon(context: GraphicsContext, size: CGSize, outfit: Outf
 }
 // MARK: - Card background
 
-struct CardBackground<Content: View>: View {
-    enum Wash { case red, green, pink, amber, cyan, indigo, soft }
+/// The colour wash behind a card. Lives outside `CardBackground` so views that
+/// only need to name it — the inbox rows, which forward a wash they don't draw
+/// — don't have to spell out the generic parameter.
+enum CardWash { case red, green, pink, amber, cyan, indigo, soft }
 
-    let wash: Wash?
+struct CardBackground<Content: View>: View {
+    let wash: CardWash?
     let content: (() -> Content)?
 
-    init(wash: Wash?, @ViewBuilder content: @escaping () -> Content) {
+    init(wash: CardWash?, @ViewBuilder content: @escaping () -> Content) {
         self.wash = wash
         self.content = content
     }
@@ -3368,7 +3368,7 @@ struct CardBackground<Content: View>: View {
 }
 
 extension CardBackground where Content == EmptyView {
-    init(wash: Wash?) {
+    init(wash: CardWash?) {
         self.wash = wash
         self.content = nil
     }
