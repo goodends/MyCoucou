@@ -293,17 +293,8 @@ enum DiffEngine {
             s = s.replacingOccurrences(of: "__", with: "")
             s = s.replacingOccurrences(of: "`", with: "")
             let processed: [String] = s.components(separatedBy: "\n").compactMap { line in
-                var l = line
-                while l.hasPrefix("#") { l = String(l.dropFirst()) }
-                l = l.trimmingCharacters(in: .whitespaces)
-                // Strip leading bullet markers: -, *, •, or N. (ordered list)
-                if l.hasPrefix("- ") || l.hasPrefix("* ") || l.hasPrefix("• ") {
-                    l = String(l.dropFirst(2))
-                } else if let m = l.range(of: #"^\d+\.\s+"#, options: .regularExpression) {
-                    l = String(l[m.upperBound...])
-                }
-                let trimmed = l.trimmingCharacters(in: .whitespaces)
-                return trimmed.isEmpty ? nil : trimmed
+                let cleaned = cleanMarkdownLine(line)
+                return cleaned.isEmpty ? nil : cleaned
             }
             let joined = processed.joined(separator: " ")
             let collapsed = joined.components(separatedBy: .whitespaces)
@@ -312,6 +303,69 @@ enum DiffEngine {
             if !collapsed.isEmpty { return String(collapsed.prefix(maxChars)) }
         }
         return ""
+    }
+
+    // MARK: - toTickerText
+
+    /// The opening of an assistant message, kept across its blank lines, for the
+    /// overview's left card.
+    ///
+    /// `toOneLine` stops at the first blank line, so on a structured answer —
+    /// an opening sentence, then a heading, then a table — it returns only that
+    /// sentence and the card showed one line where it had room for four. This
+    /// keeps the lines instead and drops the blanks, so the row fills with the
+    /// start of the answer rather than its first sentence.
+    ///
+    /// `maxChars` is a hard budget across the whole string, not per line: the
+    /// card's width is fixed, so characters are what actually decide how tall
+    /// the row comes out.
+    static func toTickerText(_ text: String, maxLines: Int = 4, maxChars: Int = 160) -> String {
+        var out: [String] = []
+        var used = 0
+        for raw in text.components(separatedBy: "\n") {
+            let line = cleanMarkdownLine(raw)
+            if line.isEmpty { continue }
+            // Skip table rows and horizontal rules. Both render as pipe/dash
+            // noise at 13pt, and `toOneLine` drops them for the same reason —
+            // the rows underneath carry the actual content.
+            guard !line.hasPrefix("|"), !isHorizontalRule(line) else { continue }
+            let cost = line.count + 1   // + the newline joining it to the previous
+            if used + cost > maxChars {
+                let room = maxChars - used - 1
+                if room > 4 { out.append(String(line.prefix(room)) + "…") }
+                break
+            }
+            out.append(line)
+            used += cost
+            if out.count >= maxLines { break }
+        }
+        return out.joined(separator: "\n")
+    }
+
+    /// A markdown horizontal rule: 3+ of `-`, `*` or `_` and nothing else.
+    /// Checked before bullet stripping, which would otherwise turn `---` into
+    /// a stray `-`.
+    private static func isHorizontalRule(_ line: String) -> Bool {
+        line.count >= 3 && (line.allSatisfy { $0 == "-" } ||
+                            line.allSatisfy { $0 == "*" } ||
+                            line.allSatisfy { $0 == "_" })
+    }
+
+    /// Strip the markdown that reads as noise in a 13pt ticker row: heading
+    /// hashes, `**`/`__`/backtick emphasis, and leading bullet markers.
+    private static func cleanMarkdownLine(_ line: String) -> String {
+        var l = line.trimmingCharacters(in: .whitespaces)
+        while l.hasPrefix("#") { l = String(l.dropFirst()) }
+        l = l.replacingOccurrences(of: "**", with: "")
+        l = l.replacingOccurrences(of: "__", with: "")
+        l = l.replacingOccurrences(of: "`", with: "")
+        l = l.trimmingCharacters(in: .whitespaces)
+        if l.hasPrefix("- ") || l.hasPrefix("* ") || l.hasPrefix("• ") {
+            l = String(l.dropFirst(2))
+        } else if let m = l.range(of: #"^\d+\.\s+"#, options: .regularExpression) {
+            l = String(l[m.upperBound...])
+        }
+        return l.trimmingCharacters(in: .whitespaces)
     }
 }
 

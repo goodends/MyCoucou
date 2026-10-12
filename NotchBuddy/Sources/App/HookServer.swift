@@ -538,7 +538,10 @@ final class HookServer: @unchecked Sendable {
                 ?? (payload["message"] as? String) ?? ""
             let finalText = DiffEngine.toOneLine(rawFinal)
             if !finalText.isEmpty {
-                appendStep(id: agentId, step: finalText, sessionId: sessionId)
+                // The ticker gets the opening of the answer across its blank
+                // lines; `finalLine` stays the single-line summary, because the
+                // finished card renders it at lineLimit(1).
+                appendStep(id: agentId, step: DiffEngine.toTickerText(rawFinal), sessionId: sessionId)
                 if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                     state.tasks[idx].finalLine = finalText
                 }
