@@ -1537,11 +1537,8 @@ struct PromptView: View {
                 // at the top of the chat card, above the (small) Mochi on the left.
                 if let name = chatSessionName {
                     HStack(spacing: 5) {
-                        Image(systemName: "folder")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(hex: "#5F646D"))
                         Text(name)
-                            .font(.system(size: 11.5, weight: .medium))
+                            .font(.system(size: 11.5, weight: .semibold))
                             .foregroundColor(Color(hex: "#A8ADB5"))
                             .lineLimit(1)
                             .truncationMode(.tail)
