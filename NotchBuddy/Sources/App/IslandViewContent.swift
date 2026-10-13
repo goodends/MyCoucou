@@ -113,6 +113,52 @@ struct OverviewView: View {
     @ObservedObject var state: AppState
     @State private var activeDiffId: Int? = nil
 
+    /// Context-window usage of the session on the left card, or nil when it
+    /// has not been through the statusline wrapper.
+    ///
+    /// Polled rather than pushed: the wrapper writes a file and nothing tells
+    /// us when it changed, and the left card only ever shows one session, so
+    /// reading the whole live-session list would be work nobody sees.
+    @State private var contextWindow: ContextWindow? = nil
+
+    /// The line under the session name: the source, and how full the session's
+    /// context window is.
+    ///
+    /// Its own view rather than inline: this card's `body` was already at the
+    /// edge of what the type-checker will accept in one expression, and adding
+    /// a nested `Text` with a `switch` over the source tipped it over.
+    private func sourceRow(_ source: AgentSource,
+                           contextWindow: ContextWindow?) -> some View {
+        HStack(spacing: 6) {
+            // "Claude Code" on every Claude session, and this card only ever
+            // renders Claude work — a constant that says nothing. The other
+            // sources are worth the space.
+            if source != .claudeCode {
+                Text({ () -> String in
+                    switch source {
+                    case .claudeCode: return "Claude Code"
+                    case .agent:      return "Agent"
+                    case .n8n:        return "n8n"
+                    }
+                }())
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#8E939C"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            // Absent until the session has been through the statusline
+            // wrapper — see ContextBar.
+            if let window = contextWindow {
+                ContextBar(window: window)
+            }
+        }
+        // Its own trailing inset, and it does not widen when the diff capsule
+        // appears: that capsule and the ↗ button sit above this line, not
+        // beside it. Sharing the title row's inset left 44pt here on sessions
+        // that had edited something — too narrow for anything readable.
+        .padding(.trailing, 12)
+    }
+
     /// Open the changes list for whatever session the left card is showing.
     /// Needs a session to key on: a card showing an agent with no Claude
     /// session behind it has no diffs of its own, so there is nothing to show
@@ -148,10 +194,10 @@ struct OverviewView: View {
                 // Title row + ticker stacked
                 if let agent = agent {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Two lines: the name with its step count, the source
-                        // under it. Sharing one line meant the source lost —
-                        // "Claude Code" came out as "Claude C…" on every
-                        // session whose name was more than a few characters.
+                        // Two lines: the name, the source under it. Sharing one
+                        // line meant the source lost — "Claude Code" came out as
+                        // "Claude C…" on every session whose name was more than
+                        // a few characters.
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
                                 // No status dot beside the name. The Mochi beside
@@ -168,32 +214,17 @@ struct OverviewView: View {
                                     .truncationMode(.tail)
                                     .layoutPriority(1)
                                 Spacer(minLength: 2)
-                                if agent.steps.count > 1 {
-                                    Text("\(min(agent.stepIndex + 1, agent.steps.count))/\(agent.steps.count)")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(Color(hex: "#6B7079"))
-                                        .fixedSize()
-                                }
                             }
-                            Text({ () -> String in
-                                switch agent.source {
-                                case .claudeCode: return "Claude Code"
-                                case .agent:      return "Agent"
-                                case .n8n:        return "n8n"
-                                }
-                            }())
-                                .font(.system(size: 11))
-                                .foregroundColor(Color(hex: "#8E939C"))
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+                            // Only this row shares vertical space with the ↗ button
+                            // and the diff capsule, so only this row reserves room
+                            // for them. A fixed wide value on the whole stack would
+                            // shorten the session name even on sessions that have
+                            // never touched a file, for a badge that is not there.
+                            .padding(.trailing, hasChangeTotals ? 96 : 36)
+                            sourceRow(agent.source, contextWindow: contextWindow)
                         }
                         .padding(.top, 6)
                         .padding(.leading, 108)
-                        // Room for the jump arrow alone, plus the diff capsule
-                        // when there is one. A fixed wide value would shorten the
-                        // session name even on sessions that have never touched a
-                        // file, for a badge that is not there.
-                        .padding(.trailing, hasChangeTotals ? 96 : 36)
 
                         TickerView(task: agent, onDiffTap: { diffIdx in
                             withAnimation(.easeIn(duration: 0.16)) { activeDiffId = diffIdx }
@@ -341,6 +372,91 @@ struct OverviewView: View {
                 withAnimation(.easeIn(duration: 0.16)) { activeDiffId = last.id }
             }
         }
+        // Re-read the payload for whatever session the card is showing. Keyed
+        // on the id so switching sessions restarts against the right file, and
+        // cancelled with the view, so a hidden island costs nothing.
+        .task(id: agent?.sessionId) { await pollContextWindow() }
+    }
+
+    /// Follows the statusline payload for the card's current session until the
+    /// view goes away. Two seconds is well inside how often Claude Code
+    /// redraws a statusline, and finer would only cost wakeups.
+    private func pollContextWindow() async {
+        while !Task.isCancelled {
+            var window: ContextWindow?
+            if let sid = agent?.sessionId {
+                window = await Task.detached { StatusLineReader.contextWindow(sessionId: sid) }.value
+            }
+            if contextWindow != window { contextWindow = window }
+            try? await Task.sleep(for: .seconds(2))
+        }
+    }
+}
+
+// MARK: - Context bar
+
+/// How full a session's context window is: a horizontal bar with the
+/// percentage and the token counts beside it.
+///
+/// The bar carries the shape, the numbers carry the precision. The bar alone
+/// is unreadable past its first two steps; the numbers alone need the bar to
+/// be comparable against the last session without reading them.
+private struct ContextBar: View {
+    var window: ContextWindow
+
+    /// Product thresholds, not Claude Code's: auto-compact lands around 80%
+    /// on a 200k window and ~97% on a 1M one, so no single fraction means
+    /// "about to compact". Amber is worth a look; red is "this one is nearly
+    /// full", which on a 1M session arrives long before anything is lost.
+    private static let warning: Double = 0.70
+    private static let critical: Double = 0.85
+
+    /// Wide enough to read a fraction off, short enough to leave room for the
+    /// counts: measured, this line is 189pt of text plus the bar inside a
+    /// 202pt inset, so 50pt is what is actually free.
+    private static let barWidth: CGFloat = 50
+
+    private var percent: Int { Int((window.usedFraction * 100).rounded()) }
+    private var usedTokens: Int { Int((window.usedFraction * Double(window.windowSize)).rounded()) }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(String(localized: "context.label"))
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#6B7079"))
+
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color(hex: "#454850")).frame(height: 5)
+                Capsule().fill(fillColor)
+                    .frame(width: max(Self.barWidth * window.usedFraction, 2), height: 5)
+            }
+            .frame(width: Self.barWidth, height: 5)
+
+            Text("\(percent)%")
+                .font(.system(size: 10).monospacedDigit())
+                .foregroundColor(fillColor)
+
+            Text("(\(Self.format(usedTokens))/\(Self.format(window.windowSize)))")
+                .font(.system(size: 10).monospacedDigit())
+                .foregroundColor(Color(hex: "#6B7079"))
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var fillColor: Color {
+        if window.usedFraction >= Self.critical { return Color(hex: "#F4505E") }
+        if window.usedFraction >= Self.warning { return Color(hex: "#F5A524") }
+        return Color(hex: "#8E939C")
+    }
+
+    /// 189k, 1.0M, 200K — the same shape claude-hud uses, so the two do not
+    /// disagree about the same number.
+    static func format(_ tokens: Int) -> String {
+        if tokens >= 1_000_000 { return String(format: "%.1fM", Double(tokens) / 1_000_000) }
+        if tokens >= 10_000 { return "\(tokens / 1000)k" }
+        if tokens >= 1_000 { return String(format: "%.1fk", Double(tokens) / 1000) }
+        return "\(tokens)"
     }
 }
 

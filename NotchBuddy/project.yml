@@ -64,6 +64,8 @@ targets:
         type: folder
       - path: Resources/Localizable.xcstrings
         buildPhase: resources
+      - path: Resources/statusline-hook.sh
+        buildPhase: resources
     info:
       path: Resources/Info.plist
       properties:
@@ -113,6 +115,8 @@ targets:
         buildPhase: resources
         type: folder
       - path: Resources/Localizable.xcstrings
+        buildPhase: resources
+      - path: Resources/statusline-hook.sh
         buildPhase: resources
     info:
       path: Resources/InfoAppStore.plist

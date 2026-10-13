@@ -10,6 +10,18 @@ struct SettingsView: View {
     @State private var hookNeedsUpdate: Bool = HookServer.hooksNeedUpdate()
 
     #if !APPSTORE
+    // Context usage on the overview card comes from Claude Code's statusline,
+    // which needs a line in settings.json. Only offer it off-App Store: there
+    // the wrapper would live inside the app container, where the Claude Code
+    // running on the host cannot execute it.
+    @State private var contextUsageEnabled: Bool = StatusLineReader.isEnabled
+    @State private var showStatusLineDiff: Bool = false
+    @State private var pendingStatusLine: (data: Data, original: Data?, previousCommand: String)? = nil
+    @State private var statusLineDiffText: String = ""
+    @State private var statusLineError: String? = nil
+    #endif
+
+    #if !APPSTORE
     @State private var geminiHooksInstalled: Bool = HookServer.geminiHooksInstalled()
     @State private var showGeminiDiff: Bool = false
     @State private var pendingGeminiJSON: String = ""
@@ -419,6 +431,64 @@ struct SettingsView: View {
         }
 
         #if !APPSTORE
+        GroupBox(String(localized: "statusline.title")) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(String(localized: "statusline.explain"))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(contextUsageEnabled
+                     ? String(localized: "statusline.installed")
+                     : "~/.claude/settings.json")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary)
+
+                if let error = statusLineError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if contextUsageEnabled {
+                    Button(String(localized: "hooks.uninstall")) { uninstallStatusLine() }
+                        .buttonStyle(.bordered)
+                } else {
+                    Button(String(localized: "statusline.install")) { installStatusLine() }
+                        .buttonStyle(.borderedProminent)
+                }
+
+                if showStatusLineDiff {
+                    ScrollView {
+                        Text(statusLineDiffText)
+                            .font(.system(size: 10, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(height: 60)
+                    .background(Color(NSColor.textBackgroundColor))
+                    .cornerRadius(6)
+
+                    HStack {
+                        Button(String(localized: "hooks.confirm-write")) { confirmStatusLine() }
+                            .buttonStyle(.borderedProminent)
+                        Button(String(localized: "Cancel")) {
+                            showStatusLineDiff = false
+                            pendingStatusLine = nil
+                        }
+                            .buttonStyle(.bordered)
+                    }
+                }
+            }
+            .padding(6)
+        }
+        #endif
+
+        #if !APPSTORE
         GroupBox(String(localized: "hooks.gemini.title")) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(geminiHooksInstalled
@@ -826,6 +896,59 @@ struct SettingsView: View {
             statusMessage = "❌ \(error.localizedDescription)"
         }
     }
+
+    #if !APPSTORE
+    private func installStatusLine() {
+        do {
+            // Uninstalling deliberately leaves settings.json pointing at the
+            // wrapper, so a second install is a no-op on the file and only has
+            // to put the script and the flag back.
+            if let command = try StatusLineInstaller.currentCommand(),
+               StatusLineReader.settingsPointAtWrapper(command) {
+                try StatusLineInstaller.reenable()
+                contextUsageEnabled = true
+                statusLineError = nil
+                statusMessage = String(localized: "status.statusline-installed")
+                return
+            }
+            let prepared = try StatusLineInstaller.buildEnabled()
+            pendingStatusLine = prepared
+            // Only the one line differs, so show the line rather than the whole
+            // file — a settings.json can hold API keys, and asking the user to
+            // read past them to find one changed line helps nobody.
+            let from = (try? StatusLineInstaller.currentCommand()) ?? prepared.previousCommand
+            let to = StatusLineReader.wrapperCommand ?? ""
+            showStatusLineDiff = true
+            statusLineError = nil
+            statusLineDiffText = "- \"command\": \(from)\n+ \"command\": \(to)"
+        } catch {
+            statusLineError = error.localizedDescription
+        }
+    }
+
+    private func confirmStatusLine() {
+        guard let prepared = pendingStatusLine else { return }
+        do {
+            _ = try StatusLineInstaller.install(from: prepared)
+            showStatusLineDiff = false
+            pendingStatusLine = nil
+            contextUsageEnabled = true
+            statusLineError = nil
+            statusMessage = String(localized: "status.statusline-installed")
+        } catch {
+            statusLineError = error.localizedDescription
+        }
+    }
+
+    private func uninstallStatusLine() {
+        StatusLineReader.disable()
+        contextUsageEnabled = false
+        showStatusLineDiff = false
+        pendingStatusLine = nil
+        statusLineError = nil
+        statusMessage = String(localized: "status.statusline-removed")
+    }
+    #endif
 
     #if !APPSTORE
     private func triggerGeminiPreview(install: Bool) {

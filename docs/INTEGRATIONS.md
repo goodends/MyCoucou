@@ -38,6 +38,16 @@ claude (terminal, VS Code, app Claude)
 
 Vérifier dans la doc la liste exacte des événements et leurs champs.
 
+### Contexte du session (`StatusLine`) — facultatif, désactivé par défaut
+- **C'est le seul point d'intégration qui donne l'occupation du contexte.** Aucun autre hook ne transporte de compteur de tokens, et `/context` n'a pas de forme scriptable. Un wrapper `statusline-hook.sh` enregistre le payload que Claude Code envoie puis le transmet tel quel au statusline déjà configuré ; l'app lit `context_window.used_percentage` et `context_window_size` depuis `~/Library/Application Support/NotchBuddy/statusline/<sessionId>.json`.
+- **Pourquoi ne pas reconstruire le chiffre soi-même** : le payload contient `context_window_size`, déjà résolu par Claude Code pour cette session. Le deviner depuis le nom du modèle est faux en général — une passerelle peut associer un même nom à un backend 200k ou 1M.
+- **Piège** : `exceeds_200k_tokens` est un seuil fixe de 200k, « regardless of actual context window size » — il passe à `true` à 22 % sur un modèle 1M. Ne jamais s'en servir comme taille de fenêtre. Le pourcentage officiel, lui, exclut `output_tokens` (`input + cache_creation + cache_read`).
+- `used_percentage` vaut `null` avant le premier appel API d'une session, et de nouveau entre `/compact` et l'appel suivant : l'absence de donnée est le cas normal, pas une erreur.
+- L'écriture est conditionnée à un fichier marqueur (`statusline-enabled`) et ignorée si le payload n'a pas changé : Claude Code redessine le statusline toutes les ~300 ms. Désactiver le réglage supprime le marqueur et les payloads, et **ne touche pas** `settings.json` — le wrapper reste en place et continue de transmettre au statusline qu'il remplace.
+- L'installation réécrit **une seule ligne** de `settings.json` (`statusLine.command`), par substitution regex et non par re-sérialisation : `JSONSerialization` avec `sortedKeys` réordonnerait tout le fichier, alors que celui-ci peut contenir des clés API dans `env`. Diff affiché, confirmation, sauvegarde datée.
+- Si `settings.json` n'a déjà aucun `statusLine.command`, l'installation est refusée : créer un statusline n'a pas à être un effet de bord de cette option.
+- Non disponible en version App Store : le wrapper y vivrait dans le conteneur de l'app, inatteignable pour le Claude Code qui tourne sur la machine.
+
 ### Approuver depuis le notch
 - Sur `PermissionRequest`, `nb-hook` **attend** la décision de l'app (défaut 110 s, réglable) puis écrit sur stdout le JSON de décision du hook (d'après la doc actuelle : `hookSpecificOutput` avec `decision.behavior` = `allow` ou `deny`). Timeout du hook dans settings.json : décision + 10 s.
 - Pas de réponse avant le délai, ou app fermée → aucune sortie, le terminal affiche sa demande habituelle. Si Louis répond dans le terminal, l'app retire l'alerte au prochain événement de la session.

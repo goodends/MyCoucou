@@ -19585,6 +19585,198 @@
           }
         }
       }
+    },
+    "statusline.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Context usage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文占用"
+          }
+        }
+      }
+    },
+    "statusline.explain": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows how much of a session's context window is used — the thin bar under the session name on the home card.\n\nClaude Code reports this only to its statusline command, so this points one line of ~/.claude/settings.json at a wrapper that saves it and then passes it on to the statusline you already use. Nothing is recorded while this is off."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示会话已用掉多少上下文窗口——首页会话名下方的细竖条。\n\nClaude Code 只把这项数据交给它的状态栏命令，所以这个开关会把 ~/.claude/settings.json 的一行指向一个包装脚本：它先把数据存下来，再原样转交给你原本的状态栏。关闭时不会记录任何东西。"
+          }
+        }
+      }
+    },
+    "statusline.install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show context usage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示上下文占用"
+          }
+        }
+      }
+    },
+    "statusline.installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On — the statusline command is wrapped"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已开启——状态栏命令已被包装"
+          }
+        }
+      }
+    },
+    "statusline.error.no-statusline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code has no statusline command, so there is nothing to read context usage from. Set one up first (for example /statusline), then install this."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 没有设置状态栏命令，无从读取上下文占用。请先设置好（例如运行 /statusline），再安装本项。"
+          }
+        }
+      }
+    },
+    "statusline.error.no-support-dir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not locate NotchBuddy's support folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 NotchBuddy 的支持目录。"
+          }
+        }
+      }
+    },
+    "statusline.error.wrapper-missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The wrapper script is missing from this build."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个版本里缺少包装脚本。"
+          }
+        }
+      }
+    },
+    "statusline.error.unpatchable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not find the statusLine.command line to change."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到要修改的 statusLine.command 那一行。"
+          }
+        }
+      }
+    },
+    "status.statusline-installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Context usage is on."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文占用已开启。"
+          }
+        }
+      }
+    },
+    "status.statusline-removed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Context usage is off. Your statusline command is unchanged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文占用已关闭。你的状态栏命令没有变化。"
+          }
+        }
+      }
+    },
+    "statusline.error.original-missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到安装时保存的原状态栏命令，无法安全地重新开启。请先在 ~/.claude/settings.json 中还原 statusLine.command，再重新安装。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到安装时保存的原状态栏命令，无法安全地重新开启。请先在 ~/.claude/settings.json 中还原 statusLine.command，再重新安装。"
+          }
+        }
+      }
+    },
+    "context.label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Context"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Context"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
