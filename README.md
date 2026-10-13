@@ -15,7 +15,9 @@ Every coding agent you start gets its own character: its own name, its own colou
 ![Code: MIT](https://img.shields.io/badge/code-MIT-green)
 ![GitHub stars](https://img.shields.io/github/stars/goodends/MyCoucou?style=social)
 
-<img src="docs/media/demo.gif" width="760" alt="MyCoucou in action">
+<img src="docs/media/mycoucou-sessions.png" width="760" alt="The home view: one card per session, showing what it edited, and the projects they belong to">
+<img src="docs/media/mycoucou-approvals.png" width="760" alt="Approving a permission request and answering a question, without leaving the notch">
+<img src="docs/media/mycoucou-chat.png" width="760" alt="Chatting with a session straight from the notch">
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 

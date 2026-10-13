@@ -15,7 +15,9 @@
 ![Code: MIT](https://img.shields.io/badge/code-MIT-green)
 ![GitHub stars](https://img.shields.io/github/stars/goodends/MyCoucou?style=social)
 
-<img src="docs/media/demo.gif" width="760" alt="MyCoucou in action">
+<img src="docs/media/mycoucou-sessions.png" width="760" alt="首页：每个会话一张卡片，显示它改了哪些文件，以及它们分别属于哪个项目">
+<img src="docs/media/mycoucou-approvals.png" width="760" alt="在不离开刘海的前提下，批准权限请求、回答提问">
+<img src="docs/media/mycoucou-chat.png" width="760" alt="直接在刘海里和会话聊天">
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
