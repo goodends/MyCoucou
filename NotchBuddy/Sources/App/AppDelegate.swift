@@ -25,6 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// The settings window is the app's only document window, and ⌘W on it must
+    /// not take the menu-bar app down with it — quitting stays on ⌘Q / the
+    /// Quit menu item.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     // MARK: - Menu bar
 
     private func setupMenuBarItem() {
@@ -69,8 +76,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             placeBelowIsland(w)
             w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return
         }
+        // .accessory apps are invisible to ⌘⇥ and have no Dock icon, so the
+        // settings window has to promote the app to .regular while it is up.
+        NSApp.setActivationPolicy(.regular)
         let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 560),
-                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                           styleMask: [.titled, .closable, .resizable],
                            backing: .buffered, defer: false)
         win.title = String(localized: "settings.window.title")
         let host = NSHostingView(rootView: SettingsView())
@@ -80,6 +90,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         win.isReleasedWhenClosed = false
         placeBelowIsland(win)
         settingsWindow = win
+        // Closed window, closed app: back to a menu-bar-only accessory so the
+        // Dock icon disappears again.
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification,
+                                               object: win, queue: .main) { _ in
+            NSApp.setActivationPolicy(.accessory)
+        }
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
