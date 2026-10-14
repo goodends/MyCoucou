@@ -784,6 +784,13 @@ final class AppState: ObservableObject {
 
     func updateTask(id: String, state: BotState) {
         guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }
+        // The pill is what the notch draws, so a session in an app the user
+        // switched off in Settings → Apps must not drive it — that was the last
+        // way such a session could still make the notch move. Gated here rather
+        // than at the dozen call sites that feed it, so the next event type
+        // added to the hook handler can't slip past.
+        guard ClaudeHost.isVisibleHost(hostApp: tasks[idx].hostApp,
+                                       bundleId: tasks[idx].sessionBundleId) else { return }
         tasks[idx].state = state
     }
 

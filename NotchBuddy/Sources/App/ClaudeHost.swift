@@ -210,6 +210,16 @@ struct ClaudeHost: Equatable {
         isVisible(hostId: id, mode: storedMode, ids: storedIds)
     }
 
+    /// Same, for a host read off an `AgentTask` — the pill, which is what the
+    /// notch draws. A pill with no host recorded at all is an agent that isn't
+    /// a Claude Code session (Codex, Copilot…), so it shows regardless: here
+    /// "unknown" must not be read as "the user excluded it".
+    static func isVisibleHost(hostApp: String?, bundleId: String?) -> Bool {
+        let recorded = !(hostApp ?? "").isEmpty || !(bundleId ?? "").isEmpty
+        guard recorded else { return true }
+        return isVisibleHostId(hostId(hostApp: hostApp, bundleId: bundleId))
+    }
+
     /// How to label where a session runs, shared by the session pill's subtitle
     /// and the chat's host chip so the two can't drift apart.
     ///

@@ -586,8 +586,13 @@ final class HookServer: @unchecked Sendable {
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
             nbLog("SessionStart \(isExternalAgent ? agentId : projectName) (\(sessionId.prefix(8)))")
-            if state.isPresent { expandIfNeeded(to: .overview) }
-            SoundEngine.shared.play("work")
+            // An app the user switched off must not make the notch open or make
+            // a sound. Its session bookkeeping above still ran, so ticking the
+            // app back restores the session with its history.
+            if !isHiddenHostSession {
+                if state.isPresent { expandIfNeeded(to: .overview) }
+                SoundEngine.shared.play("work")
+            }
             if agentId == "agent_hermes", let platform = payload["platform"] as? String,
                !platform.isEmpty, platform != "cli" {
                 let capitalized = platform.prefix(1).uppercased() + platform.dropFirst()
@@ -605,7 +610,7 @@ final class HookServer: @unchecked Sendable {
                 appendHistory(id: agentId, role: .user, content: prompt)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
-            if state.isPresent { expandIfNeeded(to: .overview) }
+            if state.isPresent, !isHiddenHostSession { expandIfNeeded(to: .overview) }
 
         case "PreToolUse":
             activeSessionId = sessionId
@@ -1188,7 +1193,13 @@ final class HookServer: @unchecked Sendable {
         } else {
             state.tasks.insert(task, at: 0)
         }
-        if state.focusId == nil { state.focusId = id }
+        // Focusing a pill from an app the user switched off would hand the
+        // notch's main character to it — the filter owns what the notch shows,
+        // focus included.
+        if state.focusId == nil,
+           ClaudeHost.isVisibleHost(hostApp: task.hostApp, bundleId: task.sessionBundleId) {
+            state.focusId = id
+        }
         state.syncMode()
     }
 

@@ -126,6 +126,24 @@ enum ClaudeHostTests {
         check("every row excluded still leaves unknown-outside-the-list alone",
               ClaudeHost.isVisibleHostId("com.brand.new.terminal"), failures: &failures)
 
+        print("ClaudeHost.isVisibleHost (a pill's own host fields)")
+        // A pill with no host recorded at all is an agent that isn't a Claude
+        // Code session (Codex, Copilot…). Filtering it as "unknown" would mute
+        // every agent pill the moment the user excluded Other.
+        ClaudeHost.storedMode = .some
+        ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
+        check("no host recorded shows", ClaudeHost.isVisibleHost(hostApp: nil, bundleId: nil), failures: &failures)
+        check("empty host fields show", ClaudeHost.isVisibleHost(hostApp: "", bundleId: ""), failures: &failures)
+        check("recorded host is filtered", !ClaudeHost.isVisibleHost(hostApp: "com.apple.Terminal", bundleId: "com.apple.Terminal"), failures: &failures)
+        // VS Code and Cursor name no terminal, only the app they run in.
+        check("editor host is filtered", !ClaudeHost.isVisibleHost(hostApp: nil, bundleId: "com.microsoft.VSCode"), failures: &failures)
+        check("Orca host shows", ClaudeHost.isVisibleHost(hostApp: ClaudeHost.orcaBundleId, bundleId: ""), failures: &failures)
+        ClaudeHost.storedMode = .all
+        ClaudeHost.storedIds = ["com.apple.Terminal"]
+        check("under All, an unexcluded host shows", ClaudeHost.isVisibleHost(hostApp: ClaudeHost.orcaBundleId, bundleId: ""), failures: &failures)
+        check("under All, a ticked host is muted", !ClaudeHost.isVisibleHost(hostApp: "com.apple.Terminal", bundleId: ""), failures: &failures)
+        check("under All, no host recorded still shows", ClaudeHost.isVisibleHost(hostApp: nil, bundleId: nil), failures: &failures)
+
         ClaudeHost.storedMode = .some
         ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
         UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterIdsKey)
