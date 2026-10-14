@@ -242,6 +242,11 @@ struct SettingsView: View {
             }
             .padding(6)
         }
+        // The boxes in General are as wide as the widest thing they hold (a
+        // Slider). Nothing here is, so this one used to shrink to the width of
+        // two radio buttons and the same card looked a different size from the
+        // one above it. Full width like the rest.
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The rows, split by kind. Orca and Other stand alone — one row each, so a
