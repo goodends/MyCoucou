@@ -1476,7 +1476,6 @@ struct PromptView: View {
     // there and delivers `pendingPrompt` (the message the user had already
     // typed when they found out there was nowhere to send it).
     @State private var showProjectPicker = false
-    @State private var startingInPath: String? = nil
     @State private var pendingPrompt: String? = nil
 
     /// A session the chat can actually reach: one Coucou has seen hook events
@@ -1535,87 +1534,19 @@ struct PromptView: View {
     }
 
     private var projectPickerPopover: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "Start Claude Code in…"))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color(hex: "#8E939C"))
-            if state.orcaWorktreesLoading {
-                Text(String(localized: "Loading…"))
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "#6B7079"))
-            } else if let list = state.orcaWorktrees, !list.isEmpty {
-                ForEach(list) { wt in
-                    Button {
-                        startSession(in: wt)
-                    } label: {
-                        HStack(spacing: 8) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(wt.name)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(Color(hex: "#F5F6F8"))
-                                Text(wt.path)
-                                    .font(.system(size: 10))
-                                    .foregroundColor(Color(hex: "#6B7079"))
-                                    .lineLimit(1)
-                                    .truncationMode(.head)
-                            }
-                            Spacer(minLength: 6)
-                            if startingInPath == wt.path {
-                                ProgressView().controlSize(.mini)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(startingInPath != nil)
-                }
-            } else {
-                // Orca is installed but answered with nothing usable — say so
-                // instead of showing a picker that can only fail.
-                Text(String(localized: "No Orca projects found. Open one in Orca first."))
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "#6B7079"))
-                    .frame(width: 220, alignment: .leading)
-            }
-        }
-        .padding(12)
-        .frame(width: 260)
-        // Popovers default to the system material — a light panel that clashes
-        // with every other surface here. Same fill and hairline as
-        // CardBackground so it reads as part of the island.
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#141518"))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
-                )
-        )
-        .presentationBackground(Color(hex: "#141518"))
-    }
-
-    /// Spawn Claude Code in `wt` and deliver whatever the user had already typed
-    /// when they found out there was nowhere to send it.
-    private func startSession(in wt: OrcaWorktree) {
-        let prompt = pendingPrompt
-        pendingPrompt = nil
-        text = ""
-        startingInPath = wt.path
-        Task { @MainActor in
-            let ok = await state.startClaudeSession(in: wt.path, prompt: prompt)
-            startingInPath = nil
-            if ok {
-                showProjectPicker = false
-                showNotWiredToast = false
-            } else {
-                // Keep the words and the picker open: the user can retry, and
-                // Claude Code really might not have come up.
-                text = prompt ?? ""
-                pendingPrompt = prompt
-                showNotWiredToast = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
-            }
+        OrcaProjectPickerList(state: state,
+                              isPresented: $showProjectPicker,
+                              prompt: pendingPrompt) {
+            // Start failed: the picker stays open, and the words the user had
+            // already typed go back in the box — the one thing here that isn't
+            // ours to lose. Claude Code really might not have come up.
+            text = pendingPrompt ?? ""
+            showNotWiredToast = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
+        } onStarted: { _, _ in
+            pendingPrompt = nil
+            text = ""
+            showNotWiredToast = false
         }
     }
 
@@ -2759,6 +2690,12 @@ struct ClaudeSessionsListView: View {
     @State private var swapping = false
     @State private var showHidden = false
 
+    // "+": start a Claude Code session in an Orca project, from the list
+    // itself rather than by going through the chat first. Only where that is
+    // actually possible — with no Orca there is no project to start in.
+    @State private var showProjectPicker = false
+    private var canStartInProject: Bool { OrcaCLIBridge.isInstalled }
+
     /// Fallback threshold for sessions the relay gave us no pid for (an agent
     /// still on an older relay, or a parent chain it couldn't resolve). Only
     /// these age out — a session that reported a pid is judged by whether its
@@ -2880,6 +2817,9 @@ struct ClaudeSessionsListView: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
+                    // Room for the pinned + button, so a long project name
+                    // truncates against it rather than running underneath.
+                    .padding(.trailing, canStartInProject ? 18 : 0)
                     // Reserve room so the last pill isn't hidden under the chip.
                     .padding(.bottom, hiddenCount > 0 ? 32 : 0)
                 }
@@ -2890,6 +2830,13 @@ struct ClaudeSessionsListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Pinned to the card's top-right rather than living in the scroll: the
+        // list scrolls under it, and it has to be reachable from every
+        // project — including an empty card, where starting a session is the
+        // only thing there is to do.
+        .overlay(alignment: .topTrailing) {
+            if canStartInProject { addButton }
+        }
         .task {
             // A killed process announces nothing, so there is no event to
             // re-render this list — the stale pill would sit there until the
@@ -2934,6 +2881,43 @@ struct ClaudeSessionsListView: View {
         .padding(.bottom, 6)
         .popover(isPresented: $showHidden, arrowEdge: .bottom) {
             hiddenPopover
+        }
+    }
+
+    /// Start a new Claude Code session in an Orca project. Same place the chat
+    /// asks for one — the list has nowhere else to put it, and the chat only
+    /// offers it when there's no session to type into.
+    private var addButton: some View {
+        Button {
+            showProjectPicker.toggle()
+            if showProjectPicker { Task { await state.loadOrcaWorktrees() } }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(Color(hex: "#5F646D"))
+                .frame(width: 18, height: 18)
+                .background(Color.white.opacity(0.07))
+                .clipShape(Circle())
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+        .padding(.trailing, 8)
+        .help(String(localized: "Start a Claude Code session in a project"))
+        // The button sits near the card's top edge, so the list opens downward.
+        .popover(isPresented: $showProjectPicker, arrowEdge: .bottom) {
+            OrcaProjectPickerList(state: state,
+                                  isPresented: $showProjectPicker,
+                                  onStarted: { wt, began in
+                // Open the session we just started, the way double-clicking a
+                // pill in this same list would — starting a session you then
+                // have to go find is the half-finished version of that.
+                Task { @MainActor in
+                    guard await state.focusClaudeSessionStarted(inCwd: wt.path,
+                                                                since: began) != nil else { return }
+                    state.view = .prompt
+                }
+            })
         }
     }
 
@@ -3009,6 +2993,121 @@ struct ClaudeSessionsListView: View {
     private func openChat(_ s: ClaudeSession) {
         state.focusedSessionId = s.sessionId
         state.view = .prompt
+    }
+}
+
+/// The Orca project list, shared by the chat's "Pick a project" chip and the
+/// overview's + button: picking a row starts a Claude Code session in that
+/// worktree. Starting lives here rather than in the callers because both do
+/// exactly the same thing; they differ only in what a failure means, which
+/// `onFinish` hands back.
+struct OrcaProjectPickerList: View {
+    @ObservedObject var state: AppState
+    /// Dismissed by this view once the session is up, so the caller doesn't
+    /// have to wire the popover to its own start handler.
+    @Binding var isPresented: Bool
+    /// Handed to the new agent. The chat has a pending prompt when the user
+    /// typed their message before there was anywhere to send it; the + button
+    /// has none.
+    var prompt: String? = nil
+    /// The start failed. The chat puts back the words the user had already
+    /// typed; the overview has nothing to put back and only shows the inline
+    /// failure line.
+    var onFailure: () -> Void = {}
+    /// The agent is up. Carries the worktree and the moment the start began:
+    /// the session announces itself over the hook a moment later, so a caller
+    /// that wants to open it needs both to find it rather than an older
+    /// session in the same folder.
+    var onStarted: (OrcaWorktree, Date) -> Void = { _, _ in }
+
+    @State private var startingInPath: String? = nil
+    @State private var failed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(String(localized: "Start Claude Code in an Orca project"))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Color(hex: "#8E939C"))
+            if state.orcaWorktreesLoading {
+                Text(String(localized: "Loading…"))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#6B7079"))
+            } else if let list = state.orcaWorktrees, !list.isEmpty {
+                ForEach(list) { wt in
+                    Button {
+                        start(in: wt)
+                    } label: {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(wt.name)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(Color(hex: "#F5F6F8"))
+                                Text(wt.path)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Color(hex: "#6B7079"))
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                            }
+                            Spacer(minLength: 6)
+                            if startingInPath == wt.path {
+                                ProgressView().controlSize(.mini)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(startingInPath != nil)
+                }
+                // Orca answered, the create didn't take. Kept inline rather than
+                // as a toast: the picker is still open, and a line under the
+                // rows is where the failure belongs.
+                if failed {
+                    Text("暂未启动 — 检查一下这个项目")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "#F4B400"))
+                }
+            } else {
+                // Orca is installed but answered with nothing usable — say so
+                // instead of showing a picker that can only fail.
+                Text(String(localized: "No Orca projects found. Open one in Orca first."))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#6B7079"))
+                    .frame(width: 220, alignment: .leading)
+            }
+        }
+        .padding(12)
+        .frame(width: 260)
+        // Popovers default to the system material — a light panel that clashes
+        // with every other surface here. Same fill and hairline as
+        // CardBackground so it reads as part of the island.
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#141518"))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                )
+        )
+        .presentationBackground(Color(hex: "#141518"))
+    }
+
+    /// Spawn Claude Code in `wt`, delivering `prompt` to it.
+    private func start(in wt: OrcaWorktree) {
+        startingInPath = wt.path
+        failed = false
+        let began = Date()
+        Task { @MainActor in
+            let ok = await state.startClaudeSession(in: wt.path, prompt: prompt)
+            startingInPath = nil
+            if ok {
+                isPresented = false
+                onStarted(wt, began)
+            } else {
+                failed = true
+                onFailure()
+            }
+        }
     }
 }
 

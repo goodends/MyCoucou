@@ -906,8 +906,28 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Process scan (sessions that predate us)
+    /// Focus the session that `startClaudeSession` just started in `cwd`.
+    ///
+    /// Starting a session only proves the agent came up, not what it calls
+    /// itself: the SessionStart hook that names it lands a moment later, so we
+    /// watch for it rather than reading once. Only sessions that began after
+    /// `since` count — a folder can already have an older session running, and
+    /// focusing that one would open somebody else's chat.
+    @discardableResult
+    func focusClaudeSessionStarted(inCwd cwd: String, since: Date,
+                                   timeout: TimeInterval = 5) async -> String? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let s = claudeSessions.last(where: { $0.cwd == cwd && $0.startedAt >= since }) {
+                focusedSessionId = s.sessionId
+                return s.sessionId
+            }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        return nil
+    }
 
+    // MARK: - Process scan (sessions that predate us)
     private var lastScanAt: Date = .distantPast
     private var scanInFlight = false
 

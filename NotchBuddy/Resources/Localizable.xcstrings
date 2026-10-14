@@ -19074,66 +19074,66 @@
         }
       }
     },
-    "Start Claude Code in…": {
+    "Start Claude Code in an Orca project": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "ابدأ Claude Code في…"
+            "value": "ابدأ Claude Code في مشروع Orca"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "এতে Claude Code শুরু করুন…"
+            "value": "একটি Orca প্রকল্পে Claude Code শুরু করুন"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Start Claude Code in…"
+            "value": "Start Claude Code in an Orca project"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Iniciar Claude Code en…"
+            "value": "Iniciar Claude Code en un proyecto de Orca"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lancer Claude Code dans…"
+            "value": "Lancer Claude Code dans un projet Orca"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "…में Claude Code शुरू करें"
+            "value": "एक Orca प्रोजेक्ट में Claude Code शुरू करें"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mulai Claude Code di…"
+            "value": "Mulai Claude Code di proyek Orca"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Iniciar o Claude Code em…"
+            "value": "Iniciar o Claude Code em um projeto do Orca"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Запустить Claude Code в…"
+            "value": "Запустить Claude Code в проекте Orca"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在…中启动 Claude Code"
+            "value": "在 Orca 项目中启动 Claude Code"
           }
         }
       }
@@ -19666,7 +19666,7 @@
         }
       }
     },
-    "Apps":     {
+    "Apps": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19682,7 +19682,7 @@
         }
       }
     },
-    "All":     {
+    "All": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19698,7 +19698,7 @@
         }
       }
     },
-    "Other":     {
+    "Other": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19714,7 +19714,7 @@
         }
       }
     },
-    "Terminals":     {
+    "Terminals": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19730,7 +19730,7 @@
         }
       }
     },
-    "Editors":     {
+    "Editors": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19746,7 +19746,7 @@
         }
       }
     },
-    "Claude Code sessions":     {
+    "Claude Code sessions": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19762,7 +19762,7 @@
         }
       }
     },
-    "apps.explain-include":     {
+    "apps.explain-include": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19778,7 +19778,7 @@
         }
       }
     },
-    "apps.explain-exclude":     {
+    "apps.explain-exclude": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19794,7 +19794,7 @@
         }
       }
     },
-    "apps.other-note":     {
+    "apps.other-note": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -19810,7 +19810,6 @@
         }
       }
     }
-
   },
   "version": "1.0"
 }
