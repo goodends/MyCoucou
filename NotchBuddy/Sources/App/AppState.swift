@@ -130,17 +130,10 @@ final class AppState: ObservableObject {
     /// caller falls back to its usual app activation.
     @discardableResult
     func jumpToOrcaTerminal(sessionId: String? = nil) async -> Bool {
-        // Non-Orca sessions (Warp, Terminal.app, iTerm2, Ghostty, …) live
-        // in a regular terminal — there's no Orca tab to switch to, and
-        // raising Orca here would put the wrong app in front of the user.
-        // Return false up front so the caller falls through to
-        // ClaudeHost.activate(hostApp) and raises the actual terminal.
-        if let lookupSid = sessionId ?? focusedSessionId, !lookupSid.isEmpty,
-           let session = claudeSessions.first(where: { $0.sessionId == lookupSid }),
-           let host = session.hostApp, !host.isEmpty,
-           host != "com.stablyai.orca" {
-            return false
-        }
+        // A session Orca doesn't host has no Orca tab to switch to — there's
+        // nothing to raise here, so `resolveOrcaHandle` declines it and the
+        // caller falls through to activating the app that does host it (VS
+        // Code, Warp, Terminal…).
         guard OrcaCLIBridge.isInstalled else { return false }
         // Bind the requested session to a handle. The fast path is the
         // ORCA_TERMINAL_HANDLE binding written by HookServer on every
@@ -195,17 +188,9 @@ final class AppState: ObservableObject {
     /// so the caller can show its "not sent" hint.
     @discardableResult
     func sendToOrcaTerminal(_ text: String) async -> Bool {
-        // Non-Orca sessions (Warp, Terminal.app, iTerm2, Ghostty, …) have
-        // no Orca handle — `handle(forCwd:)` would match on cwd alone and
-        // land on the wrong tab when an Orca session happens to share the
-        // worktree, sending the message to an unrelated agent. Bail out so
-        // the caller can show its "not sent" hint instead of misrouting.
-        if let key = focusedSessionId ?? focusTask?.id, !key.isEmpty,
-           let session = claudeSessions.first(where: { $0.sessionId == key }),
-           let host = session.hostApp, !host.isEmpty,
-           host != "com.stablyai.orca" {
-            return false
-        }
+        // A session Orca doesn't host has no handle to send to; `resolveOrcaHandle`
+        // declines it on the same grounds it declines the jump, so the caller
+        // can show its "not sent" hint instead of misrouting the message.
         guard OrcaCLIBridge.isInstalled else { return false }
         guard let key = focusedSessionId ?? focusTask?.id, !key.isEmpty else { return false }
 
@@ -234,6 +219,12 @@ final class AppState: ObservableObject {
     private func resolveOrcaHandle(for sessionId: String) async -> String? {
         if let bound = orcaHandleBySession[sessionId] { return bound }
         let session = claudeSessions.first { $0.sessionId == sessionId }
+        // Only Orca has an Orca tab. Everything below resolves by cwd, which
+        // names a folder and not a session — a VS Code or Warp session sharing
+        // one with an Orca worktree would jump to that unrelated agent. Both
+        // callers used to carry their own copy of this check, and both read
+        // `hostApp`, which is nil for exactly the editor sessions that hit it.
+        if let session, !ClaudeHost.runsInOrca(session) { return nil }
         if let session, let pane = session.pid.flatMap({ orcaPaneByPid[$0] }),
            let byPane = await OrcaCLIBridge.shared.handle(paneKey: pane) {
             orcaHandleBySession[sessionId] = byPane

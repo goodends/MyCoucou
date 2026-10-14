@@ -220,6 +220,22 @@ struct ClaudeHost: Equatable {
         return isVisibleHostId(hostId(hostApp: hostApp, bundleId: bundleId))
     }
 
+    /// Whether a session runs in Orca — the only host with an Orca terminal to
+    /// switch to.
+    ///
+    /// Goes through `hostId(for:)` rather than reading `hostApp` directly,
+    /// because an editor session names no terminal: VS Code and Cursor leave
+    /// `hostApp` nil and put their identity in `sessionBundleId`. A check that
+    /// only looked at `hostApp` therefore saw "unknown" for every editor
+    /// session and waved it through to the cwd lookup, which jumped to whatever
+    /// Orca tab happened to share the folder.
+    ///
+    /// A session with no host recorded is not Orca either: we cannot place it,
+    /// and guessing lands on an unrelated agent.
+    static func runsInOrca(_ session: ClaudeSession) -> Bool {
+        hostId(for: session) == orcaBundleId
+    }
+
     /// How to label where a session runs, shared by the session pill's subtitle
     /// and the chat's host chip so the two can't drift apart.
     ///

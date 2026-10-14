@@ -144,6 +144,17 @@ enum ClaudeHostTests {
         check("under All, a ticked host is muted", !ClaudeHost.isVisibleHost(hostApp: "com.apple.Terminal", bundleId: ""), failures: &failures)
         check("under All, no host recorded still shows", ClaudeHost.isVisibleHost(hostApp: nil, bundleId: nil), failures: &failures)
 
+        print("ClaudeHost.runsInOrca")
+        // Only Orca has an Orca terminal to switch to. The check reads the
+        // resolved host, not `hostApp`: an editor session names no terminal, so
+        // `hostApp` is nil for exactly the sessions that used to fall through
+        // to the cwd lookup and land on an unrelated Orca worktree.
+        check("Orca host runs in Orca", ClaudeHost.runsInOrca(session(ClaudeHost.orcaBundleId)), failures: &failures)
+        check("Warp does not", !ClaudeHost.runsInOrca(session("dev.warp.Warp-Stable")), failures: &failures)
+        check("VS Code does not", !ClaudeHost.runsInOrca(session(nil, "com.microsoft.VSCode")), failures: &failures)
+        check("Cursor does not", !ClaudeHost.runsInOrca(session(nil, "com.todesktop.230313mzl4w4u92")), failures: &failures)
+        check("no host at all does not", !ClaudeHost.runsInOrca(session(nil)), failures: &failures)
+
         ClaudeHost.storedMode = .some
         ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
         UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterIdsKey)
