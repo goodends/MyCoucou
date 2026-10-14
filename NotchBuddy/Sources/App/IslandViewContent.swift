@@ -129,6 +129,9 @@ struct OverviewView: View {
     /// reading the whole live-session list would be work nobody sees.
     @State private var contextWindow: ContextWindow? = nil
 
+    /// Hover state for the host chip at the bottom of the left card.
+    @State private var chipHovered = false
+
     /// The line under the session name: the source, and how full the session's
     /// context window is.
     ///
@@ -193,9 +196,49 @@ struct OverviewView: View {
         return !state.fileChanges(for: sid).isEmpty
     }
 
+    /// The bottom of the left card: ↗ plus the app the session runs in, both
+    /// leading to the same place — the terminal — and trailing-aligned like the
+    /// chat card's pair, so jumping to a session reads the same from either
+    /// page. Nothing for a card with no session behind it: there is no terminal
+    /// to reach and no host to name.
+    ///
+    /// Its own view, not inline: `body` was already at the edge of what the
+    /// type-checker accepts in one expression, and these two buttons tipped it
+    /// over.
+    @ViewBuilder
+    private var jumpAndHostRow: some View {
+        if let session = state.overviewSession {
+            HStack(spacing: 4) {
+                Spacer(minLength: 0)
+                // The chip names where the session runs, so it *is* the jump —
+                // no arrow beside it, like the chat card.
+                Button(action: { AgentLauncher.open(agent, state: state) }) {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(Color(hex: agent?.color ?? "#7B8089"))
+                            .frame(width: 6, height: 6)
+                        Text(ClaudeHost.label(for: session))
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(Color(hex: "#7B8089"))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(chipHovered ? 0.12 : 0.06))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .onHover { chipHovered = $0 }
+                .help(String(localized: "Open terminal"))
+            }
+            .padding(.leading, 108)
+            .padding(.trailing, 12)
+            .padding(.bottom, 4)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 10) {
-            // Left card: title row + ticker below + ↗ button overlay
+            // Left card: title row + ticker below + the ↗ / host chip row
             ZStack(alignment: .topLeading) {
                 CardBackground(wash: nil)
 
@@ -223,12 +266,12 @@ struct OverviewView: View {
                                     .layoutPriority(1)
                                 Spacer(minLength: 2)
                             }
-                            // Only this row shares vertical space with the ↗ button
-                            // and the diff capsule, so only this row reserves room
-                            // for them. A fixed wide value on the whole stack would
-                            // shorten the session name even on sessions that have
-                            // never touched a file, for a badge that is not there.
-                            .padding(.trailing, hasChangeTotals ? 96 : 36)
+                            // Only this row shares vertical space with the diff
+                            // capsule, so only this row reserves room for it. A
+                            // fixed wide value on the whole stack would shorten the
+                            // session name even on sessions that have never touched
+                            // a file, for a badge that is not there.
+                            .padding(.trailing, hasChangeTotals ? 70 : 12)
                             sourceRow(agent.source, contextWindow: contextWindow)
                         }
                         .padding(.top, 6)
@@ -243,6 +286,12 @@ struct OverviewView: View {
                             .padding(.top, 0)
                             .padding(.leading, 108)
                             .padding(.trailing, 12)
+
+                        // ↗ + the app the session runs in, bottom-right — the
+                        // same pair the chat card closes with, so "go to the
+                        // terminal" reads the same from either page and the
+                        // name beside it says where that is.
+                        jumpAndHostRow
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(.top, 4)
@@ -260,12 +309,12 @@ struct OverviewView: View {
                         .transition(.opacity)
                 }
 
-                // ↗ jump + diff buttons — last in ZStack so they render on top; hidden
-                // while a diff is open. Buttons, not part of the card's tap
-                // gesture: a Button's gesture wins over the ancestor's, so each
-                // one is clickable without also opening the chat.
-                let hideJumpButton = activeDiffId != nil
-                if !hideJumpButton {
+                // Diff capsule — last in ZStack so it renders on top; hidden
+                // while a diff is open. A Button, not part of the card's tap
+                // gesture: a Button's gesture wins over the ancestor's, so it
+                // is clickable without also opening the chat.
+                let hideChangeCapsule = activeDiffId != nil
+                if !hideChangeCapsule {
                     HStack(spacing: 4) {
                         // The session's running totals, as the way in to its
                         // changes — the numbers say what changed and the
@@ -311,15 +360,6 @@ struct OverviewView: View {
                                 .disabled(!hasChangeTotals)
                             }
                         }
-                        Button(action: { AgentLauncher.open(agent, state: state) }) {
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(Color(hex: "#5F646D"))
-                                .frame(width: 16, height: 16)
-                                .background(Color.white.opacity(0.07))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
                     }
                     .padding(.top, 8)
                     .padding(.trailing, 10)
@@ -332,7 +372,7 @@ struct OverviewView: View {
                 // The whole card is the way into the chat, for whatever session
                 // it is currently showing — i.e. the one last picked in the
                 // right-hand list. What the session changed is one click away,
-                // on the Diff button beside the jump arrow.
+                // on the Diff capsule at the top-right.
                 if let s = state.overviewSession {
                     // Lock the chat to the card's session so its host shows in
                     // the bottom-right label (e.g. "Orca") instead of falling
@@ -1707,22 +1747,8 @@ struct PromptView: View {
                     if canPickProject {
                         projectPickerButton
                     }
-                    #if !APPSTORE
-                    if hasSession {
-                        Button(action: { openChatTerminal() }) {
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(Color(hex: "#5F646D"))
-                                .frame(width: 16, height: 16)
-                                .background(Color.white.opacity(0.07))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(String(localized: "Open terminal"))
-                    }
-                    #endif
-                    // The chip names where the session runs, so it doubles as
-                    // the jump — same action as the ↗ beside it.
+                    // The chip names where the session runs, so it is the jump:
+                    // one control, not an arrow plus a label.
                     if hasSession {
                         Button(action: { openChatTerminal() }) {
                         HStack(spacing: 5) {
@@ -2232,14 +2258,15 @@ struct TickerView: View {
 
     /// One text line of the ticker.
     static let lineHeight: CGFloat = 22
-    /// The history row may use two, the current row below it four. Both are
+    /// The history row may use two, the current row below it three. Both are
     /// caps on the text, not slots it has to fill — a short step just takes
-    /// fewer lines and the rows close up. The current row's cap is four rather
-    /// than five so the card can carry 6pt of air above and below it without
-    /// growing: the ticker's height is fixed from these two numbers, and the
-    /// card is the tallest state by far, its top edge crowding the icons.
+    /// fewer lines and the rows close up. The current row's cap is three rather
+    /// than four so the card can carry 6pt of air above and below it plus the
+    /// bottom ↗ / host chip row without growing: the ticker's height is fixed
+    /// from these two numbers, and the card is the tallest state by far, its top
+    /// edge crowding the icons.
     static let historyLines = 2
-    static let currentLines = 4
+    static let currentLines = 3
     /// Reading between the two rows. Same rhythm as the title above them.
     private static let rowGap: CGFloat = 8
     /// How far the soft edge at each end of the mask reaches, in points.
