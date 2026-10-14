@@ -215,7 +215,7 @@ struct OverviewView: View {
                 Button(action: { AgentLauncher.open(agent, state: state) }) {
                     HStack(spacing: 5) {
                         Circle()
-                            .fill(Color(hex: agent?.color ?? "#7B8089"))
+                            .fill(Color(hex: session.bodyColor))
                             .frame(width: 6, height: 6)
                         Text(ClaudeHost.label(for: session))
                             .font(.system(size: 10.5, weight: .medium))
@@ -1627,6 +1627,16 @@ struct PromptView: View {
         return task.name
     }
 
+    /// The chip's dot, from the same session `focusTaskLabel` names: its
+    /// `bodyColor`, the Mochi's own colour. Reading `focusTask.color` instead
+    /// answered with whichever pill happened to be focused — a different thing
+    /// from the session on screen, and so a different colour for the same
+    /// session depending on which page you looked at it from.
+    private var hostDotColor: String {
+        if let s = state.focusedClaudeSession ?? state.overviewSession { return s.bodyColor }
+        return state.focusTask?.color ?? "#7B8089"
+    }
+
     private func scrollHistoryToBottom(proxy: ScrollViewProxy) {
         if let last = historyBinding.last(where: { !$0.content.isEmpty }) {
             proxy.scrollTo(last.id, anchor: .bottom)
@@ -1753,7 +1763,7 @@ struct PromptView: View {
                         Button(action: { openChatTerminal() }) {
                         HStack(spacing: 5) {
                             Circle()
-                                .fill(Color(hex: state.focusTask?.color ?? "#7B8089"))
+                                .fill(Color(hex: hostDotColor))
                                 .frame(width: 6, height: 6)
                             Text(focusTaskLabel)
                                 .font(.system(size: 10.5, weight: .medium))
