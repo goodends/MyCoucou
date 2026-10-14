@@ -17,10 +17,10 @@ import Foundation
 //     *provisional* session keyed by pid; AppState.upsertClaudeSession adopts it
 //     the first time a hook event reports that same pid, which the relay now
 //     sends on every event.
-//   • editor-hosted sessions (VS Code extension, Claude Desktop's Code tab) run
-//     inside the editor's own process. They are not separate entries in the
-//     process table, so a scan cannot see them at all — they can only ever
-//     appear through a hook event.
+//   • editor-hosted sessions (the VS Code extension) are ordinary entries in
+//     the process table and scan fine. What they are not is *Orca*: their host
+//     comes from the parent chain, not from ORCA_PANE_KEY, so they arrive with
+//     a hostBundleId instead of a pane key.
 
 /// Claude Code's own live-session registry entry, `~/.claude/sessions/<pid>.json`.
 /// One file per running process, removed when it exits — so this is exactly the
@@ -60,36 +60,44 @@ enum ClaudeProcessScanner {
     /// callers must keep it off the main thread. Returns [] rather than
     /// throwing — a failed scan just means the island falls back to hooks.
     static func scan() -> [ScannedClaudeProcess] {
-        guard let ps = run("/bin/ps", ["-Ao", "pid=,tty=,comm="]) else { return [] }
+        guard let ps = run("/bin/ps", ["-Ao", "pid=,comm="]) else { return [] }
 
-        var candidates: [(pid: Int32, tty: String)] = []
+        var candidates: [Int32] = []
         for line in ps.split(separator: "\n") {
-            let parts = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
-            guard parts.count == 3, let pid = Int32(parts[0]) else { continue }
-            let tty = parts[1].trimmingCharacters(in: .whitespaces)
-            // A controlling terminal is what separates the CLI from the Claude
-            // desktop app, which also runs a process named "Claude".
-            guard tty != "??" else { continue }
-            let comm = parts[2].trimmingCharacters(in: .whitespaces).lowercased()
-            guard comm == "claude" || comm == "claude.exe" else { continue }
-            candidates.append((pid, tty))
+            let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard parts.count == 2, let pid = Int32(parts[0]) else { continue }
+            // Match on the file name, not the whole `comm`: an editor's bundled
+            // binary reports its full path
+            // ("…/anthropic.claude-code-…/native-binary/claude"), while a CLI
+            // installed on PATH reports a bare "claude". Comparing the string
+            // as it comes off `ps` therefore found one and missed the other.
+            let comm = parts[1].trimmingCharacters(in: .whitespaces)
+            guard URL(fileURLWithPath: comm).lastPathComponent.lowercased() == "claude"
+                || URL(fileURLWithPath: comm).lastPathComponent.lowercased() == "claude.exe"
+            else { continue }
+            candidates.append(pid)
         }
 
-        return candidates.compactMap { candidate in
-            guard let (exe, cwd) = detail(pid: candidate.pid) else { return nil }
+        return candidates.compactMap { pid in
+            guard let (exe, cwd) = detail(pid: pid) else { return nil }
             guard let exe, let cwd, !cwd.isEmpty else { return nil }
-            // The Claude desktop app runs a process named "Claude" too. It has
-            // no controlling terminal, so the tty check above already excludes
-            // it; this is the belt to that braces, and the only reliable shape
-            // of the discriminator — matching the executable against a known
-            // install path would be wrong, since a real CLI was found living at
-            // a bare `/claude` with nothing identifying in the name.
+            // The only discriminator against the Claude desktop app, which also
+            // runs a process named "Claude": its binary lives inside
+            // Claude.app. A real CLI does not, even one found living at a bare
+            // `/claude` with nothing identifying in the name — which is why
+            // this checks the bundle rather than a known install path.
+            //
+            // This used to be a two-part filter: a controlling terminal, plus
+            // this check. The tty half threw away every editor-hosted session
+            // (the VS Code extension's Claude has none) along with the desktop
+            // app it was there to exclude, so a VS Code session already running
+            // at launch stayed invisible until it happened to fire a hook.
             guard !exe.contains(".app/") else { return nil }
-            let pane = paneKey(pid: candidate.pid)
-            return ScannedClaudeProcess(pid: candidate.pid, cwd: cwd,
+            let pane = paneKey(pid: pid)
+            return ScannedClaudeProcess(pid: pid, cwd: cwd,
                                         paneKey: pane,
-                                        hostBundleId: pane != nil ? nil : hostApp(of: candidate.pid),
-                                        descriptor: descriptor(pid: candidate.pid))
+                                        hostBundleId: pane != nil ? nil : hostApp(of: pid),
+                                        descriptor: descriptor(pid: pid))
         }
     }
 

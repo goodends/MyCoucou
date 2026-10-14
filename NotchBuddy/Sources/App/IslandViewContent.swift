@@ -100,9 +100,17 @@ func openTerminalForSession(task: AgentTask?, sessionId: String?, state: AppStat
         let sid = sessionId.flatMap { $0.isEmpty ? nil : $0 }
         if await state.jumpToOrcaTerminal(sessionId: sid) { return }
         // Otherwise raise the app the session runs in (its terminal, or VS
-        // Code), then any known terminal.
-        if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
-           !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
+        // Code), then any known terminal. A session that never fired a hook has
+        // no workspace pill to read a host from — the scan named it on the
+        // session — so fall back to asking the session itself.
+        let hostBundleId = task?.sessionBundleId
+            ?? sid.flatMap { state.hostBundleId(forSessionId: $0) }
+            ?? task?.hostApp
+        // The field is the signal, not the pill id: a session pill is
+        // "claude:<id>" and would never match the id this used to test for,
+        // even when it carries a perfectly good host.
+        if !(task != nil && ClaudeHost.activate(task?.hostApp)),
+           !TerminalTarget.activate(sessionBundleId: hostBundleId) {
             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
         }
     }

@@ -315,10 +315,24 @@ final class AppState: ObservableObject {
             source: .claudeCode,
             sessionCwd: session.cwd,
             sessionId: session.sessionId,
-            sessionBundleId: session.sessionBundleId,
+            // A session found by the process scan never got a hook event, so it
+            // has no `bundle_id` — the scan names its host in `hostApp` instead.
+            // Everything that raises the host app reads `sessionBundleId`, so
+            // without this a scanned session's "Open terminal" found nothing and
+            // fell through to "activate any known terminal": the wrong app.
+            sessionBundleId: session.sessionBundleId ?? session.hostApp,
             hostApp: session.hostApp,
             outfit: session.outfit
         )
+    }
+
+    /// The bundle id of the app that runs `sessionId`, from whichever record has
+    /// it: the hook's `bundle_id` for a session that announced itself, else the
+    /// host the process scan resolved from its parent chain. nil when nothing is
+    /// known — which is what makes the caller fall back to a known terminal.
+    func hostBundleId(forSessionId sessionId: String) -> String? {
+        guard let session = claudeSessions.first(where: { $0.sessionId == sessionId }) else { return nil }
+        return session.sessionBundleId ?? session.hostApp
     }
 
     // Bot state override
