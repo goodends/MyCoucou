@@ -1486,6 +1486,21 @@ struct PromptView: View {
         state.focusedSessionId != nil || state.focusTask?.sessionId != nil
     }
 
+    /// Whether a typed message has somewhere to go. Sending types into the
+    /// Orca terminal hosting the session (`sendToOrcaTerminal`), so a session
+    /// running anywhere else — VS Code, Warp, Terminal — has nothing to type
+    /// into: the input would only echo the words and then report "not sent".
+    /// With no session at all the picker starts one in an Orca worktree, which
+    /// is Orca again, so the input stays.
+    private var canSendMessage: Bool {
+        guard hasSession else { return true }
+        if let session = state.focusedClaudeSession ?? state.overviewSession {
+            return ClaudeHost.runsInOrca(session)
+        }
+        guard let task = state.focusTask else { return false }
+        return ClaudeHost.hostId(hostApp: task.hostApp, bundleId: task.sessionBundleId) == ClaudeHost.orcaBundleId
+    }
+
     /// The picker stands in for the host chip when there's no session to name,
     /// and only where starting a session is actually possible.
     private var canPickProject: Bool {
@@ -1799,54 +1814,56 @@ struct PromptView: View {
                 }
                 .padding(.horizontal, 10)
 
-                HStack(spacing: 8) {
-                    TextField(historyBinding.isEmpty ? String(localized: "Ask me anything…") : String(localized: "Continue…"), text: $text)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                        .focused($focused)
-                        .onSubmit { sendMessage() }
-
-                    if showNotWiredToast {
-                        Text("暂未发送 — Orca 里没找到该 session")
-                            .font(.system(size: 10.5))
-                            .foregroundColor(Color(hex: "#F4B400"))
-                            .lineLimit(1)
-                    }
-
-                    #if !APPSTORE
-                    // Dictate instead of typing (on-device speech recognition when available)
-                    Button {
-                        Task {
-                            if dictation.isRecording { text = await dictation.finish() }
-                            else { await dictation.start(from: text) }
+                if canSendMessage {
+                    HStack(spacing: 8) {
+                        TextField(historyBinding.isEmpty ? String(localized: "Ask me anything…") : String(localized: "Continue…"), text: $text)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                            .focused($focused)
+                            .onSubmit { sendMessage() }
+    
+                        if showNotWiredToast {
+                            Text("暂未发送 — Orca 里没找到该 session")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(Color(hex: "#F4B400"))
+                                .lineLimit(1)
                         }
-                    } label: {
-                        Image(systemName: dictation.isRecording ? "mic.fill" : "mic")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(dictation.isRecording ? Color(hex: "#F4505E") : Color(hex: "#8E939C"))
-                            .frame(width: 18, height: 18)
-                            .contentShape(Rectangle())
+    
+                        #if !APPSTORE
+                        // Dictate instead of typing (on-device speech recognition when available)
+                        Button {
+                            Task {
+                                if dictation.isRecording { text = await dictation.finish() }
+                                else { await dictation.start(from: text) }
+                            }
+                        } label: {
+                            Image(systemName: dictation.isRecording ? "mic.fill" : "mic")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(dictation.isRecording ? Color(hex: "#F4505E") : Color(hex: "#8E939C"))
+                                .frame(width: 18, height: 18)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(dictation.isRecording ? String(localized: "Stop dictation") : String(localized: "Dictate (right-click to choose the language)"))
+                        .contextMenu { DictationLanguageMenu(dictation: dictation) }
+                        .onChange(of: dictation.transcript) { _, _ in
+                            if dictation.isRecording { text = dictation.text }
+                        }
+                        #endif
+    
+                        Button(action: sendMessage) {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color(hex: "#0B0C0E"))
+                        }
+                        .buttonStyle(SendButtonStyle())
+                        .disabled(text.isEmpty)
                     }
-                    .buttonStyle(.plain)
-                    .help(dictation.isRecording ? String(localized: "Stop dictation") : String(localized: "Dictate (right-click to choose the language)"))
-                    .contextMenu { DictationLanguageMenu(dictation: dictation) }
-                    .onChange(of: dictation.transcript) { _, _ in
-                        if dictation.isRecording { text = dictation.text }
-                    }
-                    #endif
-
-                    Button(action: sendMessage) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(Color(hex: "#0B0C0E"))
-                    }
-                    .buttonStyle(SendButtonStyle())
-                    .disabled(text.isEmpty)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .simultaneousGesture(TapGesture().onEnded { focused = true })
                 }
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(Color.white.opacity(0.07))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .simultaneousGesture(TapGesture().onEnded { focused = true })
             }
             .padding(.leading, 84)
             .padding(.trailing, 16)
