@@ -2,6 +2,33 @@ import AppKit
 import Combine
 import SwiftUI
 
+/// Window level of every panel the app floats over other apps.
+///
+/// Off: the level the app has always shipped at — above the menu bar, so the
+/// notch is never buried by a plain window, but a floating panel (Alfred,
+/// Bartender, another notch tool…) can still cover it.
+/// On: `screenSaverWindow - 2`, i.e. above every app and every other overlay,
+/// while staying under the screen saver (1000) and the lock screen, which we
+/// must never draw over.
+enum OverlayLevel {
+    enum Kind { case island, dragGhost, highlight }
+
+    /// The drag ghost is drawn over the island while dragging; the drag
+    /// highlight marks another app's window underneath, so it sits just below.
+    static func value(_ kind: Kind, alwaysOnTop: Bool) -> NSWindow.Level {
+        let anchor = alwaysOnTop ? top : standard
+        let offset = switch kind {
+        case .island:    0
+        case .dragGhost: 1
+        case .highlight: -1
+        }
+        return NSWindow.Level(rawValue: anchor + offset)
+    }
+
+    private static let standard = Int(CGWindowLevelForKey(.mainMenuWindow)) + 3  // 27
+    private static let top      = Int(CGWindowLevelForKey(.screenSaverWindow)) - 2 // 998
+}
+
 @MainActor
 final class IslandWindowController: NSWindowController {
 
@@ -19,6 +46,7 @@ final class IslandWindowController: NSWindowController {
     private var autoCloseSubscription: AnyCancellable?
     private var absenceSubscription: AnyCancellable?
     private var openOnHoverSubscription: AnyCancellable?
+    private var alwaysOnTopSubscription: AnyCancellable?
 
     // Suppress peek sound on next reveal (e.g. musicReveal)
     var silentNextReveal = false
@@ -83,7 +111,7 @@ final class IslandWindowController: NSWindowController {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 3)
+        panel.level = OverlayLevel.value(.island, alwaysOnTop: state.alwaysOnTop)
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.ignoresMouseEvents = true
 
@@ -145,6 +173,14 @@ final class IslandWindowController: NSWindowController {
         }
     }
 
+    /// Re-raise (or lower) the panels that are on screen right now, after the
+    /// "always on top" setting flips.
+    private func applyOverlayLevels(alwaysOnTop: Bool) {
+        (window as? IslandPanel)?.level = OverlayLevel.value(.island, alwaysOnTop: alwaysOnTop)
+        dragGhostPanel?.level = OverlayLevel.value(.dragGhost, alwaysOnTop: alwaysOnTop)
+        highlightPanel?.level = OverlayLevel.value(.highlight, alwaysOnTop: alwaysOnTop)
+    }
+
     // MARK: - Screen choice
 
     private func moveToTargetScreen(choice: IslandDisplayChoice) {
@@ -199,6 +235,9 @@ final class IslandWindowController: NSWindowController {
         }
         openOnHoverSubscription = state.$openOnHover.sink { [weak self] on in
             self?.fsm.openOnHover = on
+        }
+        alwaysOnTopSubscription = state.$alwaysOnTop.sink { [weak self] on in
+            self?.applyOverlayLevels(alwaysOnTop: on)
         }
 
         fsm.onTransition = { [weak self] from, to in
@@ -868,7 +907,7 @@ final class IslandWindowController: NSWindowController {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 4)
+        panel.level = OverlayLevel.value(.dragGhost, alwaysOnTop: state.alwaysOnTop)
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         panel.ignoresMouseEvents = true
 
@@ -945,7 +984,7 @@ final class IslandWindowController: NSWindowController {
             panel.backgroundColor = .clear
             panel.isOpaque = false
             panel.hasShadow = false
-            panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 2)
+            panel.level = OverlayLevel.value(.highlight, alwaysOnTop: state.alwaysOnTop)
             panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
             panel.ignoresMouseEvents = true
 

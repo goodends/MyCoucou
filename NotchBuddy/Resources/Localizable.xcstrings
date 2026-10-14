@@ -19937,6 +19937,38 @@
           }
         }
       }
+    },
+    "settings.always-on-top": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always on top"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "始终置顶"
+          }
+        }
+      }
+    },
+    "settings.always-on-top-explain": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On: the notch and the desktop Mochi stay above every app, including Alfred, Bartender and other notch tools. Off: they sit just above the menu bar, so a floating window can cover them."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启：悬浮岛和桌面的 Mochi 始终在其他所有应用之上，包括 Alfred、Bartender 以及其他挖槽软件。关闭：只略高于菜单栏，浮动窗口仍可能盖住它们。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

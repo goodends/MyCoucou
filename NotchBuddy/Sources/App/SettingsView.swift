@@ -364,6 +364,15 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                Toggle(String(localized: "settings.always-on-top",
+                              defaultValue: "Always on top"),
+                       isOn: $state.alwaysOnTop)
+                Text(String(localized: "settings.always-on-top-explain",
+                            defaultValue: "On: the notch and the desktop Mochi stay above every app, including Alfred, Bartender and other notch tools. Off: they sit just above the menu bar, so a floating window can cover them."))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(6)
             .onAppear { refreshConnectedScreens() }

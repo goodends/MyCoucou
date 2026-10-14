@@ -486,6 +486,12 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(autoCloseInterval, forKey: "autoCloseInterval") }
     }
 
+    // Float above every other app — persisted, on by default. Decides the
+    // window level of every overlay panel; see OverlayLevel.
+    @Published var alwaysOnTop: Bool = true {
+        didSet { UserDefaults.standard.set(alwaysOnTop, forKey: "alwaysOnTop") }
+    }
+
     // Absence interval — how long the island stays in petit before hiding, persisted (seconds)
     @Published var absenceInterval: TimeInterval = 60 {
         didSet { UserDefaults.standard.set(absenceInterval, forKey: "absenceInterval") }
@@ -638,6 +644,7 @@ final class AppState: ObservableObject {
         pillColors = PillColors.stored
         // Migrate old 60s default → 15s
         if let v = ud.object(forKey: "openOnHover") as? Bool { openOnHover = v }
+        if let v = ud.object(forKey: "alwaysOnTop") as? Bool { alwaysOnTop = v }
         if let v = ud.object(forKey: "autoCloseInterval") as? Double {
             autoCloseInterval = (v == 60) ? 15 : v
         }

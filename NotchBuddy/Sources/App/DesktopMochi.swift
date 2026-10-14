@@ -123,6 +123,8 @@ final class DesktopMochiController {
 
     // Lifecycle subscriptions (cleared on retractForAlert + fullTearDown)
     private var cancellables: Set<AnyCancellable> = []
+    // "Always on top" → panel level, for as long as the panel lives.
+    private var levelSubscription: AnyCancellable?
     // Alert subscription — permanent, only released with the singleton
     private var alertSubscription: AnyCancellable?
 
@@ -186,10 +188,15 @@ final class DesktopMochiController {
         hosting.autoresizingMask = [.width, .height]
         p.contentView = hosting
 
-        p.level = .floating
+        p.level = OverlayLevel.value(.island, alwaysOnTop: AppState.shared.alwaysOnTop)
         p.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         p.ignoresMouseEvents = true
         if !p.isVisible { p.orderFront(nil) }
+
+        // Keep the level in sync while Mochi stays on the desktop.
+        levelSubscription = AppState.shared.$alwaysOnTop.sink { [weak self] on in
+            self?.panel?.level = OverlayLevel.value(.island, alwaysOnTop: on)
+        }
 
         // Squash emote + sound on landing
         eng.triggerEmote(.happy, duration: 0.6, silent: true)
@@ -384,6 +391,7 @@ final class DesktopMochiController {
     private func fullTearDown() {
         phase = .home
         cancellables.removeAll()
+        levelSubscription = nil
         pendingSlapWorkItem?.cancel()
         panel?.close()
         panel = nil
