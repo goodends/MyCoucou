@@ -317,14 +317,25 @@ struct ChatSessionView: View {
             }
         }()
         guard let url, FileManager.default.fileExists(atPath: url.path) else {
-            // Nothing identifies a transcript at all (no session, no cwd) is a
-            // plain empty chat, not a load failure worth shouting about. A cwd
-            // that pointed at a missing file still is an error.
-            let nothingToShow = target == nil && state.focusTask?.sessionCwd == nil
             lines = []
-            loadError = nothingToShow
-                ? nil
-                : "no .jsonl found\ntried: \(url?.path ?? "<nil>")\nhome: \(NSHomeDirectory())"
+            // Claude Code writes a session's JSONL on its first exchange, not
+            // at startup — so a session that has only ever reported
+            // SessionStart has no file yet, and that is an empty chat, not a
+            // failure. Shouting "no .jsonl found" at someone who has just
+            // created a session is a false alarm about a normal state.
+            //
+            // A session that *has* done something and still has no transcript
+            // is a different matter — we lost it. The paths that were tried go
+            // to the log; the card says it in a sentence.
+            let onlyStartEvent = state.focusedClaudeSession
+                .map { $0.lastEventAt.timeIntervalSince($0.startedAt) < 2 } ?? true
+            if onlyStartEvent {
+                loadError = nil
+            } else {
+                appendAppLog("nb.log",
+                             "chat: no transcript session=\(target?.sid ?? "<nil>") tried=\(url?.path ?? "<nil>") home=\(NSHomeDirectory())")
+                loadError = String(localized: "Couldn't load this session's history.")
+            }
             lastLoadedURL = "MISSING"
             stopWatching()
             return
