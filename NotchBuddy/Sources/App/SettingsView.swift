@@ -7,18 +7,16 @@ struct SettingsView: View {
     @State private var statusMessage: String = ""
     @State private var showDiff: Bool = false
     @State private var pendingHookJSON: String = ""
+    /// True when the diff on screen removes things rather than adding them.
+    @State private var pendingUninstall: Bool = false
     @State private var hookNeedsUpdate: Bool = HookServer.hooksNeedUpdate()
 
     #if !APPSTORE
-    // Context usage on the overview card comes from Claude Code's statusline,
-    // which needs a line in settings.json. Only offer it off-App Store: there
-    // the wrapper would live inside the app container, where the Claude Code
-    // running on the host cannot execute it.
-    @State private var contextUsageEnabled: Bool = StatusLineReader.isEnabled
-    @State private var showStatusLineDiff: Bool = false
-    @State private var pendingStatusLine: (data: Data, original: Data?, previousCommand: String)? = nil
-    @State private var statusLineDiffText: String = ""
-    @State private var statusLineError: String? = nil
+    // The context bar on the overview card is read from Claude Code's statusline
+    // payload, so it rides along with the hooks: same file, same diff, same
+    // write, and no switch of its own — a checkbox that only took effect after
+    // pressing a button elsewhere read as broken.
+    @State private var contextUsageInstalled: Bool = StatusLineReader.isEnabled
     #endif
 
     #if !APPSTORE
@@ -241,6 +239,18 @@ struct SettingsView: View {
                         .frame(width: 64)
                     Text("s without movement")
                 }
+                Divider()
+                // Belongs here rather than under the hooks: it is how the app
+                // answers events it already receives, not something installing
+                // an integration sets up.
+                Toggle(String(localized: "hooks.terminal-cards",
+                              defaultValue: "Answer questions and permissions from terminal sessions in the notch"),
+                       isOn: $terminalCardsEnabled)
+                Text(String(localized: "hooks.terminal-cards-explain",
+                            defaultValue: "Off: sessions in Warp, Terminal, iTerm… show in the notch, but their questions and permission requests are asked in the terminal. On: the notch shows them first, and the terminal waits until you answer there or close the island (up to 2 min)."))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(6)
         }
@@ -401,12 +411,13 @@ struct SettingsView: View {
                         .buttonStyle(.bordered)
                 }
                 #endif
-                Toggle("Answer questions and permissions from terminal sessions in the notch", isOn: $terminalCardsEnabled)
-                Text("Off: sessions in Warp, Terminal, iTerm… show in the notch, but their questions and permission requests are asked in the terminal. On: the notch shows them first, and the terminal waits until you answer there or close the island (up to 2 min).")
+                Text(String(localized: "statusline.note",
+                      defaultValue: "Also wraps your statusline command, so the home card can show how much of a session's context is used. Removed together with the hooks."))
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                
                 #if !APPSTORE
                 if showDiff {
                     ScrollView {
@@ -421,7 +432,11 @@ struct SettingsView: View {
                     HStack {
                         Button(String(localized: "hooks.confirm-write")) { confirmInstall() }
                             .buttonStyle(.borderedProminent)
-                        Button(String(localized: "Cancel")) { showDiff = false; pendingHookJSON = "" }
+                        Button(String(localized: "Cancel")) {
+                            showDiff = false
+                            pendingHookJSON = ""
+                            pendingUninstall = false
+                        }
                             .buttonStyle(.bordered)
                     }
                 }
@@ -430,63 +445,6 @@ struct SettingsView: View {
             .padding(6)
         }
 
-        #if !APPSTORE
-        GroupBox(String(localized: "statusline.title")) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(String(localized: "statusline.explain"))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(contextUsageEnabled
-                     ? String(localized: "statusline.installed")
-                     : "~/.claude/settings.json")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(.secondary)
-
-                if let error = statusLineError {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text(error)
-                            .font(.system(size: 11))
-                            .foregroundColor(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                if contextUsageEnabled {
-                    Button(String(localized: "hooks.uninstall")) { uninstallStatusLine() }
-                        .buttonStyle(.bordered)
-                } else {
-                    Button(String(localized: "statusline.install")) { installStatusLine() }
-                        .buttonStyle(.borderedProminent)
-                }
-
-                if showStatusLineDiff {
-                    ScrollView {
-                        Text(statusLineDiffText)
-                            .font(.system(size: 10, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(height: 60)
-                    .background(Color(NSColor.textBackgroundColor))
-                    .cornerRadius(6)
-
-                    HStack {
-                        Button(String(localized: "hooks.confirm-write")) { confirmStatusLine() }
-                            .buttonStyle(.borderedProminent)
-                        Button(String(localized: "Cancel")) {
-                            showStatusLineDiff = false
-                            pendingStatusLine = nil
-                        }
-                            .buttonStyle(.bordered)
-                    }
-                }
-            }
-            .padding(6)
-        }
-        #endif
 
         #if !APPSTORE
         GroupBox(String(localized: "hooks.gemini.title")) {
@@ -868,7 +826,23 @@ struct SettingsView: View {
 
     private func installHooks() {
         do {
-            pendingHookJSON = try HookServer.shared.previewClaudeHooks()
+            #if !APPSTORE
+            pendingHookJSON = try HookServer.shared.previewClaudeHooks(statusLine: true)
+            #else
+            pendingHookJSON = try HookServer.shared.previewClaudeHooks(statusLine: false)
+            #endif
+            pendingUninstall = false
+            showDiff = true
+            statusMessage = String(localized: "hooks.review-json")
+        } catch {
+            statusMessage = "❌ \(error.localizedDescription)"
+        }
+    }
+
+    private func uninstallHooks() {
+        do {
+            pendingHookJSON = try HookServer.shared.previewClaudeUninstall()
+            pendingUninstall = true
             showDiff = true
             statusMessage = String(localized: "hooks.review-json")
         } catch {
@@ -878,77 +852,35 @@ struct SettingsView: View {
 
     private func confirmInstall() {
         do {
-            try HookServer.shared.writeClaudeHooks()
-            showDiff = false
-            statusMessage = String(localized: "status.hooks-installed-settings")
-            pendingHookJSON = ""
-            hookNeedsUpdate = false
+            if pendingUninstall {
+                try HookServer.shared.writeClaudeUninstall()
+                #if !APPSTORE
+                contextUsageInstalled = false
+                #endif
+                showDiff = false
+                pendingHookJSON = ""
+                pendingUninstall = false
+                statusMessage = String(localized: "status.hooks-removed")
+            } else {
+                try HookServer.shared.writeClaudeHooks()
+                showDiff = false
+                pendingHookJSON = ""
+                hookNeedsUpdate = false
+                #if !APPSTORE
+                contextUsageInstalled = StatusLineReader.isEnabled
+                #endif
+                // Installing the hooks also wraps the statusline, so the two
+                // can come apart: settings.json with no `statusLine.command`
+                // has nothing to wrap, and the hooks still went in fine.
+                statusMessage = String(
+                    localized: contextUsageInstalled
+                        ? "status.hooks-installed-settings"
+                        : "status.hooks-installed-no-statusline")
+            }
         } catch {
             statusMessage = "❌ Write error: \(error.localizedDescription)"
         }
     }
-
-    private func uninstallHooks() {
-        do {
-            try HookServer.shared.uninstallClaudeHooks()
-            statusMessage = String(localized: "status.hooks-removed")
-        } catch {
-            statusMessage = "❌ \(error.localizedDescription)"
-        }
-    }
-
-    #if !APPSTORE
-    private func installStatusLine() {
-        do {
-            // Uninstalling deliberately leaves settings.json pointing at the
-            // wrapper, so a second install is a no-op on the file and only has
-            // to put the script and the flag back.
-            if let command = try StatusLineInstaller.currentCommand(),
-               StatusLineReader.settingsPointAtWrapper(command) {
-                try StatusLineInstaller.reenable()
-                contextUsageEnabled = true
-                statusLineError = nil
-                statusMessage = String(localized: "status.statusline-installed")
-                return
-            }
-            let prepared = try StatusLineInstaller.buildEnabled()
-            pendingStatusLine = prepared
-            // Only the one line differs, so show the line rather than the whole
-            // file — a settings.json can hold API keys, and asking the user to
-            // read past them to find one changed line helps nobody.
-            let from = (try? StatusLineInstaller.currentCommand()) ?? prepared.previousCommand
-            let to = StatusLineReader.wrapperCommand ?? ""
-            showStatusLineDiff = true
-            statusLineError = nil
-            statusLineDiffText = "- \"command\": \(from)\n+ \"command\": \(to)"
-        } catch {
-            statusLineError = error.localizedDescription
-        }
-    }
-
-    private func confirmStatusLine() {
-        guard let prepared = pendingStatusLine else { return }
-        do {
-            _ = try StatusLineInstaller.install(from: prepared)
-            showStatusLineDiff = false
-            pendingStatusLine = nil
-            contextUsageEnabled = true
-            statusLineError = nil
-            statusMessage = String(localized: "status.statusline-installed")
-        } catch {
-            statusLineError = error.localizedDescription
-        }
-    }
-
-    private func uninstallStatusLine() {
-        StatusLineReader.disable()
-        contextUsageEnabled = false
-        showStatusLineDiff = false
-        pendingStatusLine = nil
-        statusLineError = nil
-        statusMessage = String(localized: "status.statusline-removed")
-    }
-    #endif
 
     #if !APPSTORE
     private func triggerGeminiPreview(install: Bool) {

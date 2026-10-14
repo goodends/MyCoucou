@@ -1469,8 +1469,14 @@ final class HookServer: @unchecked Sendable {
     private var _pendingHooksOriginal: Data?
 
     /// Returns preview JSON without writing — call writeClaudeHooks() to confirm.
-    func previewClaudeHooks() throws -> String {
-        let (data, original) = try buildHooksData()
+    /// Returns the settings.json that installing would produce, without writing.
+///
+/// `statusLine` has no default on purpose: it and `buildHooksData`'s once
+/// disagreed, and the pane — which called this with no argument — got the
+/// false one and installed the hooks while quietly leaving the statusline
+/// alone. Making the caller say which it wants means the two cannot drift.
+func previewClaudeHooks(statusLine: Bool) throws -> String {
+        let (data, original) = try buildHooksData(statusLine: statusLine)
         _pendingHooksData = data
         _pendingHooksOriginal = original
         return String(data: data, encoding: .utf8) ?? ""
@@ -1485,9 +1491,24 @@ final class HookServer: @unchecked Sendable {
         try ClaudeSettingsFile.write(data, to: settingsURL, expecting: _pendingHooksOriginal)
         _pendingHooksData = nil
         _pendingHooksOriginal = nil
+        // The wrapper script and its flag go down only after settings.json
+        // landed: the reverse order would leave the app reading payloads from a
+        // wrapper Claude Code is not calling. Checked against the file rather
+        // than a remembered intent, so re-installing the hooks also repairs a
+        // wrapper someone deleted.
+        if statusLineInstalled() { try StatusLineReader.installWrapper() }
+        else { StatusLineReader.disable() }
     }
 
-    private func buildHooksData() throws -> (data: Data, original: Data?) {
+    /// Whether settings.json currently points at the wrapper.
+    private func statusLineInstalled() -> Bool {
+        let settingsURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/settings.json")
+        guard let snapshot = try? ClaudeSettingsFile.read(at: settingsURL) else { return false }
+        return StatusLineInstaller.isApplied(to: snapshot.object)
+    }
+
+    private func buildHooksData(statusLine: Bool) throws -> (data: Data, original: Data?) {
         let settingsURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/settings.json")
         // Unreadable or invalid settings must stop here, never count as empty.
@@ -1525,16 +1546,41 @@ final class HookServer: @unchecked Sendable {
         ])
         hooks["PreToolUse"] = preToolUse
         settings["hooks"] = hooks
+        // Same write as the hooks, so the diff the user confirms is the diff that
+        // lands — and the file is reordered once, not twice. Skipped silently
+        // when there is no statusline to wrap; the hooks still install.
+        if statusLine {
+            try StatusLineInstaller.apply(to: &settings)
+        } else {
+            StatusLineInstaller.restore(in: &settings)
+        }
         let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys])
         return (data, snapshot.bytes)
     }
 
-    func uninstallClaudeHooks() throws {
+    /// settings.json with our hooks and statusline removed, without writing it.
+    ///
+    /// Uninstall is a two-line diff but it touches the same file the hooks do,
+    /// so it goes through the same confirm-before-write path as installing. The
+    /// one thing it must not do is invent a `hooks` key the user never had.
+    private func buildUninstallData() throws -> (data: Data?, original: Data?) {
         let settingsURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/settings.json")
         let snapshot = try ClaudeSettingsFile.read(at: settingsURL)
         var settings = snapshot.object
-        guard var hooks = settings["hooks"] as? [String: Any] else { return }
+        // Put the statusline back in the same write that removes the hooks.
+        // Leaving it pointed at the wrapper would mean a statusline that costs
+        // an extra process on every redraw, and — if NotchBuddy is ever removed
+        // — a settings.json naming a script that no longer exists.
+        let hadStatusLine = StatusLineInstaller.isApplied(to: settings)
+        StatusLineInstaller.restore(in: &settings)
+        guard var hooks = settings["hooks"] as? [String: Any] else {
+            // Nothing to remove. Rewriting the file to say the same thing would
+            // still take a backup and reorder it for no reason.
+            guard hadStatusLine else { return (nil, snapshot.bytes) }
+            return (try JSONSerialization.data(withJSONObject: settings,
+                                               options: [.prettyPrinted, .sortedKeys]), snapshot.bytes)
+        }
 
         for key in hooks.keys {
             if var matchers = hooks[key] as? [[String: Any]] {
@@ -1548,9 +1594,36 @@ final class HookServer: @unchecked Sendable {
                 else { hooks[key] = matchers }
             }
         }
-        settings["hooks"] = hooks
-        let newData = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys])
-        try ClaudeSettingsFile.write(newData, to: settingsURL, expecting: snapshot.bytes)
+        // An empty object where the user had no hooks at all is noise; drop the
+        // key rather than writing `"hooks": {}` back.
+        if hooks.isEmpty { settings.removeValue(forKey: "hooks") }
+        else { settings["hooks"] = hooks }
+        return (try JSONSerialization.data(withJSONObject: settings,
+                                           options: [.prettyPrinted, .sortedKeys]), snapshot.bytes)
+    }
+
+    /// Returns the settings.json that uninstalling would produce, without
+    /// writing — call writeClaudeUninstall() to confirm.
+    func previewClaudeUninstall() throws -> String {
+        let (data, original) = try buildUninstallData()
+        _pendingHooksData = data
+        _pendingHooksOriginal = original
+        return data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    /// Writes the previewed uninstall. A no-op when the preview found nothing
+    /// to remove — there is no file change to make, and taking a backup of an
+    /// untouched settings.json would only litter the directory.
+    func writeClaudeUninstall() throws {
+        guard let data = _pendingHooksData else { return }
+        let settingsURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/settings.json")
+        let wasApplied = (try? ClaudeSettingsFile.read(at: settingsURL).object)
+            .map { StatusLineInstaller.isApplied(to: $0) } ?? false
+        try ClaudeSettingsFile.write(data, to: settingsURL, expecting: _pendingHooksOriginal)
+        _pendingHooksData = nil
+        _pendingHooksOriginal = nil
+        if wasApplied { StatusLineReader.disable() }
     }
 
     // MARK: - App Store: hooks via security-scoped bookmark

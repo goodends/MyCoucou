@@ -1,101 +1,154 @@
 import Foundation
 
-/// `StatusLineInstaller` rewrites one JSON string in a file that can hold API
-/// keys and a dozen hooks. These pin the two things that would go wrong: a
-/// command containing escaped quotes and backslashes (every `bash -c '…'`
-/// statusline has those), and a replacement that must not reorder or reshape
-/// anything else in the file.
+/// `StatusLineInstaller` rewrites one key of a file that can hold API keys and
+/// a dozen hooks, and is undone by uninstalling. These pin both directions:
+/// that it points at the wrapper without losing the command it replaced, and
+/// that it puts that command back.
 @main
 enum StatusLineInstallerTests {
     static func main() {
-        // A real-world statusline: nested quotes, backslashes, single quotes.
-        //
-        // A raw literal on purpose. Written as a normal Swift string, `\"`
-        // would collapse to a bare `"` and produce JSON the parser rejects —
-        // so the fixture has to carry the two characters `\` and `"` to match
-        // what an actual settings.json holds.
-        let tricky = #"bash -c 'd=$(ls -d \"${X_DIR}\"/p/*/ | awk -F/ '\''{ print $1 }'\''); exec node \"$d/i.js\"'\''"#
-        let original = """
-        {
-          "env": { "TOKEN": "sk-abc\\"def" },
-          "hooks": { "Stop": [ { "hooks": [ { "command": "\\"a b\\"" } ] } ] },
-          "includeCoAuthoredBy": false,
-          "statusLine": {
-            "type": "command",
-            "command": "\(tricky)"
-          },
-          "model": "opus"
-        }
-        """
+        // Point the support folder somewhere disposable. These tests call the
+        // same apply/restore the app calls, and against the real folder they
+        // overwrite the statusline the user's installed wrapper saved — which
+        // breaks their statusline with no visible cause.
+        let sandbox = NSTemporaryDirectory() + "coucou-statusline-tests-\(getpid())"
+        try? FileManager.default.createDirectory(atPath: sandbox,
+                                                 withIntermediateDirectories: true)
+        setenv("COUCOU_SUPPORT_DIR", sandbox, 1)
+        defer { try? FileManager.default.removeItem(atPath: sandbox) }
 
-        let patched = patch(original, to: "/tmp/wrapper.sh")
-        let out = parse(patched, "first")
+        // A statusline command with the escaped quotes every `bash -c '…'` one has.
+        // A raw literal on purpose — written as a normal Swift string, `\"`
+        // collapses to a bare `"` and the fixture stops being JSON. Nothing
+        // else in here may escape: `'\''` is valid shell but a lone `\'` is not
+        // a legal JSON escape, and the fixture has to parse.
+        let tricky = #"bash -c 'd=$(ls -d \"${X_DIR}\"/p/*/ | head -1); exec node \"$d/i.js\"'"#
+        var settings = real(
+            """
+            {
+              "env": { "TOKEN": "sk-abc" },
+              "hooks": { "Stop": [ { "hooks": [ { "command": "\\"a b\\"" } ] } ] },
+              "includeCoAuthoredBy": false,
+              "statusLine": {
+                "type": "command",
+                "command": "\(tricky)"
+              },
+              "model": "opus"
+            }
+            """)
 
-        // The point of the rewrite: the new command took.
-        let statusLine = out["statusLine"] as? [String: Any] ?? [:]
-        precondition(statusLine["command"] as? String == "/tmp/wrapper.sh",
-                     "replacement failed, got \(statusLine["command"] as? String ?? "nil")")
-        precondition(statusLine["type"] as? String == "command")
+        precondition(!StatusLineInstaller.isApplied(to: settings),
+                     "a hand-written statusline must not read as ours")
 
-        // Everything else survived. A re-serialise would reorder these keys and
-        // re-escape the token; both are real failures, because this is the
-        // user's settings file and the whole point is a one-line diff.
-        precondition(out["model"] as? String == "opus")
-        precondition(out["includeCoAuthoredBy"] as? Bool == false)
-        precondition((out["env"] as? [String: Any])?["TOKEN"] as? String == "sk-abc\"def")
-        let hooks = out["hooks"] as? [String: Any] ?? [:]
+        // The command as it exists once parsed: `\"` in the fixture arrives
+        // here as a bare `"`. Everything below compares against this, not
+        // against the source text.
+        let originalCommand = (settings["statusLine"] as? [String: Any])?["command"] as? String ?? ""
+        precondition(originalCommand.contains("\""), "fixture lost its escaped quotes")
+
+        mustApply(to: &settings)
+        precondition(StatusLineInstaller.isApplied(to: settings),
+                     "apply did not take")
+
+        let applied = settings["statusLine"] as? [String: Any] ?? [:]
+        precondition(applied["type"] as? String == "command")
+
+        // The shell quoting is the app's job, and it is load-bearing: without
+        // it Claude Code runs the path up to the first space and the statusline
+        // dies silently. This was the bug that made an earlier install look
+        // installed while nothing ran.
+        let command = applied["command"] as? String ?? ""
+        precondition(command.hasPrefix("\""), "command must be shell-quoted: \(command)")
+        precondition(command.hasSuffix("\""), "command must be shell-quoted: \(command)")
+
+        // The command it replaced is saved before the line is changed, so
+        // uninstalling has something to put back.
+        let saved = StatusLineReader.savedOriginalCommand
+        precondition(saved == originalCommand, "original not saved, got: \(saved ?? "nil")")
+
+        // Unrelated keys are untouched.
+        precondition(settings["model"] as? String == "opus")
+        precondition(settings["includeCoAuthoredBy"] as? Bool == false)
+        let hooks = settings["hooks"] as? [String: Any] ?? [:]
         let stop = hooks["Stop"] as? [[String: Any]] ?? []
         let inner = (stop.first?["hooks"] as? [[String: Any]]) ?? []
         precondition(inner.first?["command"] as? String == "\"a b\"",
                      "an unrelated hook command was rewritten")
 
-        // The path contains a space, so what lands in settings.json is a
-        // *shell-quoted* command: the quotes are part of the value, escaped
-        // once by the JSON encoder on the way in. The installer stores the
-        // command it is handed verbatim — adding the shell quoting is
-        // `StatusLineReader.wrapperCommand`'s job, and doing it in both places
-        // is how a path ends up doubly quoted.
-        let quoted = "\"/Users/x/Library/Application Support/NotchBuddy/statusline-hook.sh\""
-        let withSpace = parse(patch(original, to: quoted), "spaced path")
-        precondition((withSpace["statusLine"] as? [String: Any])?["command"] as? String == quoted,
-                     "a command containing quotes did not survive the round trip")
+        // ---- Uninstalling puts it back, byte-identical ----
+        StatusLineInstaller.restore(in: &settings)
+        precondition(!StatusLineInstaller.isApplied(to: settings), "restore did not take")
+        precondition((settings["statusLine"] as? [String: Any])?["command"] as? String == originalCommand,
+                     "the original statusline came back changed")
 
-        // A file with no statusLine is refused, not turned into one.
-        precondition(patchOrNil("{\"model\":\"opus\"}") == nil,
-                     "must not invent a statusLine")
+        // ---- A fresh settings.json is claimed by apply ----
+        var installCase = real(#"{"statusLine":{"type":"command","command":"mine.sh"}}"#)
+        // ---- A settings.json with no statusline is skipped, not invented ----
+        // Most people have no statusline at all. Inventing one would make
+        // Claude Code run a command on every redraw they never asked for; the
+        // hooks have to install either way.
+        var none = real(#"{"model":"opus"}"#)
+        precondition(skipsApplying(&none), "a statusline was applied to a file that had none")
+        precondition(none["statusLine"] == nil, "a statusline was invented")
 
-        // So is one whose statusLine we cannot match.
-        precondition(patchOrNil("{\"statusLine\": {\"type\":\"command\"}}") == nil,
-                     "statusLine without a command must not be rewritten")
+        // ---- Applying is what turns a statusline into a wrapped one ----
+        // Regression: the settings pane installed the hooks and left the
+        // statusline untouched, because the pane and the builder disagreed on
+        // a default argument. The signature that caused it now takes the
+        // value with no default, so a caller cannot get it wrong by omission;
+        // what this pins is that the operation itself, given a settings.json
+        // with a statusline, really does claim it.
+        precondition(mustApply(to: &installCase), "apply found no statusline to claim")
+        precondition(StatusLineInstaller.isApplied(to: installCase), "apply did not claim it")
 
-        // Bytes that are not UTF-8 are not something to guess at.
-        precondition(patchOrNilData(Data([0xFF, 0xFE, 0x00, 0x01])) == nil)
+        // ---- Restoring is a no-op when the line is not ours ----
+        // A statusline the user wrote by hand after installing is theirs to
+        // keep; removing it because it happens to sit where ours did would be
+        // reaching past the setting.
+        var theirs = real(#"{"statusLine":{"type":"command","command":"mine.sh"}}"#)
+        StatusLineInstaller.restore(in: &theirs)
+        precondition((theirs["statusLine"] as? [String: Any])?["command"] as? String == "mine.sh",
+                     "restore touched a statusline that is not the wrapper")
+
+        // ---- Installing over ours is idempotent ----
+        // Re-running "install hooks" is a normal thing to do. The second apply
+        // sees the wrapper's own path in the line, and must not take it for the
+        // original — that would leave the wrapper invoking itself forever once
+        // the statusline was put back.
+        mustApply(to: &settings)
+        precondition(StatusLineReader.savedOriginalCommand == originalCommand,
+                     "a repeat install overwrote the saved original")
+        precondition(StatusLineInstaller.isApplied(to: settings),
+                     "a repeat install un-applied the wrapper")
+        StatusLineInstaller.restore(in: &settings)
 
         print("StatusLineInstallerTests OK")
     }
 
-    /// Parses and reports instead of trapping: a `try!` here would fail with
-    /// no message once the file is compiled with optimisations on.
-    private static func parse(_ data: Data, _ what: String) -> [String: Any] {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            print("✗ \(what) did not produce a JSON object:")
-            print(String(data: data, encoding: .utf8) ?? "<not UTF-8>")
-            exit(1)
+    /// Apply and report whether it found a statusline to wrap.
+    private static func skipsApplying(_ settings: inout [String: Any]) -> Bool {
+        do { return try !StatusLineInstaller.apply(to: &settings) }
+        catch { preconditionFailure("apply threw: \(error)") }
+    }
+
+    /// Apply and report whether it claimed a statusline. A throw here is the
+    /// test failing, not a case to record.
+    @discardableResult
+    private static func mustApply(to settings: inout [String: Any]) -> Bool {
+        do { return try StatusLineInstaller.apply(to: &settings) }
+        catch { preconditionFailure("apply threw: \(error)") }
+    }
+
+
+    /// Parses a fixture, failing loudly. Returning `[:]` on a bad fixture would
+    /// make every later assertion fail on the wrong thing — that cost an hour
+    /// of chasing a phantom bug once already.
+    private static func real(_ json: String) -> [String: Any] {
+        do {
+            return try JSONSerialization.jsonObject(
+                with: Data(json.utf8), options: [.fragmentsAllowed]) as? [String: Any] ?? [:]
+        } catch {
+            preconditionFailure("fixture is not valid JSON (\(error)):\n\(json)")
         }
-        return object
-    }
-
-    private static func patch(_ json: String, to command: String) -> Data {
-        let result = patchOrNil(json, command)
-        precondition(result != nil, "patch failed for \(command)")
-        return result!
-    }
-
-    private static func patchOrNil(_ json: String, _ command: String = "/tmp/wrapper.sh") -> Data? {
-        patchOrNilData(json.data(using: .utf8)!, command)
-    }
-
-    private static func patchOrNilData(_ data: Data, _ command: String = "/tmp/wrapper.sh") -> Data? {
-        StatusLineInstaller.replacingStatusLineCommand(in: data, with: command)
     }
 }

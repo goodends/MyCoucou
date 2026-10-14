@@ -26,7 +26,15 @@ enum StatusLineReader {
     /// this file is compiled on its own by `tests/StatusLineContextTests.swift`,
     /// and importing HookServer would drag the whole server in with it.
     static var supportDir: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+        // The tests run this exact code against a temporary folder. Without the
+        // override they wrote to the real support directory — and cleaning up
+        // after them meant deleting the user's installed wrapper's saved
+        // statusline, which left their statusline silently broken.
+        if let override = ProcessInfo.processInfo.environment["COUCOU_SUPPORT_DIR"],
+           !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
             .appendingPathComponent("NotchBuddy", isDirectory: true)
     }
 
@@ -104,16 +112,6 @@ enum StatusLineReader {
     enum InstallError: LocalizedError {
         case noSupportDir
         case wrapperMissing
-        /// settings.json has no `statusLine.command`. Installing anyway would
-        /// invent a statusline the user never configured, and Claude Code would
-        /// start paying for one on every redraw.
-        case noStatusLine
-        /// The `statusLine.command` line could not be rewritten in place.
-        case unpatchable
-        /// settings.json points at the wrapper, but the statusline it replaced
-        /// is gone — someone deleted `statusline-original`, so enabling would
-        /// leave Claude Code with a wrapper that has nothing to pass on to.
-        case originalMissing
 
         var errorDescription: String? {
             switch self {
@@ -121,23 +119,19 @@ enum StatusLineReader {
                 return String(localized: "statusline.error.no-support-dir")
             case .wrapperMissing:
                 return String(localized: "statusline.error.wrapper-missing")
-            case .noStatusLine:
-                return String(localized: "statusline.error.no-statusline")
-            case .unpatchable:
-                return String(localized: "statusline.error.unpatchable")
-            case .originalMissing:
-                return String(localized: "statusline.error.original-missing")
             }
         }
     }
 
-    /// Start saving. `originalCommand` must be the `statusLine.command` value
-    /// settings.json holds right now — the wrapper runs it after saving.
+    /// Start saving: put the wrapper script in place and raise the flag it checks.
+    ///
+    /// The `statusLine.command` line in settings.json is set separately, by
+    /// `StatusLineInstaller` — both are needed, and only one of them touches
+    /// the user's file.
     @discardableResult
-    static func enable(originalCommand: String) throws -> URL {
+    static func installWrapper() throws -> URL {
         let fm = FileManager.default
-        guard let support = supportDir, let wrapper = wrapperURL,
-              let marker = enabledMarker, let saved = savedOriginalURL
+        guard let support = supportDir, let wrapper = wrapperURL, let marker = enabledMarker
         else { throw InstallError.noSupportDir }
 
         guard let bundleURL = Bundle.main.url(forResource: "statusline-hook", withExtension: "sh"),
@@ -151,17 +145,32 @@ enum StatusLineReader {
         try script.write(to: wrapper)
         try fm.setAttributes([.posixPermissions: NSNumber(value: 0o755)],
                              ofItemAtPath: wrapper.path)
-        try originalCommand.write(to: saved, atomically: true, encoding: .utf8)
         try Data().write(to: marker)
         return wrapper
     }
 
+    /// The `statusLine.command` this wrapper replaced, saved at install time so
+    /// uninstalling can put it back without guessing.
+    static var savedOriginalCommand: String? {
+        guard let url = savedOriginalURL,
+              let text = try? String(contentsOf: url, encoding: .utf8),
+              !text.isEmpty
+        else { return nil }
+        return text
+    }
+
+    static func saveOriginalCommand(_ command: String) throws {
+        guard let saved = savedOriginalURL else { throw InstallError.noSupportDir }
+        if let support = supportDir {
+            try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        }
+        try command.write(to: saved, atomically: true, encoding: .utf8)
+    }
+
     /// Stop saving and delete what was saved.
     ///
-    /// `settings.json` is deliberately left alone: the wrapper stays in place,
-    /// still handing the payload to the statusline it replaced, so turning
-    /// this off changes only whether NotchBuddy records anything. Uninstalling
-    /// the `statusLine` line itself is a separate, confirm-gated edit.
+    /// This does not touch settings.json — the caller does that, in the same
+    /// write that removes the hooks, so the file is edited once.
     static func disable() {
         let fm = FileManager.default
         if let marker = enabledMarker { try? fm.removeItem(at: marker) }
@@ -169,13 +178,5 @@ enum StatusLineReader {
               let contents = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
         else { return }
         for file in contents { try? fm.removeItem(at: file) }
-    }
-
-    /// Whether `settings.json`'s `statusLine.command` is this wrapper. Used by
-    /// the settings pane to notice that the line was changed behind the app's
-    /// back and that the saved original is no longer what is running.
-    static func settingsPointAtWrapper(_ command: String) -> Bool {
-        guard let wrapper = wrapperURL else { return false }
-        return command == "\"\(wrapper.path)\"" || command == wrapper.path
     }
 }

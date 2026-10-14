@@ -14,6 +14,13 @@ private func payload(usedPercentage: Any?, windowSize: Int) -> String {
 @main
 enum StatusLineContextTests {
     static func main() {
+        // Disposable support folder — see the note in StatusLineInstallerTests.
+        let sandbox = NSTemporaryDirectory() + "coucou-context-tests-\(getpid())"
+        try? FileManager.default.createDirectory(atPath: sandbox,
+                                                 withIntermediateDirectories: true)
+        setenv("COUCOU_SUPPORT_DIR", sandbox, 1)
+        defer { try? FileManager.default.removeItem(atPath: sandbox) }
+
         let dir = StatusLineReader.payloadDir!
         let sid = "test-session-\(UUID().uuidString)"
         let file = StatusLineReader.payloadURL(sessionId: sid)!

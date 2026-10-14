@@ -38,14 +38,17 @@ claude (terminal, VS Code, app Claude)
 
 Vérifier dans la doc la liste exacte des événements et leurs champs.
 
-### Contexte du session (`StatusLine`) — facultatif, désactivé par défaut
-- **C'est le seul point d'intégration qui donne l'occupation du contexte.** Aucun autre hook ne transporte de compteur de tokens, et `/context` n'a pas de forme scriptable. Un wrapper `statusline-hook.sh` enregistre le payload que Claude Code envoie puis le transmet tel quel au statusline déjà configuré ; l'app lit `context_window.used_percentage` et `context_window_size` depuis `~/Library/Application Support/NotchBuddy/statusline/<sessionId>.json`.
+### Contexte de session (`StatusLine`) — installé avec les crochets
+- **C'est le seul point d'intégration qui donne l'occupation du contexte.** Aucun autre hook ne transporte de compteur de tokens, et `/context` n'a pas de forme scriptable. Le wrapper `statusline-hook.sh` enregistre le payload que Claude Code envoie puis le transmet tel quel au statusline déjà configuré ; l'app lit `context_window.used_percentage` et `context_window_size` depuis `~/Library/Application Support/NotchBuddy/statusline/<sessionId>.json`.
+- **Installé et retiré avec les crochets Claude Code**, dans le même diff et la même écriture. Pas de réglage séparé : une case à cocher qui ne prenait effet qu'après avoir cliqué sur un autre bouton se lisait comme cassée.
+- **Désinstaller restaure la commande d'origine.** Sans cela, `settings.json` garderait un chemin vers un script qui disparaît avec l'app, et la barre de statut cesserait de fonctionner sans que rien ne l'explique. La commande d'origine est sauvegardée dans `statusline-original` au moment de l'installation.
+- Si `settings.json` n'a aucun `statusLine.command`, il n'y a rien à envelopper : les crochets s'installent quand même, la barre de contexte n'apparaît pas. Créer un statusline ne doit pas être un effet de bord de cette option — Claude Code exécuterait alors une commande à chaque rafraîchissement que l'utilisateur n'a jamais demandée.
 - **Pourquoi ne pas reconstruire le chiffre soi-même** : le payload contient `context_window_size`, déjà résolu par Claude Code pour cette session. Le deviner depuis le nom du modèle est faux en général — une passerelle peut associer un même nom à un backend 200k ou 1M.
 - **Piège** : `exceeds_200k_tokens` est un seuil fixe de 200k, « regardless of actual context window size » — il passe à `true` à 22 % sur un modèle 1M. Ne jamais s'en servir comme taille de fenêtre. Le pourcentage officiel, lui, exclut `output_tokens` (`input + cache_creation + cache_read`).
 - `used_percentage` vaut `null` avant le premier appel API d'une session, et de nouveau entre `/compact` et l'appel suivant : l'absence de donnée est le cas normal, pas une erreur.
-- L'écriture est conditionnée à un fichier marqueur (`statusline-enabled`) et ignorée si le payload n'a pas changé : Claude Code redessine le statusline toutes les ~300 ms. Désactiver le réglage supprime le marqueur et les payloads, et **ne touche pas** `settings.json` — le wrapper reste en place et continue de transmettre au statusline qu'il remplace.
-- L'installation réécrit **une seule ligne** de `settings.json` (`statusLine.command`), par substitution regex et non par re-sérialisation : `JSONSerialization` avec `sortedKeys` réordonnerait tout le fichier, alors que celui-ci peut contenir des clés API dans `env`. Diff affiché, confirmation, sauvegarde datée.
-- Si `settings.json` n'a déjà aucun `statusLine.command`, l'installation est refusée : créer un statusline n'a pas à être un effet de bord de cette option.
+- L'écriture est conditionnée à un fichier marqueur (`statusline-enabled`) et ignorée si le payload n'a pas changé : Claude Code redessine le statusline toutes les ~300 ms.
+- **La commande doit être citée pour le shell.** Le chemin contient un espace ; sans guillemets, Claude Code exécute la partie jusqu'au premier espace et le statusline meurt en silence.
+- `previewClaudeHooks(statusLine:)` prend sa valeur sans valeur par défaut. Les deux niveaux avaient une valeur par défaut différente, l'interface récupérait `false` et installait les crochets en laissant la barre de statut intacte — sans le dire.
 - Non disponible en version App Store : le wrapper y vivrait dans le conteneur de l'app, inatteignable pour le Claude Code qui tourne sur la machine.
 
 ### Approuver depuis le notch
