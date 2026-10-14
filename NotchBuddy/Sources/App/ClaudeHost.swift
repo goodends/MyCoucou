@@ -80,22 +80,27 @@ struct ClaudeHost: Equatable {
 
     // MARK: - Which hosts the notch lists
 
-    /// Which way the ticked rows read. The setting is one list of apps and one
-    /// question — "these" or "everything but these" — so the mode is stored
-    /// next to the list rather than being spelled out by the list's contents,
-    /// which would leave no room for an exclusion list.
-    enum FilterMode: String {
-        /// The ticked ids are the ones we show. The default: the app ships for
-        /// Orca, and a session opened in a plain terminal is noise.
-        case some
-        /// The ticked ids are the ones we hide; everything else shows.
-        case all
+    /// What the ticked rows mean, once the user has chosen to pick them by
+    /// hand. Its own labelled state rather than something the checkboxes imply:
+    /// an unticked box reads as "don't filter on this", never as "filter the
+    /// other way round", so the direction has to be spelled out.
+    enum FilterRule: String {
+        /// Ticked ids are the ones we show; everything else is hidden.
+        case showOnly
+        /// Ticked ids are the ones we hide; everything else shows. The default,
+        /// so that stepping into "custom" from "all" changes nothing until the
+        /// user ticks something.
+        case exclude
     }
 
-    /// UserDefaults keys. `hostFilterIdsKey` holds the ticked rows, read as the
-    /// shown hosts in `.some` and the excluded ones in `.all`.
-    static let hostFilterModeKey = "claudeHostFilterMode"
+    /// UserDefaults keys. `hostFilterIdsKey` holds the ticked rows, read through
+    /// `hostFilterRuleKey`. `hostFilterShowsAllKey` records the "all" choice
+    /// itself, which is a third state, not a special value of either — the same
+    /// way Power BI stores `Include | Exclude` as a field of its own rather
+    /// than inferring it.
+    static let hostFilterRuleKey = "claudeHostFilterRule"
     static let hostFilterIdsKey = "claudeHostFilterIds"
+    static let hostFilterShowsAllKey = "claudeHostShowsAll"
 
     /// Stands in for a session whose host we were never told — a scan whose
     /// parent chain didn't resolve, a hook payload with no bundle id. It gets
@@ -106,13 +111,16 @@ struct ClaudeHost: Equatable {
     /// One row in Settings → Apps. `group` is what the list is split by: a flat
     /// run of sixteen boxes told the reader nothing about why Terminal sits
     /// next to Kitty.
+    ///
+    /// Orca is a terminal, not a category of its own: it is listed in
+    /// `terminals` below, its sessions live in its panes, and the scan reads
+    /// them out of `ORCA_PANE_KEY`. Giving it a row above the groups put the UI
+    /// at odds with the model for no reason the reader could see.
     struct Host: Identifiable {
         enum Group: Int, CaseIterable {
-            /// What we ship for — one row, so no header of its own.
-            case orca
             case terminal
             case editor
-            /// A host we couldn't name. One row, so no header either.
+            /// A host we couldn't name. One row, so no header of its own.
             case other
         }
         let id: String
@@ -120,15 +128,15 @@ struct ClaudeHost: Equatable {
         let group: Group
     }
 
-    /// Every host the user can tick, in reading order: Orca first (the app we
-    /// ship for), then the terminals, then the editors, unknown last.
+    /// Every host the user can tick, in reading order: the terminals, then the
+    /// editors, then the unknown bucket.
     ///
     /// Sorted by display name because both tables are unordered — a picker that
     /// reshuffled between launches would be its own bug — and deduped by name
     /// because Cursor is reachable under two bundle ids and must be one row.
     static var allHosts: [Host] {
-        var seen: Set<String> = ["Orca"]
-        var rows: [Host] = [Host(id: orcaBundleId, name: "Orca", group: .orca)]
+        var seen: Set<String> = []
+        var rows: [Host] = []
         for (table, group) in [(terminals, Host.Group.terminal), (editors, Host.Group.editor)] {
             for (id, name) in table.sorted(by: { $0.value < $1.value }) where !seen.contains(name) {
                 seen.insert(name)
@@ -141,29 +149,31 @@ struct ClaudeHost: Equatable {
         return rows
     }
 
-    /// The stored mode. `.some` unless the user has said otherwise — a missing
-    /// key and a malformed one both fall back to the shipped default rather
-    /// than to a state nobody asked for.
-    static var storedMode: FilterMode {
-        get {
-            guard let raw = UserDefaults.standard.string(forKey: hostFilterModeKey),
-                  let mode = FilterMode(rawValue: raw)
-            else { return .some }
-            return mode
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: hostFilterModeKey) }
+    /// Whether the user is filtering by hand at all. True — show everything —
+    /// until they say otherwise: "no filter" is a state the user can see and
+    /// name, which is also why the per-app list stays hidden until they leave
+    /// it. A missing key means no filter; so does a missing or malformed rule.
+    static var showsAllHosts: Bool {
+        get { UserDefaults.standard.object(forKey: hostFilterShowsAllKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: hostFilterShowsAllKey) }
     }
 
-    /// The ticked ids. Orca alone on a fresh install; a *written* empty set is
-    /// a choice (show nothing, or exclude nothing under `.all`) and is kept
-    /// distinct from an absent key, which means the default.
-    static var storedIds: Set<String> {
+    /// The stored rule, read only when `showsAllHosts` is false.
+    static var storedRule: FilterRule {
         get {
-            guard let saved = UserDefaults.standard.stringArray(forKey: hostFilterIdsKey) else {
-                return [orcaBundleId]
-            }
-            return Set(saved)
+            guard let raw = UserDefaults.standard.string(forKey: hostFilterRuleKey),
+                  let rule = FilterRule(rawValue: raw)
+            else { return .exclude }
+            return rule
         }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: hostFilterRuleKey) }
+    }
+
+    /// The ticked ids, read through `storedRule`. Empty on a fresh install,
+    /// which under the default `.exclude` rule means "nothing excluded" — so
+    /// stepping into "custom" leaves what the notch shows exactly as it was.
+    static var storedIds: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: hostFilterIdsKey) ?? []) }
         set { UserDefaults.standard.set(newValue.sorted(), forKey: hostFilterIdsKey) }
     }
 
@@ -190,24 +200,22 @@ struct ClaudeHost: Equatable {
         return unknownHostId
     }
 
-    /// Whether a host id is shown, given a filter. Pure, and the only place the
-    /// two modes are spelled out, so the view layer and the hook gates can't
-    /// disagree about what a tick means.
-    ///
-    /// Under `.all` this is an exclusion test, which is the reason the mode is
-    /// stored rather than encoded: a host with no row of its own still shows,
-    /// because nothing can have excluded it.
-    static func isVisible(hostId: String, mode: FilterMode, ids: Set<String>) -> Bool {
-        switch mode {
-        case .some: return ids.contains(hostId)
-        case .all:  return !ids.contains(hostId)
+    /// Whether a host id is shown, given a rule and its ticked rows. Pure, and
+    /// the only place the two directions are spelled out, so the view layer and
+    /// the hook gates can't disagree about what a tick means.
+    static func isVisible(hostId: String, rule: FilterRule, ids: Set<String>) -> Bool {
+        switch rule {
+        case .showOnly: return ids.contains(hostId)
+        case .exclude:  return !ids.contains(hostId)
         }
     }
 
     /// Same, reading the stored filter — for the hook gates, which have no view
-    /// state to pass.
+    /// state to pass. "All" short-circuits: with no list, there is nothing that
+    /// could have been filtered out.
     static func isVisibleHostId(_ id: String) -> Bool {
-        isVisible(hostId: id, mode: storedMode, ids: storedIds)
+        guard !showsAllHosts else { return true }
+        return isVisible(hostId: id, rule: storedRule, ids: storedIds)
     }
 
     /// Same, for a host read off an `AgentTask` — the pill, which is what the

@@ -19682,22 +19682,6 @@
         }
       }
     },
-    "All": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "全部"
-          }
-        }
-      }
-    },
     "Other": {
       "localizations": {
         "en": {
@@ -19762,34 +19746,18 @@
         }
       }
     },
-    "apps.explain-include": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Only the ticked apps show their Claude Code sessions, questions and permission requests. An unticked app stays silent."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "只有勾选的应用会展示会话、提问和权限请求；未勾选的应用完全不打扰。"
-          }
-        }
-      }
-    },
     "apps.explain-exclude": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every app is shown except the ticked ones, which stay silent: no sessions in the list, no notifications, and their questions and permission requests are asked in the app itself."
+            "value": "The ticked apps stay silent: no sessions in the list, no notifications, and their questions and permission requests are asked in the app itself. Every other app is shown."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "除勾选的应用外全部展示。勾选的应用不展示会话、不发通知，它们的提问和权限请求在各自的应用里回答。"
+            "value": "勾选的应用保持安静：不展示会话、不发通知，它们的提问和权限请求在各自的应用里回答。其余应用全部展示。"
           }
         }
       }
@@ -19870,6 +19838,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法加载这个会话的历史记录。"
+          }
+        }
+      }
+    },
+    "apps.all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部"
+          }
+        }
+      }
+    },
+    "apps.custom": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义"
+          }
+        }
+      }
+    },
+    "apps.rule-show-only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show only the ticked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只显示勾选的"
+          }
+        }
+      }
+    },
+    "apps.rule-exclude": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exclude the ticked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "排除勾选的"
+          }
+        }
+      }
+    },
+    "apps.explain-all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every app's Claude Code sessions are shown, notified and answered in the notch."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有应用的 Claude Code 会话都会展示、通知，并在缺口中应答。"
+          }
+        }
+      }
+    },
+    "apps.explain-show-only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the ticked apps show their Claude Code sessions, questions and permission requests. The rest stay silent."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有勾选的应用会展示会话、提问和权限请求，其余的完全不打扰。"
           }
         }
       }

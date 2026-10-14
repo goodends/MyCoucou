@@ -189,43 +189,56 @@ struct SettingsView: View {
 
     // MARK: - Apps section
 
-    /// Which apps the notch lists Claude Code sessions for. Orca alone until
-    /// something else is ticked — the app is built for Orca, so a session the
-    /// user opened in a plain terminal is noise by default.
+    /// Which apps the notch lists Claude Code sessions for.
+    ///
+    /// "All" is the default and hides the list: with nothing filtered there is
+    /// nothing to configure, and an unticked box reads as "don't filter on
+    /// this" — never as "filter the other way round". Choosing "custom" reveals
+    /// the list *and* a labelled rule for what the ticks mean, so the direction
+    /// is stated next to the checkboxes instead of being implied by the one
+    /// above them.
     @ViewBuilder private var appsSection: some View {
         GroupBox(String(localized: "Claude Code sessions")) {
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle(String(localized: "All", defaultValue: "All"), isOn: Binding(
-                    get: { state.showAllHosts },
-                    // All means "no exclusions", so the list starts empty —
-                    // otherwise a leftover tick from the previous mode would
-                    // silently silence an app the user thinks is shown. Turning
-                    // it off returns to the shipped default rather than to an
-                    // empty list, because "show me nothing" is indistinguishable
-                    // from a broken app.
-                    set: { on in
-                        state.hostFilterIds = on ? [] : [ClaudeHost.orcaBundleId]
-                        state.showAllHosts = on
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("", selection: Binding(
+                    get: { !state.showsAllHosts },
+                    set: { custom in state.showsAllHosts = !custom }
+                )) {
+                    Text(String(localized: "apps.all", defaultValue: "All")).tag(false)
+                    Text(String(localized: "apps.custom", defaultValue: "Custom")).tag(true)
+                }
+                .pickerStyle(RadioGroupPickerStyle())
+                .labelsHidden()
+
+                if state.showsAllHosts {
+                    Text(String(localized: "apps.explain-all",
+                                defaultValue: "Every app's Claude Code sessions are shown, notified and answered in the notch."))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Picker("", selection: $state.hostFilterRule) {
+                        Text(String(localized: "apps.rule-show-only", defaultValue: "Show only the ticked")).tag(ClaudeHost.FilterRule.showOnly)
+                        Text(String(localized: "apps.rule-exclude", defaultValue: "Exclude the ticked")).tag(ClaudeHost.FilterRule.exclude)
                     }
-                ))
-                // Sits directly under the switch that changes its meaning, not
-                // under the list it describes — at the bottom of sixteen boxes
-                // it was clipped by the panel edge and read too late.
-                Text(state.showAllHosts
-                     ? String(localized: "apps.explain-exclude",
-                              defaultValue: "Every app is shown except the ticked ones, which stay silent: no sessions in the list, no notifications, and their questions and permission requests are asked in the app itself.")
-                     : String(localized: "apps.explain-include",
-                              defaultValue: "Only the ticked apps show their Claude Code sessions, questions and permission requests. An unticked app stays silent."))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                appHostRows
-                Text(String(localized: "apps.other-note",
-                            defaultValue: "Sessions from an app we can't name land in Other."))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .pickerStyle(RadioGroupPickerStyle())
+                    .labelsHidden()
+                    Text(state.hostFilterRule == .showOnly
+                         ? String(localized: "apps.explain-show-only",
+                                  defaultValue: "Only the ticked apps show their Claude Code sessions, questions and permission requests. The rest stay silent.")
+                         : String(localized: "apps.explain-exclude",
+                                  defaultValue: "The ticked apps stay silent: no sessions in the list, no notifications, and their questions and permission requests are asked in the app itself. Every other app is shown."))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Divider()
+                    appHostRows
+                    Text(String(localized: "apps.other-note",
+                                defaultValue: "Sessions from an app we can't name land in Other."))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(6)
         }

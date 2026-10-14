@@ -42,9 +42,17 @@ enum ClaudeHostTests {
 
         print("ClaudeHost.allHosts")
         UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterIdsKey)
-        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterModeKey)
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterRuleKey)
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterShowsAllKey)
         let hosts = ClaudeHost.allHosts
-        check("Orca first", hosts.first?.id == ClaudeHost.orcaBundleId, failures: &failures)
+        // Orca is a terminal host like any other: its sessions live in panes and
+        // the scan reads them from ORCA_PANE_KEY, so it belongs in the group
+        // rather than in a row of its own above them.
+        check("Orca is a terminal", hosts.first { $0.id == ClaudeHost.orcaBundleId }?.group == .terminal, failures: &failures)
+        check("every terminal precedes every editor",
+              hosts.lastIndex(where: { $0.group == .terminal }).map { t in
+                  hosts.lastIndex(where: { $0.group == .editor }).map { t < $0 } ?? false
+              } ?? false, failures: &failures)
         check("unknown last", hosts.last?.id == ClaudeHost.unknownHostId, failures: &failures)
         // Cursor answers to two bundle ids but is one row the user ticks.
         check("Cursor listed once", hosts.filter { $0.name == "Cursor" }.count == 1, failures: &failures)
@@ -52,14 +60,14 @@ enum ClaudeHostTests {
         check("every row has a name", hosts.allSatisfy { !$0.name.isEmpty }, failures: &failures)
 
         print("ClaudeHost.stored filter")
-        // A fresh install shows Orca and nothing else; an explicitly empty set is
-        // the user's "show me none", so absent and empty must stay distinguishable.
-        check("mode defaults to some", ClaudeHost.storedMode == .some, failures: &failures)
-        check("Orca only by default", ClaudeHost.storedIds == [ClaudeHost.orcaBundleId], failures: &failures)
-        ClaudeHost.storedIds = []
-        check("empty stays empty", ClaudeHost.storedIds.isEmpty, failures: &failures)
+        // A fresh install filters nothing: "all" is its own state, not an empty
+        // list read one particular way, which is what lets the settings page hide
+        // the list until the user asks for it.
+        check("shows all by default", ClaudeHost.showsAllHosts, failures: &failures)
+        check("rule defaults to exclude", ClaudeHost.storedRule == .exclude, failures: &failures)
+        check("no rows ticked by default", ClaudeHost.storedIds.isEmpty, failures: &failures)
 
-        print("ClaudeHost.isVisible (.some)")
+        print("ClaudeHost.isVisible (custom · show only the ticked)")
         func session(_ hostApp: String?, _ bundleId: String? = nil) -> ClaudeSession {
             ClaudeSession(id: "sid", sessionId: "sid", cwd: "/tmp/x", hostApp: hostApp,
                           sessionBundleId: bundleId, projectName: "x", state: .idle,
@@ -69,10 +77,12 @@ enum ClaudeHostTests {
         // caller makes. Reads the stored filter, which is what each test has
         // just set and what the hook gates see.
         func isVisible(_ s: ClaudeSession) -> Bool {
-            ClaudeHost.isVisible(hostId: ClaudeHost.hostId(for: s),
-                                 mode: ClaudeHost.storedMode, ids: ClaudeHost.storedIds)
+            guard !ClaudeHost.showsAllHosts else { return true }
+            return ClaudeHost.isVisible(hostId: ClaudeHost.hostId(for: s),
+                                        rule: ClaudeHost.storedRule, ids: ClaudeHost.storedIds)
         }
-        ClaudeHost.storedMode = .some
+        ClaudeHost.showsAllHosts = false
+        ClaudeHost.storedRule = .showOnly
         ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
         check("Orca visible", isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
         check("Terminal hidden", !isVisible(session("com.apple.Terminal")), failures: &failures)
@@ -102,11 +112,12 @@ enum ClaudeHostTests {
         check("Terminal visible once ticked", isVisible(session("com.apple.Terminal")), failures: &failures)
         check("Orca hidden once unticked", !isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
 
-        print("ClaudeHost.isVisible (.all = exclude these)")
-        // Same rows, opposite meaning: the ticked ones are now the quiet ones.
-        // Nothing to exclude means everything shows, including hosts we have no
-        // row for — an exclusion list can't accidentally silence the unknown.
-        ClaudeHost.storedMode = .all
+        print("ClaudeHost.isVisible (custom · exclude the ticked)")
+        // Same rows, opposite rule — and the rule is a labelled choice in its own
+        // right, not something the checkboxes imply. Nothing to exclude means
+        // everything shows, including hosts we have no row for: an exclusion list
+        // can't accidentally silence the unknown.
+        ClaudeHost.storedRule = .exclude
         ClaudeHost.storedIds = []
         check("nothing excluded shows Orca", isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
         check("nothing excluded shows Terminal", isVisible(session("com.apple.Terminal")), failures: &failures)
@@ -130,7 +141,7 @@ enum ClaudeHostTests {
         // A pill with no host recorded at all is an agent that isn't a Claude
         // Code session (Codex, Copilot…). Filtering it as "unknown" would mute
         // every agent pill the moment the user excluded Other.
-        ClaudeHost.storedMode = .some
+        ClaudeHost.storedRule = .showOnly
         ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
         check("no host recorded shows", ClaudeHost.isVisibleHost(hostApp: nil, bundleId: nil), failures: &failures)
         check("empty host fields show", ClaudeHost.isVisibleHost(hostApp: "", bundleId: ""), failures: &failures)
@@ -138,11 +149,19 @@ enum ClaudeHostTests {
         // VS Code and Cursor name no terminal, only the app they run in.
         check("editor host is filtered", !ClaudeHost.isVisibleHost(hostApp: nil, bundleId: "com.microsoft.VSCode"), failures: &failures)
         check("Orca host shows", ClaudeHost.isVisibleHost(hostApp: ClaudeHost.orcaBundleId, bundleId: ""), failures: &failures)
-        ClaudeHost.storedMode = .all
+        ClaudeHost.storedRule = .exclude
         ClaudeHost.storedIds = ["com.apple.Terminal"]
-        check("under All, an unexcluded host shows", ClaudeHost.isVisibleHost(hostApp: ClaudeHost.orcaBundleId, bundleId: ""), failures: &failures)
-        check("under All, a ticked host is muted", !ClaudeHost.isVisibleHost(hostApp: "com.apple.Terminal", bundleId: ""), failures: &failures)
-        check("under All, no host recorded still shows", ClaudeHost.isVisibleHost(hostApp: nil, bundleId: nil), failures: &failures)
+        check("an unexcluded host shows", ClaudeHost.isVisibleHost(hostApp: ClaudeHost.orcaBundleId, bundleId: ""), failures: &failures)
+        check("an excluded host is muted", !ClaudeHost.isVisibleHost(hostApp: "com.apple.Terminal", bundleId: ""), failures: &failures)
+        check("no host recorded still shows", ClaudeHost.isVisibleHost(hostApp: nil, bundleId: nil), failures: &failures)
+        // Back to "all": with no list, nothing can have been filtered out — the
+        // rows left over from a previous custom filter must not keep silencing.
+        ClaudeHost.storedRule = .showOnly
+        ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
+        ClaudeHost.showsAllHosts = true
+        check("all shows a host the rows would have hidden",
+              ClaudeHost.isVisibleHost(hostApp: "com.apple.Terminal", bundleId: "com.apple.Terminal"), failures: &failures)
+        check("all shows an unknown host", ClaudeHost.isVisibleHost(hostApp: nil, bundleId: "com.example.app"), failures: &failures)
 
         print("ClaudeHost.runsInOrca")
         // Only Orca has an Orca terminal to switch to. The check reads the
@@ -155,10 +174,12 @@ enum ClaudeHostTests {
         check("Cursor does not", !ClaudeHost.runsInOrca(session(nil, "com.todesktop.230313mzl4w4u92")), failures: &failures)
         check("no host at all does not", !ClaudeHost.runsInOrca(session(nil)), failures: &failures)
 
-        ClaudeHost.storedMode = .some
-        ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
+        ClaudeHost.showsAllHosts = true
+        ClaudeHost.storedRule = .exclude
+        ClaudeHost.storedIds = []
         UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterIdsKey)
-        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterModeKey)
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterRuleKey)
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterShowsAllKey)
 
         if failures > 0 {
             print("\n\(failures) test(s) failed."); exit(1)

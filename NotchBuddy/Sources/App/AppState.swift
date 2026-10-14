@@ -65,15 +65,23 @@ final class AppState: ObservableObject {
     /// relies on the process scan (or its next hook event) to return.
     var hiddenClaudeSessions: [String: ClaudeSession] = [:]
 
-    /// Whether Settings → Apps reads its ticked rows as "show these" or as
-    /// "hide these". Published because flipping it re-reads every row at once.
-    @Published var showAllHosts: Bool = ClaudeHost.storedMode == .all {
-        didSet { ClaudeHost.storedMode = showAllHosts ? .all : .some }
+    /// Settings → Apps: whether the user is filtering by hand. True — show
+    /// everything — until they pick "custom", which is also what hides the
+    /// per-app list. Published because leaving it re-reads every row at once.
+    @Published var showsAllHosts: Bool = ClaudeHost.showsAllHosts {
+        didSet { ClaudeHost.showsAllHosts = showsAllHosts }
     }
 
-    /// The ticked rows of Settings → Apps: the shown hosts in `.some`, the
-    /// excluded ones in `.all`. Published so a tick takes effect on the spot
-    /// instead of at the next scan, and written through to survive a restart.
+    /// Which way the ticked rows read once the user has picked "custom". Its
+    /// own labelled state rather than something the checkboxes imply: an
+    /// unticked box reads as "don't filter on this", never as "filter the
+    /// other way round".
+    @Published var hostFilterRule: ClaudeHost.FilterRule = ClaudeHost.storedRule {
+        didSet { ClaudeHost.storedRule = hostFilterRule }
+    }
+
+    /// The ticked rows. Published so a tick takes effect on the spot instead of
+    /// at the next scan, and written through to survive a restart.
     @Published var hostFilterIds: Set<String> = ClaudeHost.storedIds {
         didSet { ClaudeHost.storedIds = hostFilterIds }
     }
@@ -252,9 +260,9 @@ final class AppState: ObservableObject {
     /// rather than the stored one: the rows are what SwiftUI re-renders on, and
     /// the two can't drift anyway (didSet writes through).
     private func isVisible(_ session: ClaudeSession) -> Bool {
-        ClaudeHost.isVisible(hostId: ClaudeHost.hostId(for: session),
-                             mode: showAllHosts ? .all : .some,
-                             ids: hostFilterIds)
+        guard !showsAllHosts else { return true }
+        return ClaudeHost.isVisible(hostId: ClaudeHost.hostId(for: session),
+                                    rule: hostFilterRule, ids: hostFilterIds)
     }
 
     /// The Claude session that should drive the OverviewView's left card:
