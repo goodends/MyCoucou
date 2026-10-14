@@ -78,6 +78,138 @@ struct ClaudeHost: Equatable {
         return terminals[id] ?? editors[id]
     }
 
+    // MARK: - Which hosts the notch lists
+
+    /// Which way the ticked rows read. The setting is one list of apps and one
+    /// question — "these" or "everything but these" — so the mode is stored
+    /// next to the list rather than being spelled out by the list's contents,
+    /// which would leave no room for an exclusion list.
+    enum FilterMode: String {
+        /// The ticked ids are the ones we show. The default: the app ships for
+        /// Orca, and a session opened in a plain terminal is noise.
+        case some
+        /// The ticked ids are the ones we hide; everything else shows.
+        case all
+    }
+
+    /// UserDefaults keys. `hostFilterIdsKey` holds the ticked rows, read as the
+    /// shown hosts in `.some` and the excluded ones in `.all`.
+    static let hostFilterModeKey = "claudeHostFilterMode"
+    static let hostFilterIdsKey = "claudeHostFilterIds"
+
+    /// Stands in for a session whose host we were never told — a scan whose
+    /// parent chain didn't resolve, a hook payload with no bundle id. It gets
+    /// its own row in Settings → Apps, so those sessions can be hidden too
+    /// instead of being un-hideable.
+    static let unknownHostId = "unknown"
+
+    /// One row in Settings → Apps. `group` is what the list is split by: a flat
+    /// run of sixteen boxes told the reader nothing about why Terminal sits
+    /// next to Kitty.
+    struct Host: Identifiable {
+        enum Group: Int, CaseIterable {
+            /// What we ship for — one row, so no header of its own.
+            case orca
+            case terminal
+            case editor
+            /// A host we couldn't name. One row, so no header either.
+            case other
+        }
+        let id: String
+        let name: String
+        let group: Group
+    }
+
+    /// Every host the user can tick, in reading order: Orca first (the app we
+    /// ship for), then the terminals, then the editors, unknown last.
+    ///
+    /// Sorted by display name because both tables are unordered — a picker that
+    /// reshuffled between launches would be its own bug — and deduped by name
+    /// because Cursor is reachable under two bundle ids and must be one row.
+    static var allHosts: [Host] {
+        var seen: Set<String> = ["Orca"]
+        var rows: [Host] = [Host(id: orcaBundleId, name: "Orca", group: .orca)]
+        for (table, group) in [(terminals, Host.Group.terminal), (editors, Host.Group.editor)] {
+            for (id, name) in table.sorted(by: { $0.value < $1.value }) where !seen.contains(name) {
+                seen.insert(name)
+                rows.append(Host(id: id, name: name, group: group))
+            }
+        }
+        rows.append(Host(id: unknownHostId,
+                         name: String(localized: "Other", defaultValue: "Other"),
+                         group: .other))
+        return rows
+    }
+
+    /// The stored mode. `.some` unless the user has said otherwise — a missing
+    /// key and a malformed one both fall back to the shipped default rather
+    /// than to a state nobody asked for.
+    static var storedMode: FilterMode {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: hostFilterModeKey),
+                  let mode = FilterMode(rawValue: raw)
+            else { return .some }
+            return mode
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: hostFilterModeKey) }
+    }
+
+    /// The ticked ids. Orca alone on a fresh install; a *written* empty set is
+    /// a choice (show nothing, or exclude nothing under `.all`) and is kept
+    /// distinct from an absent key, which means the default.
+    static var storedIds: Set<String> {
+        get {
+            guard let saved = UserDefaults.standard.stringArray(forKey: hostFilterIdsKey) else {
+                return [orcaBundleId]
+            }
+            return Set(saved)
+        }
+        set { UserDefaults.standard.set(newValue.sorted(), forKey: hostFilterIdsKey) }
+    }
+
+    /// The host a session belongs to: the terminal the scan or hook named, else
+    /// the app the hook itself ran in.
+    ///
+    /// Anything not in the tables above — a session we never learned the host
+    /// of, or an app like the Claude desktop build that has no row — lands in
+    /// the unknown bucket rather than keeping its own bundle id. Returning the
+    /// raw id would leave such a session matched by no checkbox at all: gone
+    /// from the list, and no way to bring it back.
+    static func hostId(for session: ClaudeSession) -> String {
+        hostId(hostApp: session.hostApp, bundleId: session.sessionBundleId)
+    }
+
+    /// Same, from a hook payload's two host fields, for the paths that must
+    /// decide before any `ClaudeSession` exists.
+    static func hostId(hostApp: String?, bundleId: String?) -> String {
+        for id in [hostApp, bundleId] {
+            if let id, !id.isEmpty {
+                return name(for: id) != nil ? id : unknownHostId
+            }
+        }
+        return unknownHostId
+    }
+
+    /// Whether a host id is shown, given a filter. Pure, and the only place the
+    /// two modes are spelled out, so the view layer and the hook gates can't
+    /// disagree about what a tick means.
+    ///
+    /// Under `.all` this is an exclusion test, which is the reason the mode is
+    /// stored rather than encoded: a host with no row of its own still shows,
+    /// because nothing can have excluded it.
+    static func isVisible(hostId: String, mode: FilterMode, ids: Set<String>) -> Bool {
+        switch mode {
+        case .some: return ids.contains(hostId)
+        case .all:  return !ids.contains(hostId)
+        }
+    }
+
+    /// Same, reading the stored filter — for the hook gates, which have no view
+    /// state to pass.
+    static func isVisibleHostId(_ id: String) -> Bool {
+        isVisible(hostId: id, mode: storedMode, ids: storedIds)
+    }
+
     /// How to label where a session runs, shared by the session pill's subtitle
     /// and the chat's host chip so the two can't drift apart.
     ///

@@ -2744,7 +2744,7 @@ struct ClaudeSessionsListView: View {
 
     private var live: [ClaudeSession] {
         let cutoff = Date().addingTimeInterval(-Self.idleCutoff)
-        return state.claudeSessions.filter { s in
+        return state.visibleClaudeSessions.filter { s in
             if s.pid != nil { return state.isClaudeSessionAlive(s) }
             return s.lastEventAt >= cutoff
         }
@@ -2878,7 +2878,7 @@ struct ClaudeSessionsListView: View {
                 // Nothing on the hook pipe at all can still mean a session is
                 // running that started before us — re-check the process table
                 // (rate-limited inside) so the card isn't just blank.
-                if state.claudeSessions.isEmpty {
+                if state.visibleClaudeSessions.isEmpty {
                     state.scanForRunningClaudeSessions()
                 }
             }

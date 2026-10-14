@@ -40,6 +40,97 @@ enum ClaudeHostTests {
         UserDefaults.standard.removeObject(forKey: ClaudeHost.terminalCardsKey)
         check("off by default", ClaudeHost.terminalCardsEnabled == false, failures: &failures)
 
+        print("ClaudeHost.allHosts")
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterIdsKey)
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterModeKey)
+        let hosts = ClaudeHost.allHosts
+        check("Orca first", hosts.first?.id == ClaudeHost.orcaBundleId, failures: &failures)
+        check("unknown last", hosts.last?.id == ClaudeHost.unknownHostId, failures: &failures)
+        // Cursor answers to two bundle ids but is one row the user ticks.
+        check("Cursor listed once", hosts.filter { $0.name == "Cursor" }.count == 1, failures: &failures)
+        check("no duplicate names", Set(hosts.map(\.name)).count == hosts.count, failures: &failures)
+        check("every row has a name", hosts.allSatisfy { !$0.name.isEmpty }, failures: &failures)
+
+        print("ClaudeHost.stored filter")
+        // A fresh install shows Orca and nothing else; an explicitly empty set is
+        // the user's "show me none", so absent and empty must stay distinguishable.
+        check("mode defaults to some", ClaudeHost.storedMode == .some, failures: &failures)
+        check("Orca only by default", ClaudeHost.storedIds == [ClaudeHost.orcaBundleId], failures: &failures)
+        ClaudeHost.storedIds = []
+        check("empty stays empty", ClaudeHost.storedIds.isEmpty, failures: &failures)
+
+        print("ClaudeHost.isVisible (.some)")
+        func session(_ hostApp: String?, _ bundleId: String? = nil) -> ClaudeSession {
+            ClaudeSession(id: "sid", sessionId: "sid", cwd: "/tmp/x", hostApp: hostApp,
+                          sessionBundleId: bundleId, projectName: "x", state: .idle,
+                          startedAt: .now, lastEventAt: .now)
+        }
+        // Resolve the host, then ask the one predicate — the two steps every
+        // caller makes. Reads the stored filter, which is what each test has
+        // just set and what the hook gates see.
+        func isVisible(_ s: ClaudeSession) -> Bool {
+            ClaudeHost.isVisible(hostId: ClaudeHost.hostId(for: s),
+                                 mode: ClaudeHost.storedMode, ids: ClaudeHost.storedIds)
+        }
+        ClaudeHost.storedMode = .some
+        ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
+        check("Orca visible", isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
+        check("Terminal hidden", !isVisible(session("com.apple.Terminal")), failures: &failures)
+        check("VS Code hidden", !isVisible(session("com.microsoft.VSCode")), failures: &failures)
+        // No host at all: a scan whose parent chain didn't resolve. Not Orca, so
+        // it stays out unless the user ticks Other.
+        check("unknown host hidden", !isVisible(session(nil)), failures: &failures)
+        check("empty host is unknown", ClaudeHost.hostId(for: session("")) == ClaudeHost.unknownHostId, failures: &failures)
+        // The hook's own bundle id is the fallback when no terminal was named —
+        // an editor session has no terminal, only the app it runs in.
+        check("falls back to the hook bundle id",
+              ClaudeHost.hostId(for: session(nil, "com.microsoft.VSCode")) == "com.microsoft.VSCode",
+              failures: &failures)
+        // An app with no row in the tables (the Claude desktop build) used to
+        // keep its own bundle id, which no checkbox matched: gone from the list
+        // with no way to bring it back. It has to fall into the Other bucket.
+        check("unlisted app is Other",
+              ClaudeHost.hostId(for: session(nil, "com.anthropic.claudefordesktop")) == ClaudeHost.unknownHostId,
+              failures: &failures)
+        check("hook payload form", ClaudeHost.hostId(hostApp: nil, bundleId: "com.apple.Terminal") == "com.apple.Terminal", failures: &failures)
+        check("hook payload, nothing known", ClaudeHost.hostId(hostApp: "", bundleId: "") == ClaudeHost.unknownHostId, failures: &failures)
+        ClaudeHost.storedIds = [ClaudeHost.orcaBundleId, ClaudeHost.unknownHostId]
+        check("unknown visible once ticked", isVisible(session(nil)), failures: &failures)
+        check("unlisted app visible via Other too",
+              isVisible(session(nil, "com.anthropic.claudefordesktop")), failures: &failures)
+        ClaudeHost.storedIds = ["com.apple.Terminal"]
+        check("Terminal visible once ticked", isVisible(session("com.apple.Terminal")), failures: &failures)
+        check("Orca hidden once unticked", !isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
+
+        print("ClaudeHost.isVisible (.all = exclude these)")
+        // Same rows, opposite meaning: the ticked ones are now the quiet ones.
+        // Nothing to exclude means everything shows, including hosts we have no
+        // row for — an exclusion list can't accidentally silence the unknown.
+        ClaudeHost.storedMode = .all
+        ClaudeHost.storedIds = []
+        check("nothing excluded shows Orca", isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
+        check("nothing excluded shows Terminal", isVisible(session("com.apple.Terminal")), failures: &failures)
+        check("nothing excluded shows VS Code", isVisible(session("com.microsoft.VSCode")), failures: &failures)
+        check("nothing excluded shows an unknown host", isVisible(session(nil)), failures: &failures)
+        check("nothing excluded covers a brand-new id", ClaudeHost.isVisibleHostId("com.brand.new.terminal"), failures: &failures)
+        ClaudeHost.storedIds = ["com.apple.Terminal"]
+        check("excluded Terminal is quiet", !isVisible(session("com.apple.Terminal")), failures: &failures)
+        check("untouched Orca still shows", isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
+        ClaudeHost.storedIds = [ClaudeHost.unknownHostId]
+        check("excluding Other also silences unlisted apps",
+              !isVisible(session(nil, "com.anthropic.claudefordesktop")), failures: &failures)
+        check("excluding Other leaves Terminal alone", isVisible(session("com.apple.Terminal")), failures: &failures)
+        ClaudeHost.storedIds = Set(ClaudeHost.allHosts.map(\.id))
+        check("every row excluded shows nothing", !isVisible(session(ClaudeHost.orcaBundleId)), failures: &failures)
+        check("every row excluded silences a terminal too", !isVisible(session("com.apple.Terminal")), failures: &failures)
+        check("every row excluded still leaves unknown-outside-the-list alone",
+              ClaudeHost.isVisibleHostId("com.brand.new.terminal"), failures: &failures)
+
+        ClaudeHost.storedMode = .some
+        ClaudeHost.storedIds = [ClaudeHost.orcaBundleId]
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterIdsKey)
+        UserDefaults.standard.removeObject(forKey: ClaudeHost.hostFilterModeKey)
+
         if failures > 0 {
             print("\n\(failures) test(s) failed."); exit(1)
         }

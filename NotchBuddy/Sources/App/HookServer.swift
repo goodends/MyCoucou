@@ -511,6 +511,13 @@ final class HookServer: @unchecked Sendable {
         // external-agent branch with a different pill id.
         let isClaudeSession = PillCatalog.definition(for: agentId)?.source == .claudeCode
         if isClaudeSession { lastClaudeSessionId = sessionId }
+        // A Claude Code session running in an app the user switched off in
+        // Settings → Apps. Its session stays out of the list, so it must stay
+        // out of the inbox too — otherwise unticking an app only hid the list
+        // and left it yanking the island open with sounds. The agent keeps
+        // working either way: nothing here holds its hook open.
+        let isHiddenHostSession = isClaudeSession
+            && !ClaudeHost.isVisibleHostId(ClaudeHost.hostId(hostApp: hostApp, bundleId: bundleId))
         // Orca injects `ORCA_TERMINAL_HANDLE` (the runtime-issued `handle`
         // for the pane hosting this Claude session) into every Claude
         // process's environment, and nb-hook forwards it on every event.
@@ -650,7 +657,7 @@ final class HookServer: @unchecked Sendable {
             let lower = message.lowercased()
             if lower.contains("rate limit") || lower.contains("limite d") {
                 state.updateTask(id: agentId, state: .ratelimit)
-                SoundEngine.shared.play("rate")
+                if !isHiddenHostSession { SoundEngine.shared.play("rate") }
             } else if message.hasSuffix("?") {
                 state.updateTask(id: agentId, state: .question)
                 appendStep(id: agentId, step: message, sessionId: sessionId)
@@ -674,21 +681,27 @@ final class HookServer: @unchecked Sendable {
             // Queue the notification: the finished card shows every session
             // that finished, each with its own avatar / final line /
             // "Open terminal" target, instead of one slot the newest overwrites.
-            state.pushNotification(agentId: agentId,
-                                   sessionId: sessionId,
-                                   kind: .finished,
-                                   finalLine: finalText)
+            // Steps and session state land either way — unticking the app back
+            // must reveal the session with its history, not a hole.
+            if !isHiddenHostSession {
+                state.pushNotification(agentId: agentId,
+                                       sessionId: sessionId,
+                                       kind: .finished,
+                                       finalLine: finalText)
+            }
             if isClaudeSession {
                 updateClaudeSession(state: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid)
             }
             state.scheduleReloadHistoryFromJSONL(for: agentId)
-            SoundEngine.shared.play("finish")
-            // A background session must not yank the island open, but if the
-            // stack is already on screen this one belongs in it.
-            if focused || state.view == .finished {
-                expandIfNeeded(to: .finished)
-            } else {
-                setPillBadge(id: agentId, badge: .finished)
+            if !isHiddenHostSession {
+                SoundEngine.shared.play("finish")
+                // A background session must not yank the island open, but if the
+                // stack is already on screen this one belongs in it.
+                if focused || state.view == .finished {
+                    expandIfNeeded(to: .finished)
+                } else {
+                    setPillBadge(id: agentId, badge: .finished)
+                }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.2) {
                 if isExternalAgent {
@@ -704,21 +717,23 @@ final class HookServer: @unchecked Sendable {
             // n8n placeholder, which named a workflow that this app no longer has
             // and said nothing about the session that actually failed. An error
             // notification is the real thing — its own Mochi, its own session.
-            state.pushNotification(agentId: agentId,
-                                   sessionId: sessionId,
-                                   kind: .error,
-                                   finalLine: DiffEngine.toOneLine((payload["message"] as? String) ?? ""))
             state.updateTask(id: agentId, state: .error)
             if isClaudeSession {
                 updateClaudeSession(state: .error, sessionId: sessionId, cwd: cwd,
                                     hostApp: hostApp, bundleId: bundleId,
                                     projectName: projectName, pid: agentPid)
             }
-            SoundEngine.shared.play("error")
-            if focused || state.view == .finished {
-                expandIfNeeded(to: .finished)
-            } else {
-                setPillBadge(id: agentId, badge: .error)
+            if !isHiddenHostSession {
+                state.pushNotification(agentId: agentId,
+                                       sessionId: sessionId,
+                                       kind: .error,
+                                       finalLine: DiffEngine.toOneLine((payload["message"] as? String) ?? ""))
+                SoundEngine.shared.play("error")
+                if focused || state.view == .finished {
+                    expandIfNeeded(to: .finished)
+                } else {
+                    setPillBadge(id: agentId, badge: .error)
+                }
             }
             if isClaudeSession { updateClaudeSession(state: .idle, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid) }
 
@@ -924,7 +939,16 @@ final class HookServer: @unchecked Sendable {
         let terminalHost = isCursorEditor || isVSCodeEditor ? nil
             : ClaudeHost.terminal(termProgram: termProgram, bundleId: bundleId)
         let isTerminal = terminalHost != nil && ClaudeHost.terminalCardsEnabled
-        guard isCodexRequest || isCopilotRequest || isMuseRequest || isHermesRequest || isCursorEditor || isVSCodeEditor || isTerminal else {
+        // A Claude Code session in an app the user switched off in Settings →
+        // Apps, same contract as the terminal-cards switch: no card, so answer
+        // "ask" and let the host app ask. Never answered from here on that
+        // session's behalf — the agent isn't blocked either way. The other
+        // agents are untouched: they aren't Claude Code sessions and have no
+        // host app to have switched off.
+        let isHiddenHostRequest = !(isCodexRequest || isCopilotRequest || isMuseRequest || isHermesRequest)
+            && !ClaudeHost.isVisibleHostId(ClaudeHost.hostId(hostApp: terminalHost?.bundleId, bundleId: bundleId))
+        guard isCodexRequest || isCopilotRequest || isMuseRequest || isHermesRequest || isCursorEditor || isVSCodeEditor || isTerminal,
+              !isHiddenHostRequest else {
             Task.detached { [weak self] in
                 self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
                 close(fd)
@@ -1068,7 +1092,13 @@ final class HookServer: @unchecked Sendable {
         let terminalHost = isCursorEditor || isVSCodeEditor ? nil
             : ClaudeHost.terminal(termProgram: termProgram, bundleId: bundleId)
         let isTerminal = terminalHost != nil && ClaudeHost.terminalCardsEnabled
-        guard isCodexRequest || isCursorEditor || isVSCodeEditor || isTerminal else {
+        // As in the permission handler: a Claude Code session in an app the user
+        // switched off asks in its own UI rather than in the notch. Codex is
+        // exempt — it isn't a Claude Code session.
+        let isHiddenHostRequest = !isCodexRequest
+            && !ClaudeHost.isVisibleHostId(ClaudeHost.hostId(hostApp: terminalHost?.bundleId, bundleId: bundleId))
+        guard isCodexRequest || isCursorEditor || isVSCodeEditor || isTerminal,
+              !isHiddenHostRequest else {
             Task.detached { [weak self] in
                 self?.sendLine(fd: fd, text: #"{"permissionDecision":"ask"}"#)
                 close(fd)

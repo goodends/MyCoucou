@@ -126,6 +126,7 @@ struct SettingsView: View {
                     )) {
                         SettingsSidebarRow(title: "General",      icon: "gearshape.fill",                    color: "#8E939C").tag("general")
                         SettingsSidebarRow(title: "Agents",       icon: "terminal.fill",                     color: "#3B9EFF").tag("agents")
+                        SettingsSidebarRow(title: "Apps",         icon: "square.grid.2x2.fill",               color: "#10B981").tag("apps")
                         SettingsSidebarRow(title: "Shortcuts",    icon: "keyboard.fill",                     color: "#6366F1").tag("shortcuts")
                     }
                     .listStyle(.sidebar)
@@ -171,6 +172,7 @@ struct SettingsView: View {
         switch selectedSection {
         case "general":      return String(localized: "General")
         case "agents":       return String(localized: "Agents")
+        case "apps":         return String(localized: "Apps", defaultValue: "Apps")
         case "shortcuts":    return String(localized: "Shortcuts")
         default:             return String(localized: "General")
         }
@@ -179,8 +181,77 @@ struct SettingsView: View {
     @ViewBuilder private var sectionContent: some View {
         switch selectedSection {
         case "agents":       agentsSection
+        case "apps":         appsSection
         case "shortcuts":    ShortcutsSettingsView()
         default:             generalSection
+        }
+    }
+
+    // MARK: - Apps section
+
+    /// Which apps the notch lists Claude Code sessions for. Orca alone until
+    /// something else is ticked — the app is built for Orca, so a session the
+    /// user opened in a plain terminal is noise by default.
+    @ViewBuilder private var appsSection: some View {
+        GroupBox(String(localized: "Claude Code sessions")) {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle(String(localized: "All", defaultValue: "All"), isOn: Binding(
+                    get: { state.showAllHosts },
+                    // All means "no exclusions", so the list starts empty —
+                    // otherwise a leftover tick from the previous mode would
+                    // silently silence an app the user thinks is shown. Turning
+                    // it off returns to the shipped default rather than to an
+                    // empty list, because "show me nothing" is indistinguishable
+                    // from a broken app.
+                    set: { on in
+                        state.hostFilterIds = on ? [] : [ClaudeHost.orcaBundleId]
+                        state.showAllHosts = on
+                    }
+                ))
+                // Sits directly under the switch that changes its meaning, not
+                // under the list it describes — at the bottom of sixteen boxes
+                // it was clipped by the panel edge and read too late.
+                Text(state.showAllHosts
+                     ? String(localized: "apps.explain-exclude",
+                              defaultValue: "Every app is shown except the ticked ones, which stay silent: no sessions in the list, no notifications, and their questions and permission requests are asked in the app itself.")
+                     : String(localized: "apps.explain-include",
+                              defaultValue: "Only the ticked apps show their Claude Code sessions, questions and permission requests. An unticked app stays silent."))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                appHostRows
+                Text(String(localized: "apps.other-note",
+                            defaultValue: "Sessions from an app we can't name land in Other."))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(6)
+        }
+    }
+
+    /// The rows, split by kind. Orca and Other stand alone — one row each, so a
+    /// header over them would only add noise.
+    @ViewBuilder private var appHostRows: some View {
+        ForEach(ClaudeHost.allHosts) { host in
+            if host.group == .terminal || host.group == .editor,
+               let firstOfGroup = ClaudeHost.allHosts.first(where: { $0.group == host.group }),
+               firstOfGroup.id == host.id {
+                Text(host.group == .terminal
+                     ? String(localized: "Terminals", defaultValue: "Terminals")
+                     : String(localized: "Editors", defaultValue: "Editors"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+            }
+            Toggle(host.name, isOn: Binding(
+                get: { state.hostFilterIds.contains(host.id) },
+                set: { on in
+                    if on { state.hostFilterIds.insert(host.id) }
+                    else   { state.hostFilterIds.remove(host.id) }
+                }
+            ))
         }
     }
 

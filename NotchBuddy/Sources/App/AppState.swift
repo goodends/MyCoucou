@@ -65,6 +65,19 @@ final class AppState: ObservableObject {
     /// relies on the process scan (or its next hook event) to return.
     var hiddenClaudeSessions: [String: ClaudeSession] = [:]
 
+    /// Whether Settings → Apps reads its ticked rows as "show these" or as
+    /// "hide these". Published because flipping it re-reads every row at once.
+    @Published var showAllHosts: Bool = ClaudeHost.storedMode == .all {
+        didSet { ClaudeHost.storedMode = showAllHosts ? .all : .some }
+    }
+
+    /// The ticked rows of Settings → Apps: the shown hosts in `.some`, the
+    /// excluded ones in `.all`. Published so a tick takes effect on the spot
+    /// instead of at the next scan, and written through to survive a restart.
+    @Published var hostFilterIds: Set<String> = ClaudeHost.storedIds {
+        didSet { ClaudeHost.storedIds = hostFilterIds }
+    }
+
     /// Wardrobe choices per session id, so a restart doesn't undo them. Written
     /// on every change, including the random look a session is born with —
     /// otherwise the colours and hats would reshuffle each launch even for a
@@ -232,13 +245,34 @@ final class AppState: ObservableObject {
         return byCwd
     }
 
+    /// The Claude sessions the notch lists: `claudeSessions` minus the hosts the
+    /// user switched off in Settings → Apps. Filtered here rather than at
+    /// insertion so the same rule covers both ways a session arrives — found by
+    /// the process scan at launch, or announced by a hook mid-run — and so
+    /// unticking a host takes effect at once instead of at the next rescan.
+    ///
+    /// The hidden sessions stay in `claudeSessions`: a chat already open on one,
+    /// or a host ticked again a moment later, must find its session intact.
+    var visibleClaudeSessions: [ClaudeSession] {
+        claudeSessions.filter(isVisible)
+    }
+
+    /// Whether Settings → Apps shows this session. Off the published filter
+    /// rather than the stored one: the rows are what SwiftUI re-renders on, and
+    /// the two can't drift anyway (didSet writes through).
+    private func isVisible(_ session: ClaudeSession) -> Bool {
+        ClaudeHost.isVisible(hostId: ClaudeHost.hostId(for: session),
+                             mode: showAllHosts ? .all : .some,
+                             ids: hostFilterIds)
+    }
+
     /// The Claude session that should drive the OverviewView's left card:
     /// either the user-tapped one, or the most-recently-active session when none
     /// was explicitly chosen. Keeps the home view in sync with what the user is
     /// actually working on, regardless of which task the focus pill points at.
     var overviewSession: ClaudeSession? {
-        if let s = focusedClaudeSession { return s }
-        return claudeSessions.first
+        if let s = focusedClaudeSession, isVisible(s) { return s }
+        return visibleClaudeSessions.first
     }
 
     /// The session the island is representing *right now*. The shared Mochi
