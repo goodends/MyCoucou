@@ -146,6 +146,14 @@ struct ClaudeSession: Identifiable, Equatable {
         return projectName
     }
 
+    /// Take Claude's own name for this session, but only if we don't have one
+    /// yet. A hook event never carries a name — only the live-session registry
+    /// does — so a card a hook built first would otherwise keep showing the
+    /// folder name for the whole life of the session.
+    mutating func adoptSessionName(_ name: String) {
+        if sessionName.isEmpty, !name.isEmpty { sessionName = name }
+    }
+
     /// The curated body colours: warm + saturated so the character stays
     /// visible against the dark pill background. One is picked at random when
     /// a session first appears; the wardrobe lets the user pick another.

@@ -152,6 +152,95 @@ enum ClaudeSessionTests {
               afterRemoveAndReAdd.map { $0.outfit != .auto && $0.outfit != .none } ?? false,
               failures: &failures)
 
+        // A session a hook event built carries no name — Claude Code's hook
+        // payload never carries one — so it shows as its folder name until the
+        // process scan tops the name up from the live-session registry.
+        var named: [ClaudeSession] = []
+        named.upsert(
+            sessionId: "sid-named",
+            cwd: "/Users/me/proj-named",
+            hostApp: "dev.warp.Warp-Stable",
+            sessionBundleId: nil,
+            projectName: "proj-named",
+            state: .working,
+            eventTime: Date(timeIntervalSince1970: 3000)
+        )
+        check("a hook-built session starts nameless",
+              named.first?.sessionName.isEmpty == true,
+              failures: &failures)
+        check("…and shows as its folder name until it gets one",
+              named.first?.displayName == "proj-named",
+              failures: &failures)
+
+        named[0].adoptSessionName("proj-named-52")
+        check("adopting the registry name makes it the display name",
+              named.first?.displayName == "proj-named-52",
+              failures: &failures)
+
+        // The registry isn't always there — an older Claude Code writes no such
+        // file — so an empty name has to leave the card alone.
+        var nameless: [ClaudeSession] = []
+        nameless.upsert(
+            sessionId: "sid-nameless",
+            cwd: "/Users/me/proj-nameless",
+            hostApp: nil, sessionBundleId: nil,
+            projectName: "proj-nameless",
+            state: .working, eventTime: Date(timeIntervalSince1970: 3001)
+        )
+        nameless[0].adoptSessionName("")
+        check("adopting an empty name is a no-op",
+              nameless.first?.sessionName.isEmpty == true &&
+              nameless.first?.displayName == "proj-nameless",
+              failures: &failures)
+
+        // A later scan must not rename a session that already has a name:
+        // Claude renumbers its derived names on every restart.
+        named[0].adoptSessionName("proj-named-99")
+        check("adopting again does not overwrite a name we already have",
+              named.first?.displayName == "proj-named-52",
+              failures: &failures)
+
+        // Hook events keep arriving for the life of a session; none of them
+        // may drop the name the scan adopted.
+        named.upsert(
+            sessionId: "sid-named",
+            cwd: "/Users/me/proj-named",
+            hostApp: "dev.warp.Warp-Stable",
+            sessionBundleId: nil,
+            projectName: "proj-named",
+            state: .finished, eventTime: Date(timeIntervalSince1970: 3002)
+        )
+        check("a later hook event keeps the adopted name",
+              named.first?.displayName == "proj-named-52",
+              failures: &failures)
+
+        // A name typed in the wardrobe outranks Claude's own.
+        var custom: [ClaudeSession] = []
+        custom.upsert(
+            sessionId: "sid-custom",
+            cwd: "/Users/me/proj-custom",
+            hostApp: nil, sessionBundleId: nil,
+            projectName: "proj-custom",
+            state: .working, eventTime: Date(timeIntervalSince1970: 3003)
+        )
+        custom[0].customName = "Review the diff"
+        custom[0].adoptSessionName("proj-custom-7")
+        check("a customName outranks the session name",
+              custom.first?.displayName == "Review the diff",
+              failures: &failures)
+
+        // The path that already worked: a session the scan found first arrives
+        // with its name attached.
+        let scannedName = ClaudeSession.scanned(
+            sessionId: "sid-scanned", pid: 4242,
+            cwd: "/Users/me/proj-scanned", projectName: "proj-scanned",
+            sessionName: "proj-scanned-3", state: .idle,
+            startedAt: Date(timeIntervalSince1970: 3000), hostApp: nil
+        )
+        check("a session the scan found already shows its own name",
+              scannedName.displayName == "proj-scanned-3",
+              failures: &failures)
+
         // Every IslandView needs an entry in viewLayouts. IslandWindowController
         // and IslandRootView both reach it with a force-unwrap, so a case added
         // without one compiles fine and then crashes on first display — the one

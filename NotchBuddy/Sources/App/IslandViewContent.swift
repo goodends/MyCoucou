@@ -2884,10 +2884,13 @@ struct ClaudeSessionsListView: View {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
                 state.pruneDeadClaudeSessions()
-                // Nothing on the hook pipe at all can still mean a session is
-                // running that started before us — re-check the process table
-                // (rate-limited inside) so the card isn't just blank.
-                if state.visibleClaudeSessions.isEmpty {
+                // A card built by a hook event carries no name, and an empty
+                // list can still mean a session started before us — both are
+                // fixed by the same re-check of the process table, which is
+                // rate-limited inside. Once every session is named there is
+                // nothing left for it to find, so it stops spawning shells.
+                let sessions = state.visibleClaudeSessions
+                if sessions.isEmpty || sessions.contains(where: { $0.sessionName.isEmpty }) {
                     state.scanForRunningClaudeSessions()
                 }
             }

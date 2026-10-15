@@ -973,7 +973,16 @@ final class AppState: ObservableObject {
         let live = Set(found.map(\.pid))
         // A process that has since died shouldn't linger as a card.
         claudeSessions.removeAll { $0.provisional && ($0.pid.map { !live.contains($0) } ?? true) }
-        for p in found where !claudeSessions.contains(where: { $0.pid == p.pid }) {
+        for p in found {
+            // A card already on the books means a hook event got here first,
+            // and a hook carries no name — Claude Code's session name lives
+            // only in the registry this scan just read. Skipping the card left
+            // `displayName` stuck on the folder name for the life of the
+            // session, so top the name up instead.
+            if let idx = claudeSessions.firstIndex(where: { $0.pid == p.pid }) {
+                claudeSessions[idx].adoptSessionName(p.descriptor?.name ?? "")
+                continue
+            }
             if let key = p.paneKey { orcaPaneByPid[p.pid] = key }
             // Holding ORCA_PANE_KEY *is* the evidence that Orca spawned this
             // process, so a scanned Orca session has a known host even though
