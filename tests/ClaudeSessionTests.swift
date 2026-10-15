@@ -241,6 +241,48 @@ enum ClaudeSessionTests {
               scannedName.displayName == "proj-scanned-3",
               failures: &failures)
 
+        // What the right-click copies, so another agent can be pointed at this
+        // session: Claude Code's own name is what `SendMessage` addresses, and
+        // it is never truncated on screen the way the pill's name is.
+        var share: [ClaudeSession] = []
+        share.upsert(
+            sessionId: "sid-share", cwd: "/Users/me/proj-share",
+            hostApp: nil, sessionBundleId: nil,
+            projectName: "proj-share", state: .working,
+            eventTime: Date(timeIntervalSince1970: 3000)
+        )
+        share[0].adoptSessionName("proj-share-4")
+        check("an unrenamed session copies its Claude Code name",
+              share.first?.copyableName == "proj-share-4",
+              failures: &failures)
+
+        // The two names are the same string unless the user typed one, and
+        // copying it twice makes a message read oddly.
+        share[0].customName = "Fix the island"
+        check("a renamed session labels Claude's name, visible name first",
+              share.first?.copyableName == "Fix the island (session: proj-share-4)",
+              failures: &failures)
+
+        // A session we only know from a hook event has no Claude Code name to
+        // copy — the folder name is all there is, and it is still the answer.
+        var namelessShare: [ClaudeSession] = []
+        namelessShare.upsert(
+            sessionId: "sid-share-2", cwd: "/Users/me/proj-share-2",
+            hostApp: nil, sessionBundleId: nil,
+            projectName: "proj-share-2", state: .working,
+            eventTime: Date(timeIntervalSince1970: 3001)
+        )
+        check("a session with no Claude Code name copies its folder name",
+              namelessShare.first?.copyableName == "proj-share-2",
+              failures: &failures)
+
+        // Nothing to copy is not a state a pill can reach — projectName is
+        // always there — but an empty string would put nothing on the
+        // pasteboard at all, which reads as the copy having failed.
+        check("copyableName is never empty",
+              scannedName.copyableName.isEmpty == false,
+              failures: &failures)
+
         // Every IslandView needs an entry in viewLayouts. IslandWindowController
         // and IslandRootView both reach it with a force-unwrap, so a case added
         // without one compiles fine and then crashes on first display — the one

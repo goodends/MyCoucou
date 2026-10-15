@@ -2709,6 +2709,16 @@ struct ClaudeSessionPill: View {
             } label: {
                 Label("Change outfit…", systemImage: "tshirt")
             }
+            // Copying the name is how a session gets handed to someone else:
+            // the pill's own label is truncated, and Claude Code addresses a
+            // session by the name `copyableName` carries. Sits above the
+            // divider because copying is not destructive.
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(session.copyableName, forType: .string)
+            } label: {
+                Label(String(localized: "Copy Name"), systemImage: "doc.on.doc")
+            }
             Divider()
             Button(role: .destructive) {
                 state.hideClaudeSession(session.sessionId)
