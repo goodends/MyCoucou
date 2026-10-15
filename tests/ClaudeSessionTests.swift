@@ -252,19 +252,22 @@ enum ClaudeSessionTests {
             eventTime: Date(timeIntervalSince1970: 3000)
         )
         share[0].adoptSessionName("proj-share-4")
-        check("an unrenamed session copies its Claude Code name",
-              share.first?.copyableName == "proj-share-4",
+        // Bare `proj-share-4` would paste as a word with no indication it is
+        // an addressable session rather than a folder — say what it is.
+        check("an unrenamed session says that its name is a session name",
+              share.first?.copyableName == "session: proj-share-4",
               failures: &failures)
 
-        // The two names are the same string unless the user typed one, and
-        // copying it twice makes a message read oddly.
+        // Two different names: the one the user typed leads, because it is the
+        // one they know it by, and Claude's follows as the address.
         share[0].customName = "Fix the island"
         check("a renamed session labels Claude's name, visible name first",
               share.first?.copyableName == "Fix the island (session: proj-share-4)",
               failures: &failures)
 
         // A session we only know from a hook event has no Claude Code name to
-        // copy — the folder name is all there is, and it is still the answer.
+        // copy — the folder name is all there is, and labelling it one would
+        // claim an address it doesn't have.
         var namelessShare: [ClaudeSession] = []
         namelessShare.upsert(
             sessionId: "sid-share-2", cwd: "/Users/me/proj-share-2",
@@ -272,7 +275,7 @@ enum ClaudeSessionTests {
             projectName: "proj-share-2", state: .working,
             eventTime: Date(timeIntervalSince1970: 3001)
         )
-        check("a session with no Claude Code name copies its folder name",
+        check("a session with no Claude Code name copies its folder name alone",
               namelessShare.first?.copyableName == "proj-share-2",
               failures: &failures)
 

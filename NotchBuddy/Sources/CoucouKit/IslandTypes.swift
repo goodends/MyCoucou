@@ -147,16 +147,18 @@ struct ClaudeSession: Identifiable, Equatable {
     }
 
     /// What the pill's right-click copies, so somebody else can be pointed at
-    /// this session: the name the user knows it by comes first, then Claude
-    /// Code's own name, which is what `SendMessage` addresses and — unlike the
-    /// pill's own label — is never truncated. Labelled rather than merely
-    /// listed, because two bare names run together into what reads as one long
-    /// name. The label is fixed English: this is clipboard payload aimed at
-    /// another agent, not UI, and it shouldn't shift with the interface
-    /// language. One name is usually the whole story — unless the user typed
-    /// one the two are the same string, and copying it twice reads oddly.
+    /// this session: Claude Code's own name is what `SendMessage` addresses,
+    /// and unlike the pill's own label it is never truncated. It is always
+    /// labelled — a bare `proj-share-4` pastes as a word that could just as
+    /// well be a folder, and the whole point is that it is addressable. With a
+    /// name of the user's own in front there are two things to say, so the
+    /// second becomes a bracket; with only Claude's there is one, so it is
+    /// labelled on its own rather than repeated. The label is fixed English:
+    /// this is clipboard payload aimed at another agent, not UI, and it
+    /// shouldn't shift with the interface language.
     var copyableName: String {
-        if sessionName.isEmpty || sessionName == displayName { return displayName }
+        if sessionName.isEmpty { return displayName }
+        if sessionName == displayName { return "session: \(sessionName)" }
         return "\(displayName) (session: \(sessionName))"
     }
 
