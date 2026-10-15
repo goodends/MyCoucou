@@ -958,7 +958,7 @@ private struct InboxRow<Content: View>: View {
                             state.focusedSessionId = sessionId
                             state.view = .wardrobe
                         } label: {
-                            Label("Change outfit…", systemImage: "tshirt")
+                            Label(String(localized: "Change outfit…"), systemImage: "tshirt")
                         }
                     })
 
@@ -2707,7 +2707,7 @@ struct ClaudeSessionPill: View {
                 state.focusedSessionId = session.sessionId
                 state.view = .wardrobe
             } label: {
-                Label("Change outfit…", systemImage: "tshirt")
+                Label(String(localized: "Change outfit…"), systemImage: "tshirt")
             }
             // Copying the name is how a session gets handed to someone else:
             // the pill's own label is truncated, and Claude Code addresses a
