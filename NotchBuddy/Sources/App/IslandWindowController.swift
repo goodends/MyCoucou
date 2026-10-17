@@ -497,7 +497,21 @@ final class IslandWindowController: NSWindowController {
 
         case .openChat:
             islandPanel.makeKey()
-            expand(to: .prompt)
+            // The chat can't start a session — that lives on the empty state's
+            // "Ask Claude" and the + on the list. With nothing to talk to,
+            // stay on whichever of those two pages is up and put the list in
+            // front of the user, rather than opening a chat they can't send in.
+            if state.focusedSessionId == nil && state.focusTask?.sessionId == nil {
+                expand(to: defaultView())
+                // One turn of the run loop: the page that anchors the popover
+                // (Ask Claude or +) only exists after `expand` has laid it out.
+                DispatchQueue.main.async { [self] in
+                    state.showProjectPicker = OrcaCLIBridge.isInstalled
+                    if state.showProjectPicker { Task { await state.loadOrcaWorktrees() } }
+                }
+            } else {
+                expand(to: .prompt)
+            }
 
         case .goToAlert:
             if state.pendingApproval != nil {

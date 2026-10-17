@@ -525,8 +525,26 @@ struct EmptyStateView: View {
                         .foregroundColor(Color(hex: "#9398A1"))
                 }
                 Spacer()
+                // Nothing to ask until there is an agent to ask, and the chat
+                // can't start one any more — so this button is the list.
                 PrimaryButton("Ask Claude") {
-                    state.view = .prompt
+                    state.showProjectPicker.toggle()
+                    if state.showProjectPicker { Task { await state.loadOrcaWorktrees() } }
+                }
+                // The button sits at the card's right edge, so the list opens
+                // leftwards rather than hanging off the island.
+                .popover(isPresented: $state.showProjectPicker, arrowEdge: .leading) {
+                    OrcaProjectPickerList(state: state,
+                                          isPresented: $state.showProjectPicker,
+                                          onStarted: { wt, began in
+                        // Same as the + on the session list: open the session we
+                        // just started, rather than making the user go find it.
+                        Task { @MainActor in
+                            guard await state.focusClaudeSessionStarted(inCwd: wt.path,
+                                                                        since: began) != nil else { return }
+                            state.view = .prompt
+                        }
+                    })
                 }
             }
             .padding(.leading, 118)
@@ -1511,13 +1529,6 @@ struct PromptView: View {
     @State private var chipHovered = false
     @State private var changesChipHovered = false
 
-    // Project picker — shown instead of the host chip when there's no live
-    // session to jump to or type into. Picking a worktree starts a Claude Code
-    // there and delivers `pendingPrompt` (the message the user had already
-    // typed when they found out there was nowhere to send it).
-    @State private var showProjectPicker = false
-    @State private var pendingPrompt: String? = nil
-
     /// A session the chat can actually reach: one Coucou has seen hook events
     /// from. Everything host-shaped in this view keys off this — without it the
     /// chips would be naming a process that isn't there.
@@ -1538,56 +1549,6 @@ struct PromptView: View {
         }
         guard let task = state.focusTask else { return false }
         return ClaudeHost.hostId(hostApp: task.hostApp, bundleId: task.sessionBundleId) == ClaudeHost.orcaBundleId
-    }
-
-    /// The picker stands in for the host chip when there's no session to name,
-    /// and only where starting a session is actually possible.
-    private var canPickProject: Bool {
-        !hasSession && OrcaCLIBridge.isInstalled
-    }
-
-    private var projectPickerButton: some View {
-        Button {
-            showProjectPicker.toggle()
-            if showProjectPicker { Task { await state.loadOrcaWorktrees() } }
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "folder")
-                    .font(.system(size: 9, weight: .medium))
-                Text(String(localized: "Pick a project"))
-                    .font(.system(size: 10.5, weight: .medium))
-            }
-            .foregroundColor(Color(hex: "#7B8089"))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.white.opacity(chipHovered ? 0.12 : 0.06))
-            .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .onHover { chipHovered = $0 }
-        .help(String(localized: "Start a Claude Code session in a project"))
-        // The chip sits near the bottom edge of the island, so the list opens upward
-        // — flipping it round and down would hang it off the card.
-        .popover(isPresented: $showProjectPicker, arrowEdge: .top) {
-            projectPickerPopover
-        }
-    }
-
-    private var projectPickerPopover: some View {
-        OrcaProjectPickerList(state: state,
-                              isPresented: $showProjectPicker,
-                              prompt: pendingPrompt) {
-            // Start failed: the picker stays open, and the words the user had
-            // already typed go back in the box — the one thing here that isn't
-            // ours to lose. Claude Code really might not have come up.
-            text = pendingPrompt ?? ""
-            showNotWiredToast = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
-        } onStarted: { _, _ in
-            pendingPrompt = nil
-            text = ""
-            showNotWiredToast = false
-        }
     }
 
     private var historyBinding: [HistoryEntry] {
@@ -1751,12 +1712,6 @@ struct PromptView: View {
 
                 HStack(spacing: 6) {
                     Spacer()
-                    // With no live session there is no terminal to jump to and
-                    // no host to name — both chips would lie. Offer the only
-                    // action that does something real: start one.
-                    if canPickProject {
-                        projectPickerButton
-                    }
                     // The chip names where the session runs, so it is the jump:
                     // one control, not an arrow plus a label.
                     if hasSession {
@@ -1879,13 +1834,12 @@ struct PromptView: View {
 
         // Nothing to type into. Echoing the prompt anyway used to leave it
         // sitting in the transcript looking delivered while no agent existed,
-        // which is worse than saying so. Keep the words, and let the user pick
-        // a project to start one in — the pending prompt rides along.
+        // which is worse than saying so. Keep the words and say it wasn't
+        // sent — starting a session from here is gone with the picker, so
+        // there is nowhere further to point the user from this view.
         guard state.focusedSessionId != nil || state.focusTask?.sessionId != nil else {
-            pendingPrompt = query
             showNotWiredToast = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { showNotWiredToast = false }
-            if OrcaCLIBridge.isInstalled { showProjectPicker = true }
             return
         }
         text = ""
@@ -2740,7 +2694,6 @@ struct ClaudeSessionsListView: View {
     // "+": start a Claude Code session in an Orca project, from the list
     // itself rather than by going through the chat first. Only where that is
     // actually possible — with no Orca there is no project to start in.
-    @State private var showProjectPicker = false
     private var canStartInProject: Bool { OrcaCLIBridge.isInstalled }
 
     /// Fallback threshold for sessions the relay gave us no pid for (an agent
@@ -2934,13 +2887,13 @@ struct ClaudeSessionsListView: View {
         }
     }
 
-    /// Start a new Claude Code session in an Orca project. Same place the chat
-    /// asks for one — the list has nowhere else to put it, and the chat only
-    /// offers it when there's no session to type into.
+    /// Start a new Claude Code session in an Orca project. The empty state's
+    /// "Ask Claude" button opens the same list; this is the way in from the
+    /// list itself, without going home first.
     private var addButton: some View {
         Button {
-            showProjectPicker.toggle()
-            if showProjectPicker { Task { await state.loadOrcaWorktrees() } }
+            state.showProjectPicker.toggle()
+            if state.showProjectPicker { Task { await state.loadOrcaWorktrees() } }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 9, weight: .semibold))
@@ -2955,9 +2908,9 @@ struct ClaudeSessionsListView: View {
         .padding(.trailing, 8)
         .help(String(localized: "Start a Claude Code session in a project"))
         // The button sits near the card's top edge, so the list opens downward.
-        .popover(isPresented: $showProjectPicker, arrowEdge: .bottom) {
+        .popover(isPresented: $state.showProjectPicker, arrowEdge: .bottom) {
             OrcaProjectPickerList(state: state,
-                                  isPresented: $showProjectPicker,
+                                  isPresented: $state.showProjectPicker,
                                   onStarted: { wt, began in
                 // Open the session we just started, the way double-clicking a
                 // pill in this same list would — starting a session you then
@@ -3056,13 +3009,9 @@ struct OrcaProjectPickerList: View {
     /// Dismissed by this view once the session is up, so the caller doesn't
     /// have to wire the popover to its own start handler.
     @Binding var isPresented: Bool
-    /// Handed to the new agent. The chat has a pending prompt when the user
-    /// typed their message before there was anywhere to send it; the + button
-    /// has none.
-    var prompt: String? = nil
-    /// The start failed. The chat puts back the words the user had already
-    /// typed; the overview has nothing to put back and only shows the inline
-    /// failure line.
+    /// The start failed. The caller has nothing to put back — both entry
+    /// points reach this list before any words were typed — so the failure
+    /// stays an inline line under the rows.
     var onFailure: () -> Void = {}
     /// The agent is up. Carries the worktree and the moment the start began:
     /// the session announces itself over the hook a moment later, so a caller
@@ -3142,13 +3091,14 @@ struct OrcaProjectPickerList: View {
         .presentationBackground(Color(hex: "#141518"))
     }
 
-    /// Spawn Claude Code in `wt`, delivering `prompt` to it.
+    /// Spawn Claude Code in `wt`. No prompt rides along: both callers reach
+    /// this list before anything was typed.
     private func start(in wt: OrcaWorktree) {
         startingInPath = wt.path
         failed = false
         let began = Date()
         Task { @MainActor in
-            let ok = await state.startClaudeSession(in: wt.path, prompt: prompt)
+            let ok = await state.startClaudeSession(in: wt.path, prompt: nil)
             startingInPath = nil
             if ok {
                 isPresented = false
