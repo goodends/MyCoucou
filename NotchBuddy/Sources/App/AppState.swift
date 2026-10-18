@@ -884,8 +884,7 @@ final class AppState: ObservableObject {
     /// Whether the project list is on screen. It lives here rather than in a
     /// view because the two buttons that open it — "Ask Claude" on the empty
     /// state and + on the session list — belong to different views, and the
-    /// chat shortcut asks for it from outside both. Whichever of the two is on
-    /// screen anchors the popover.
+    /// chat shortcut asks for it from outside both.
     @Published var showProjectPicker = false
 
     /// Load (once per open) the list of projects a Claude session can be

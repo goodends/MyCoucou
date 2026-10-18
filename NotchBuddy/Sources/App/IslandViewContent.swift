@@ -516,40 +516,43 @@ struct EmptyStateView: View {
     var body: some View {
         ZStack {
             CardBackground(wash: nil)
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Nothing running right now.")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("Drop a file or window, or ask me anything.")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "#9398A1"))
+            if state.showProjectPicker {
+                // The list takes the card over — same panel the + opens on the
+                // home page, so there is one place that looks like this.
+                OrcaProjectPickerList(state: state,
+                                      isPresented: $state.showProjectPicker,
+                                      onStarted: { wt, began in
+                    Task { @MainActor in
+                        guard await state.focusClaudeSessionStarted(inCwd: wt.path,
+                                                                    since: began) != nil else { return }
+                        state.view = .prompt
+                    }
+                })
+                .padding(10)
+                .transition(.opacity)
+            } else {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Nothing running right now.")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Drop a file or window, or ask me anything.")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color(hex: "#9398A1"))
+                    }
+                    Spacer()
+                    // Nothing to ask until there is an agent to ask, and the
+                    // chat can't start one any more — so this button is the
+                    // list.
+                    PrimaryButton("Ask Claude") {
+                        state.showProjectPicker = true
+                        Task { await state.loadOrcaWorktrees() }
+                    }
                 }
-                Spacer()
-                // Nothing to ask until there is an agent to ask, and the chat
-                // can't start one any more — so this button is the list.
-                PrimaryButton("Ask Claude") {
-                    state.showProjectPicker.toggle()
-                    if state.showProjectPicker { Task { await state.loadOrcaWorktrees() } }
-                }
-                // The button sits at the card's right edge, so the list opens
-                // leftwards rather than hanging off the island.
-                .popover(isPresented: $state.showProjectPicker, arrowEdge: .leading) {
-                    OrcaProjectPickerList(state: state,
-                                          isPresented: $state.showProjectPicker,
-                                          onStarted: { wt, began in
-                        // Same as the + on the session list: open the session we
-                        // just started, rather than making the user go find it.
-                        Task { @MainActor in
-                            guard await state.focusClaudeSessionStarted(inCwd: wt.path,
-                                                                        since: began) != nil else { return }
-                            state.view = .prompt
-                        }
-                    })
-                }
+                .padding(.leading, 118)
+                .padding(.trailing, 18)
             }
-            .padding(.leading, 118)
-            .padding(.trailing, 18)
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.78), value: state.showProjectPicker)
     }
 }
 
@@ -2786,7 +2789,12 @@ struct ClaudeSessionsListView: View {
         // the ScrollView is full of session pills (VStack would push it
         // out of the card's clipped area).
         ZStack(alignment: .bottom) {
-            if live.isEmpty {
+            // The project list takes the card over rather than layering on
+            // top of it: the pills underneath would show through and there
+            // would be nowhere to tap "anywhere else" to close it.
+            if state.showProjectPicker {
+                projectPanel
+            } else if live.isEmpty {
                 // No active Claude session — leave the right card empty.
                 // The previous fallback to AgentPillsView (Cursor / Codex /
                 // Gemini / …) is gone: this view only renders Claude work.
@@ -2830,12 +2838,17 @@ struct ClaudeSessionsListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // The panel swaps the list out rather than layering over it, so it
+        // needs the same animation the pills get.
+        .animation(.spring(response: 0.4, dampingFraction: 0.78), value: state.showProjectPicker)
         // Pinned to the card's top-right rather than living in the scroll: the
         // list scrolls under it, and it has to be reachable from every
         // project — including an empty card, where starting a session is the
-        // only thing there is to do.
+        // only thing there is to do. Gone while the panel is open: the panel
+        // brings its own close button, and two of them a few pixels apart
+        // read as two unrelated controls.
         .overlay(alignment: .topTrailing) {
-            if canStartInProject { addButton }
+            if canStartInProject && !state.showProjectPicker { addButton }
         }
         .task {
             // A killed process announces nothing, so there is no event to
@@ -2907,8 +2920,16 @@ struct ClaudeSessionsListView: View {
         .padding(.top, 4)
         .padding(.trailing, 8)
         .help(String(localized: "Start a Claude Code session in a project"))
-        // The button sits near the card's top edge, so the list opens downward.
-        .popover(isPresented: $state.showProjectPicker, arrowEdge: .bottom) {
+    }
+
+    /// The project list, opening over the session list. Not a popover: AppKit
+    /// decides where a popover goes, and next to the card's top-right corner
+    /// it kept putting this to the side — over the cards behind it, at an
+    /// arrow angle that pointed at nothing. The island keeps its height, so
+    /// the list scrolls past the card's bottom instead.
+    @ViewBuilder
+    private var projectPanel: some View {
+        if state.showProjectPicker {
             OrcaProjectPickerList(state: state,
                                   isPresented: $state.showProjectPicker,
                                   onStarted: { wt, began in
@@ -2921,6 +2942,9 @@ struct ClaudeSessionsListView: View {
                     state.view = .prompt
                 }
             })
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .transition(.opacity)
         }
     }
 
@@ -3024,62 +3048,83 @@ struct OrcaProjectPickerList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "Start Claude Code in an Orca project"))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color(hex: "#8E939C"))
+            HStack(spacing: 6) {
+                Text(String(localized: "Start Claude Code in an Orca project"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color(hex: "#8E939C"))
+                Spacer()
+                Button {
+                    isPresented = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundColor(Color(hex: "#6B7079"))
+                        .frame(width: 14, height: 14)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Close"))
+            }
             if state.orcaWorktreesLoading {
                 Text(String(localized: "Loading…"))
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "#6B7079"))
             } else if let list = state.orcaWorktrees, !list.isEmpty {
-                ForEach(list) { wt in
-                    Button {
-                        start(in: wt)
-                    } label: {
-                        HStack(spacing: 8) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(wt.name)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(Color(hex: "#F5F6F8"))
-                                Text(wt.path)
-                                    .font(.system(size: 10))
-                                    .foregroundColor(Color(hex: "#6B7079"))
-                                    .lineLimit(1)
-                                    .truncationMode(.head)
+                // Fills whatever height the island gave the panel and scrolls
+                // past it — the island clips to its own shape, so a list that
+                // outgrew the page it opened over would lose its last rows.
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 6) {
+                        ForEach(list) { wt in
+                            Button {
+                                start(in: wt)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(wt.name)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(Color(hex: "#F5F6F8"))
+                                        Text(wt.path)
+                                            .font(.system(size: 10))
+                                            .foregroundColor(Color(hex: "#6B7079"))
+                                            .lineLimit(1)
+                                            .truncationMode(.head)
+                                    }
+                                    Spacer(minLength: 6)
+                                    if startingInPath == wt.path {
+                                        ProgressView().controlSize(.mini)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                                .contentShape(Rectangle())
                             }
-                            Spacer(minLength: 6)
-                            if startingInPath == wt.path {
-                                ProgressView().controlSize(.mini)
-                            }
+                            .buttonStyle(.plain)
+                            .disabled(startingInPath != nil)
                         }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
+                        // Orca answered, the create didn't take. Kept inline rather than
+                        // as a toast: the picker is still open, and a line under the
+                        // rows is where the failure belongs.
+                        if failed {
+                            Text("暂未启动 — 检查一下这个项目")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "#F4B400"))
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .disabled(startingInPath != nil)
                 }
-                // Orca answered, the create didn't take. Kept inline rather than
-                // as a toast: the picker is still open, and a line under the
-                // rows is where the failure belongs.
-                if failed {
-                    Text("暂未启动 — 检查一下这个项目")
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(hex: "#F4B400"))
-                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // Orca is installed but answered with nothing usable — say so
                 // instead of showing a picker that can only fail.
                 Text(String(localized: "No Orca projects found. Open one in Orca first."))
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "#6B7079"))
-                    .frame(width: 220, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(12)
-        .frame(width: 260)
-        // Popovers default to the system material — a light panel that clashes
-        // with every other surface here. Same fill and hairline as
-        // CardBackground so it reads as part of the island.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // Same fill and hairline as CardBackground so it reads as part of the
+        // island rather than a window floating over it.
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(hex: "#141518"))
@@ -3088,7 +3133,6 @@ struct OrcaProjectPickerList: View {
                         .stroke(Color.white.opacity(0.035), lineWidth: 1)
                 )
         )
-        .presentationBackground(Color(hex: "#141518"))
     }
 
     /// Spawn Claude Code in `wt`. No prompt rides along: both callers reach
