@@ -381,6 +381,19 @@ enum NotificationLayout {
     }
 }
 
+/// The island's height while the project list is open.
+///
+/// The empty state is 160pt and the project list is taller than that, so the
+/// list had about two and a half rows to show and the card came out visibly
+/// shorter than the home page. Opening it brings the island up to the home
+/// page's height instead — the same page the + opens it over, so the two
+/// entry points don't disagree about how tall the island is. The home page is
+/// already that tall and does not move.
+enum ProjectPickerLayout {
+    nonisolated(unsafe) static var isOpen = false
+    static let height: CGFloat = 230
+}
+
 // MARK: - View dimensions (from VIEWS in prototype)
 
 struct ViewLayout {

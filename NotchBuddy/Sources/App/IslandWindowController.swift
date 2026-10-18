@@ -1269,6 +1269,11 @@ func islandSize(mode: IslandMode, view: IslandView,
         if view == .question, let h = QuestionLayout.height {
             return (IslandConst.expandedWidth, h)
         }
+        // While the project list is open the island takes the home page's
+        // height, whichever of the two pages the list is sitting on.
+        if ProjectPickerLayout.isOpen {
+            return (IslandConst.expandedWidth, ProjectPickerLayout.height)
+        }
         // One finished notification keeps the standard card height; a stack of
         // them grows the island up to the visible cap, then scrolls.
         if view == .finished, let h = NotificationLayout.height {

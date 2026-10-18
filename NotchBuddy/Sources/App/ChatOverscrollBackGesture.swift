@@ -208,6 +208,16 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
             // Only meaningful while the island is expanded.
             guard state.mode == .expanded else { return }
 
+            // The project list is a scroll view of its own, and it isn't the
+            // chat thread — a swipe over it is the user reading the list. It
+            // never reported its position through `scrollAtBottom` (only the
+            // chat does), so the "content has reached the bottom" gate below
+            // read it as true and collapsed the island mid-list.
+            guard !state.showProjectPicker else {
+                accumulated = 0
+                return
+            }
+
             // The overview's right card is a ScrollView (active Claude
             // sessions). Scrolling inside it should never collapse the
             // island — the scroll wheel belongs to the list, not the

@@ -884,8 +884,11 @@ final class AppState: ObservableObject {
     /// Whether the project list is on screen. It lives here rather than in a
     /// view because the two buttons that open it — "Ask Claude" on the empty
     /// state and + on the session list — belong to different views, and the
-    /// chat shortcut asks for it from outside both.
-    @Published var showProjectPicker = false
+    /// chat shortcut asks for it from outside both. It also drives the island's
+    /// height: the empty state's card is shorter than the list it has to hold.
+    @Published var showProjectPicker = false {
+        didSet { ProjectPickerLayout.isOpen = showProjectPicker }
+    }
 
     /// Load (once per open) the list of projects a Claude session can be
     /// started in. Returns false when Orca isn't installed or the CLI failed,

@@ -123,6 +123,15 @@ struct IslandContainer: View {
                                     nw: state.notchWidth, nh: state.notchHeight)
             withAnimation(openSpring) { islandHeight = h }
         }
+        // The project list opens over the empty state, which is shorter than
+        // the list itself — so opening it has to move the island's height, not
+        // just swap the content.
+        .onChange(of: state.showProjectPicker) { _, _ in
+            guard state.mode == .expanded else { return }
+            let (_, h) = islandSize(mode: .expanded, view: state.view,
+                                    nw: state.notchWidth, nh: state.notchHeight)
+            withAnimation(openSpring) { islandHeight = h }
+        }
         .onAppear {
             let (w, h) = islandSize(mode: state.mode, view: state.view,
                                     nw: state.notchWidth, nh: state.notchHeight)
@@ -393,7 +402,14 @@ struct IslandContentView: View {
                     // chat (prompt) and changes are always flexible; mail is flexible only when active so
                     // it doesn't push the ZStack taller when inactive. The finished view is tall for
                     // the same reason — its stack of notification cards scrolls past the cap.
+                    // The empty state fills it too. Reached through two views — `.empty`
+                    // on its own, and `.overview` falling back to it when nothing is
+                    // running — and both were pinned at 98pt inside an island already
+                    // sized to 230, which left a black band under the card.
+                    let isEmptyState = v == .empty
+                        || (v == .overview && !state.hasOverviewContent)
                     let isTall = v == .prompt || v == .changes || v == .finished
+                        || isEmptyState
                     let anim: Animation = active
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)
