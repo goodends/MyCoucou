@@ -448,6 +448,19 @@ struct IslandHeader: View {
             HStack(spacing: 5) {
                 TabButton(icon: "house.fill", view: .overview, state: state)
                 TabButton(icon: "bubble.left.fill", view: .prompt, state: state)
+
+                // Finished sessions wait here until acknowledged. Same view
+                // the hook force-expands to, but reachable on demand, and
+                // badged with the count so an unnoticed finish is visible
+                // from any page.
+                TabButton(icon: "bell", view: .finished, state: state)
+                    .overlay(alignment: .topTrailing) {
+                        if !state.inbox.isEmpty {
+                            NotificationBadge(count: state.inbox.count)
+                                .offset(x: 4, y: -3)
+                        }
+                    }
+                    .help(String(localized: "Notifications"))
             }
             .padding(.leading, 14)
 
@@ -456,19 +469,6 @@ struct IslandHeader: View {
             // Right: action icons
             HStack(spacing: 8) {
                 HStack(spacing: 14) {
-                    // Finished sessions wait here until acknowledged. Same view
-                    // the hook force-expands to, but reachable on demand, and
-                    // badged with the count so an unnoticed finish is visible
-                    // from any page.
-                    TabButton(icon: "bell", view: .finished, state: state)
-                        .overlay(alignment: .topTrailing) {
-                            if !state.inbox.isEmpty {
-                                NotificationBadge(count: state.inbox.count)
-                                    .offset(x: 4, y: -3)
-                            }
-                        }
-                        .help(String(localized: "Notifications"))
-
                     // Settings now pops up as a separate window — the in-island
                     // settings page (sound toggle, auto-close picker, Claude
                     // hook badge) is gone.
