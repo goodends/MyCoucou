@@ -248,7 +248,14 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
             // bottom" (or there is none at all). This is the user's
             // "信息已经触底了" precondition — without it the gesture
             // would also fire mid-thread, which is what tripped them up.
-            guard state.scrollAtBottom else {
+            //
+            // Only the chat has a ScrollView reporting this. Everywhere else
+            // the flag is whatever the chat last left behind: a thread read
+            // half-way down left it false, and carrying that into the home
+            // page meant its swipe-up could never pass the gate — the home
+            // page has no scroll position to respect, so it always passes.
+            let atBottom = state.view == .prompt ? state.scrollAtBottom : true
+            guard atBottom else {
                 accumulated = 0
                 return
             }

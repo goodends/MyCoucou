@@ -39,6 +39,13 @@ final class IslandWindowController: NSWindowController {
     let fsm = IslandStateMachine()
 
     private var wasInIsland = false
+    /// The island's height as of the last poll. A view switch can shrink it
+    /// (chat 500pt → home 230pt) out from under a pointer that never moved,
+    /// which `pollFrame` would otherwise read as the mouse leaving and start
+    /// the auto-collapse timer. Compared against each tick rather than set by
+    /// the switch that caused it, so every shrinking switch is covered — the
+    /// avatar click, the chat's swipe-up, the hot key.
+    private var lastIslandHeight: CGFloat = 0
     private var frameTimer: Timer?
     private var keyMonitor: Any?
     private var viewSubscription: AnyCancellable?
@@ -334,6 +341,10 @@ final class IslandWindowController: NSWindowController {
         let hoverRect = !hasNotch && state.mode != .expanded
             ? islandRect : islandRect.insetBy(dx: -6, dy: -6)
         let inIsland = hoverRect.contains(local)
+        // A shrink this tick moved the bottom edge up under the pointer. Read
+        // before anything else uses `inIsland`.
+        let shrankThisTick = lastIslandHeight > 0 && islandRect.height < lastIslandHeight
+        lastIslandHeight = islandRect.height
 
         // Toggle click-through
         let shouldAcceptMouse = inIsland || inAttachDrag || attachDragStart != nil
@@ -368,7 +379,17 @@ final class IslandWindowController: NSWindowController {
             fsm.mouseEntered()
         }
         if !inIsland && previouslyInIsland {
-            fsm.mouseLeft()
+            // Not every "the pointer is outside now" is the user leaving. A view
+            // switch can shrink the island under a pointer that never moved —
+            // the chat is 500pt and the home page 230pt, so both the avatar
+            // click and the chat's swipe-up pull the floor out from under the
+            // cursor, and the home page would then start its auto-collapse
+            // timer and vanish a moment after arriving. Swallowing that one
+            // tick does not make the island sticky: moving the mouse re-enters
+            // and leaves it like any other page.
+            if !shrankThisTick {
+                fsm.mouseLeft()
+            }
         }
 
         // Bot-head hover (love emote)
@@ -770,6 +791,8 @@ final class IslandWindowController: NSWindowController {
                     return
                 }
                 // In the chat view, a single click on Mochi goes back home.
+                // The shrink this causes is handled in `pollFrame` — see
+                // `shrankThisTick`, which covers the swipe-up too.
                 if self.state.mode == .expanded && self.state.view == .prompt {
                     self.state.view = .overview
                     return
