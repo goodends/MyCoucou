@@ -1270,8 +1270,11 @@ func islandSize(mode: IslandMode, view: IslandView,
             return (IslandConst.expandedWidth, h)
         }
         // While the project list is open the island takes the home page's
-        // height, whichever of the two pages the list is sitting on.
-        if ProjectPickerLayout.isOpen {
+        // height. Scoped to the two views it actually opens over: a
+        // notification landing mid-list switches the view to `.finished`,
+        // and answering here would have pinned that card at the list's
+        // height, with black under it.
+        if ProjectPickerLayout.isOpen, view == .overview || view == .empty {
             return (IslandConst.expandedWidth, ProjectPickerLayout.height)
         }
         // One finished notification keeps the standard card height; a stack of

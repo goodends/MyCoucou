@@ -3128,16 +3128,10 @@ struct OrcaProjectPickerList: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        // Same fill and hairline as CardBackground so it reads as part of the
-        // island rather than a window floating over it.
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#141518"))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
-                )
-        )
+        // No background of its own: both call sites put it inside a
+        // CardBackground, and a second rounded rect read as a shorter card
+        // floating inside the real one — the padding above had already
+        // inset it on every side.
     }
 
     /// Spawn Claude Code in `wt`. No prompt rides along: both callers reach
