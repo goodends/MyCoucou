@@ -766,8 +766,9 @@ struct QuestionView: View {
                     // clicked, which left no way back and no way to change it.
                     if !curOther {
                         // Back is navigation, so it stays on its own at the far
-                        // left; Cancel and Submit are the two ways out of the
-                        // last question, so they sit together on the right.
+                        // left; Back to Terminal and the primary action sit
+                        // together on the right, on every question — bailing out
+                        // to the terminal must not require reaching the last one.
                         HStack(spacing: 8) {
                             SecondaryButton("Back") {
                                 withAnimation { questionIndex = qi - 1 }
@@ -775,9 +776,7 @@ struct QuestionView: View {
                             .disabled(qi == 0)
                             .opacity(qi == 0 ? 0.4 : 1)
                             Spacer(minLength: 0)
-                            if isLast {
-                                SecondaryButton("Cancel") { HookServer.shared.sendQuestionAsk() }
-                            }
+                            SecondaryButton("Back to Terminal") { HookServer.shared.sendQuestionAsk() }
                             PrimaryButton(isLast ? "Submit" : "Next") {
                                 if isLast { sendAnswers(q: q) }
                                 else { withAnimation { questionIndex = qi + 1 } }
