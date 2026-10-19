@@ -478,6 +478,8 @@ struct IslandHeader: View {
                         Image(systemName: "gearshape")
                             .font(.system(size: 14))
                             .foregroundColor(Color(hex: "#8E939C"))
+                            .frame(width: 22, height: 28)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(String(localized: "Settings…"))
@@ -490,6 +492,8 @@ struct IslandHeader: View {
                         Image(systemName: "eye.slash")
                             .font(.system(size: 14))
                             .foregroundColor(Color(hex: "#8E939C"))
+                            .frame(width: 22, height: 28)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(String(localized: "Hide island"))
@@ -529,6 +533,10 @@ struct TabButton: View {
                     isHovered ? Color.white.opacity(0.07) : Color.clear
                 )
                 .clipShape(Capsule())
+                // Hit target wider than the 30×22 capsule so you don't have to
+                // land the click on the glyph itself. Layout is unchanged —
+                // contentShape only extends hit-testing.
+                .contentShape(Rectangle().size(width: 36, height: 28))
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
