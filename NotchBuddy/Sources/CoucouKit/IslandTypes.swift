@@ -481,7 +481,10 @@ enum IslandConst {
         .note:      ViewLayout(height: 160, botX: 60,  botY: nil, botDiameter: 50, agentMode: .column),
         // Greeting: bot drawn by GreetingCanvasView; no BotPlacement needed
         .greeting:  ViewLayout(height: 150, botX: 320, botY: 90,  botDiameter: 0,  agentMode: .none),
-        .wardrobe:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .none),
+        // The wardrobe is the home page with the right-hand side swapped for
+        // the outfits, so it stands the same height — the Mochi lands in the
+        // same place on both.
+        .wardrobe:  ViewLayout(height: 230, botX: 68,  botY: nil, botDiameter: 58, agentMode: .none),
         // Changes is the one view that breaks the 160 law, for the same reason
         // chat does: a list of touched files needs room, and 98pt of content
         // shows three rows.

@@ -3334,146 +3334,152 @@ struct WardrobeView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 6) {
-                Text("Wardrobe")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(hex: "#F5F6F8"))
-                Spacer(minLength: 4)
-                Text(headerRight)
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "#8E939C"))
-                    .lineLimit(1)
-            }
-            .padding(.top, 6)
-            .padding(.horizontal, 10)
+        ZStack(alignment: .leading) {
+            // One card for the whole page, the way the chat page has one:
+            // the Mochi stands on it like it stands on the chat's.
+            CardBackground(wash: .indigo)
 
-            // Grid
-            let allOutfits = Outfit.allCases.filter { $0 != .auto }
-            let withAuto = [Outfit.auto] + allOutfits
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVGrid(columns: columns, spacing: 5) {
-                    ForEach(withAuto, id: \.rawValue) { outfit in
-                        OutfitPillView(
-                            outfit: outfit,
-                            isSelected: (outfit == .auto ? .none : outfit) == currentOutfit,
-                            isHovered: hoveredOutfit == outfit,
-                            onHover: { h in
-                                hoveredOutfit = h ? outfit : nil
-                                if h {
-                                    // Preview on main Mochi
-                                    let preview: Outfit = outfit == .auto
-                                        ? Outfit.seasonal(for: Date(), calendar: .current)
-                                        : outfit
-                                    state.wardrobePreviewOutfit = preview
-                                } else if hoveredOutfit == nil {
-                                    state.wardrobePreviewOutfit = nil
-                                }
-                            },
-                            onTap: {
-                                // `.auto` → outfit `.none` (falls back to seasonal in BotCanvasView).
-                                let target: Outfit = outfit == .auto ? .none : outfit
-                                guard target != currentOutfit else { return }
-                                if let s = state.overviewSession {
-                                    state.setSessionOutfit(s.sessionId, target)
-                                }
-                                SoundEngine.shared.play("pop")
-                                NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
-                            },
-                            seasonalOutfit: outfit == .auto ? state.resolvedOutfit : .none
-                        )
-                    }
-                }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 8)
-            }
-            .frame(maxHeight: .infinity)
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .white, location: 0),
-                        .init(color: .white, location: 0.85),
-                        .init(color: .clear, location: 1)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-            )
-
-            // Bottom row: the name the home view shows, then the Mochi's own
-            // body colour. The outfit grid above scrolls; this strip stays put.
-            // An empty name falls back to the session's own title.
-            Divider().overlay(Color.white.opacity(0.08))
-                .padding(.top, 4)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 10) {
-                    // The name reads as plain text until you point at it, when it
-                    // gains a background and brightens. The TextField is always in
-                    // the hierarchy — swapping a Text for a TextField on hover made
-                    // the pointer bounce in and out of hover, the same trap the
-                    // pill's jump button fell into.
-                    ZStack(alignment: .leading) {
-                        // The hint is drawn by hand rather than left to the
-                        // TextField's own placeholder: that one takes its colour
-                        // from the system appearance, so on a black island in
-                        // light mode it comes out black — invisible.
-                        if nameDraft.isEmpty {
-                            Text(emptyNameHint)
-                                .font(.system(size: 12.5))
-                                .foregroundColor(Color(hex: "#7B8089"))
-                                .lineLimit(1)
-                                .allowsHitTesting(false)
-                        }
-                        TextField("", text: nameBinding)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12.5))
-                            .foregroundColor(Color(hex: nameHovered ? "#F5F6F8" : "#8E939C"))
-                            .lineLimit(1)
-                            .focused($nameFocused)
-                            .onSubmit { commitName() }
-                            .onChange(of: nameFocused) { _, focused in
-                                if !focused { commitName() }
-                            }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 3)
-                    .background(Color.white.opacity(nameHovered ? 0.06 : 0),
-                                in: RoundedRectangle(cornerRadius: 8))
-                    .frame(width: 180)
-                    .onHover { nameHovered = $0 }
-                    .help(emptyNameHint)
-                    HStack(spacing: 8) {
-                        ForEach(ClaudeSession.palette) { option in
-                            ColorSwatchView(
-                                hex: option.hex,
-                                isSelected: option.hex == currentBodyColor,
-                                isHovered: hoveredColor == option.hex,
-                                onHover: { hoveredColor = $0 ? option.hex : nil },
-                                onTap: {
-                                    guard let s = state.overviewSession, option.hex != currentBodyColor else { return }
-                                    state.setSessionBodyColor(s.sessionId, option.hex)
-                                    SoundEngine.shared.play("pop")
-                                    NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
-                                })
-                        }
-                    }
-                    .fixedSize()
-                }
-                // The name didn't make it into the session. It stays in the
-                // field, so the user's words aren't lost — say so, though.
-                if let error = state.renameError {
-                    Text(error)
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(hex: "#F4B400"))
+            VStack(alignment: .leading, spacing: 0) {
+                // Header
+                HStack(spacing: 6) {
+                    Text("Wardrobe")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color(hex: "#F5F6F8"))
+                    Spacer(minLength: 4)
+                    Text(headerRight)
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "#8E939C"))
                         .lineLimit(1)
                 }
+                .padding(.top, 6)
+                .padding(.horizontal, 10)
+
+                // Grid
+                let allOutfits = Outfit.allCases.filter { $0 != .auto }
+                let withAuto = [Outfit.auto] + allOutfits
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVGrid(columns: columns, spacing: 5) {
+                        ForEach(withAuto, id: \.rawValue) { outfit in
+                            OutfitPillView(
+                                outfit: outfit,
+                                isSelected: (outfit == .auto ? .none : outfit) == currentOutfit,
+                                isHovered: hoveredOutfit == outfit,
+                                onHover: { h in
+                                    hoveredOutfit = h ? outfit : nil
+                                    if h {
+                                        // Preview on main Mochi
+                                        let preview: Outfit = outfit == .auto
+                                            ? Outfit.seasonal(for: Date(), calendar: .current)
+                                            : outfit
+                                        state.wardrobePreviewOutfit = preview
+                                    } else if hoveredOutfit == nil {
+                                        state.wardrobePreviewOutfit = nil
+                                    }
+                                },
+                                onTap: {
+                                    // `.auto` → outfit `.none` (falls back to seasonal in BotCanvasView).
+                                    let target: Outfit = outfit == .auto ? .none : outfit
+                                    guard target != currentOutfit else { return }
+                                    if let s = state.overviewSession {
+                                        state.setSessionOutfit(s.sessionId, target)
+                                    }
+                                    SoundEngine.shared.play("pop")
+                                    NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
+                                },
+                                seasonalOutfit: outfit == .auto ? state.resolvedOutfit : .none
+                            )
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                }
+                .frame(maxHeight: .infinity)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0),
+                            .init(color: .white, location: 0.85),
+                            .init(color: .clear, location: 1)
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+
+                // Bottom row: the name the home view shows, then the Mochi's own
+                // body colour. The outfit grid above scrolls; this strip stays put.
+                // An empty name falls back to the session's own title.
+                Divider().overlay(Color.white.opacity(0.08))
+                    .padding(.top, 4)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 10) {
+                        // The name reads as plain text until you point at it, when it
+                        // gains a background and brightens. The TextField is always in
+                        // the hierarchy — swapping a Text for a TextField on hover made
+                        // the pointer bounce in and out of hover, the same trap the
+                        // pill's jump button fell into.
+                        ZStack(alignment: .leading) {
+                            // The hint is drawn by hand rather than left to the
+                            // TextField's own placeholder: that one takes its colour
+                            // from the system appearance, so on a black island in
+                            // light mode it comes out black — invisible.
+                            if nameDraft.isEmpty {
+                                Text(emptyNameHint)
+                                    .font(.system(size: 12.5))
+                                    .foregroundColor(Color(hex: "#7B8089"))
+                                    .lineLimit(1)
+                                    .allowsHitTesting(false)
+                            }
+                            TextField("", text: nameBinding)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12.5))
+                                .foregroundColor(Color(hex: nameHovered ? "#F5F6F8" : "#8E939C"))
+                                .lineLimit(1)
+                                .focused($nameFocused)
+                                .onSubmit { commitName() }
+                                .onChange(of: nameFocused) { _, focused in
+                                    if !focused { commitName() }
+                                }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(nameHovered ? 0.06 : 0),
+                                    in: RoundedRectangle(cornerRadius: 8))
+                        .frame(width: 180)
+                        .onHover { nameHovered = $0 }
+                        .help(emptyNameHint)
+                        HStack(spacing: 8) {
+                            ForEach(ClaudeSession.palette) { option in
+                                ColorSwatchView(
+                                    hex: option.hex,
+                                    isSelected: option.hex == currentBodyColor,
+                                    isHovered: hoveredColor == option.hex,
+                                    onHover: { hoveredColor = $0 ? option.hex : nil },
+                                    onTap: {
+                                        guard let s = state.overviewSession, option.hex != currentBodyColor else { return }
+                                        state.setSessionBodyColor(s.sessionId, option.hex)
+                                        SoundEngine.shared.play("pop")
+                                        NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
+                                    })
+                            }
+                        }
+                        .fixedSize()
+                    }
+                    // The name didn't make it into the session. It stays in the
+                    // field, so the user's words aren't lost — say so, though.
+                    if let error = state.renameError {
+                        Text(error)
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "#F4B400"))
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 5)
+                .padding(.bottom, 4)
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 5)
-            .padding(.bottom, 4)
+            .padding(.leading, 108)
+            .padding(.trailing, 12)
         }
-        .padding(.leading, 108)
-        .padding(.trailing, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { loadName() }
         .onChange(of: state.overviewSession?.sessionId) { _, _ in loadName() }

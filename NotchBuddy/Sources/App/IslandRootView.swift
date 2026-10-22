@@ -409,7 +409,7 @@ struct IslandContentView: View {
                     let isEmptyState = v == .empty
                         || (v == .overview && !state.hasOverviewContent)
                     let isTall = v == .prompt || v == .changes || v == .finished
-                        || isEmptyState
+                        || v == .wardrobe || isEmptyState
                     let anim: Animation = active
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)
@@ -448,6 +448,12 @@ struct IslandHeader: View {
             HStack(spacing: 5) {
                 TabButton(icon: "house.fill", view: .overview, state: state)
                 TabButton(icon: "bubble.left.fill", view: .prompt, state: state)
+
+                // Dressing the Mochi. The wardrobe dresses the session the
+                // home view is showing, so this is the same place the pill's
+                // right-click "Change outfit…" leads to.
+                TabButton(icon: "tshirt.fill", view: .wardrobe, state: state)
+                    .help(String(localized: "Change outfit…"))
 
                 // Finished sessions wait here until acknowledged. Same view
                 // the hook force-expands to, but reachable on demand, and
