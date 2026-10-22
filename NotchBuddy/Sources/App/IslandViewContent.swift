@@ -572,7 +572,9 @@ struct ApprovalView: View {
         ZStack {
             CardBackground(wash: .amber)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "needs permission")
+                AgentWho(task: state.focusTask,
+                         name: state.sessionName(for: state.pendingApproval?.sessionId),
+                         label: "needs permission")
                 CodeBlock(text: approval?.command ?? approval?.tool ?? "…")
                 ApprovalDecisionButtons(info: approval) {
                     HookServer.shared.sendApprovalDecision($0)
@@ -640,7 +642,9 @@ struct QuestionView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     // Header row: agent name + question counter
                     HStack(spacing: 4) {
-                        AgentWho(task: nil, label: "Claude Code is asking")
+                        AgentWho(task: nil,
+                                 name: state.sessionName(for: state.pendingQuestions.first?.sessionId),
+                                 label: "Is asking")
                         Spacer(minLength: 4)
                         if q.questions.count > 1 {
                             Text("\(qi + 1)/\(q.questions.count)")
@@ -897,7 +901,9 @@ private struct QuestionInboxCard: View {
         InboxRow(state: state, pillId: question.pillId, sessionId: question.sessionId, botState: .question,
                  onDoubleTap: { openTerminalForSession(task: task, sessionId: question.sessionId, state: state) },
                  wash: nil) {
-            AgentWho(task: task, label: "Claude Code is asking")
+            AgentWho(task: task,
+                     name: state.sessionName(for: question.sessionId),
+                     label: "Is asking")
             Text(question.question.questions.first?.question ?? String(localized: "Needs an answer"))
                 .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
@@ -928,7 +934,9 @@ private struct ApprovalInboxCard: View {
         InboxRow(state: state, pillId: approval.info.pillId, sessionId: approval.info.sessionId, botState: .approval,
                  onDoubleTap: { openTerminalForSession(task: task, sessionId: approval.info.sessionId, state: state) },
                  wash: .amber) {
-            AgentWho(task: task, label: "needs permission")
+            AgentWho(task: task,
+                     name: state.sessionName(for: approval.info.sessionId),
+                     label: "needs permission")
             CodeBlock(text: approval.info.command)
             ApprovalDecisionButtons(info: approval.info) {
                 HookServer.shared.answerApproval(id: approval.id, decision: $0)
@@ -1150,9 +1158,11 @@ private struct FinishedCard: View {
                     }
 
                 VStack(alignment: .leading, spacing: 5) {
-                    AgentWho(task: task, label: isError
-                             ? String(localized: "Claude Code stopped early")
-                             : String(localized: "Claude Code finished"))
+                    AgentWho(task: task,
+                             name: session?.displayName,
+                             label: isError
+                             ? String(localized: "Turn stopped early")
+                             : String(localized: "Turn finished"))
                     Text(finalLine)
                         .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
@@ -1563,8 +1573,8 @@ struct PromptView: View {
     }
 
     /// Which session the chat is bound to. `displayName` resolves to the
-    /// user-set `customName` if they renamed the pill, otherwise the project
-    /// folder name — the same string the home view shows.
+    /// session's title, or to the name Claude Code gave it — the same string
+    /// the home view shows.
     private var chatSessionName: String? {
         guard let s = state.overviewSession else { return nil }
         let name = s.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1620,8 +1630,8 @@ struct PromptView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 // Project / session name for the session the chat is bound to.
-                // displayName = customName if the user renamed the pill, else the
-                // project folder name — the same string the home pill shows. Sits
+                // displayName is the session's title, or the name Claude Code
+                // gave it — the same string the home pill shows. Sits
                 // at the top of the chat card, above the (small) Mochi on the left.
                 if let name = chatSessionName {
                     HStack(spacing: 5) {
@@ -2569,6 +2579,9 @@ struct ClaudeSessionPill: View {
     /// it is working in instead.
     private var subtitle: String {
         if session.provisional { return String(localized: "Started · no events yet") }
+        // Only where the session runs. The title above is the session's name
+        // now, so there is nothing left to add: where it runs is the one
+        // thing the name doesn't say.
         return ClaudeHost.label(for: session)
     }
 
@@ -3245,24 +3258,59 @@ struct WardrobeView: View {
         state.overviewSession?.bodyColor
     }
 
+    /// The name in the field. It starts as the session's name and becomes
+    /// the session's name again once it is written — the session's name
+    /// lives in its transcript, and the field only writes there once the user
+    /// is done typing.
+    @State private var nameDraft: String = ""
+    /// Whether the name field holds the keyboard, so the name is written
+    /// when the user leaves the field rather than on every keystroke.
+    @FocusState private var nameFocused: Bool
+
     /// Reads and writes the active session's name: same source as
     /// `currentOutfit` / `currentBodyColor`, so right-clicking another pill
     /// and coming back here edits that session.
     private var nameBinding: Binding<String> {
         Binding(
-            get: { state.overviewSession?.customName ?? "" },
-            set: { state.setSessionName(state.overviewSession?.sessionId ?? "", $0) }
+            get: { nameDraft },
+            set: { nameDraft = $0 }
         )
     }
 
-    /// The grey line shown while the field is empty: says what happens then.
-    /// It vanishes as soon as you type.
-    private var emptyNameHint: String {
-        String(localized: "Defaults to the project's name")
+    /// Put the session's name into the field. Called when the wardrobe opens
+    /// and when the session under it changes.
+    private func loadName() {
+        nameDraft = state.overviewSession?.displayName ?? ""
     }
 
-    private var headerRight: String {
-        // Hover takes priority: the colour pointed at, then the outfit.
+    /// Rename the session, the way Claude Code's own `/rename` does, so the
+    /// two agree on what the session is called.
+    ///
+    /// An empty field is not a rename: the session keeps the name it has,
+    /// and the field goes back to showing it. Nothing happens when the name
+    /// hasn't changed either — opening the wardrobe and leaving it again must
+    /// not disturb anything.
+    private func commitName() {
+        guard let s = state.overviewSession else { return }
+        let name = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            nameDraft = s.displayName
+            return
+        }
+        guard name != s.displayName else { return }
+        state.renameSession(s.sessionId, to: name)
+    }
+
+    /// The grey line shown while the field is empty: the name the session
+    /// goes by when it has no name of its own.
+    private var emptyNameHint: String {
+        guard let s = state.overviewSession else { return "" }
+        if !s.aiTitle.isEmpty { return s.aiTitle }
+        if !s.sessionName.isEmpty { return s.sessionName }
+        return s.projectName
+    }
+
+    private var headerRight: String {        // Hover takes priority: the colour pointed at, then the outfit.
         if let hex = hoveredColor,
            let name = ClaudeSession.palette.first(where: { $0.hex == hex })?.name {
             return name
@@ -3354,56 +3402,71 @@ struct WardrobeView: View {
 
             // Bottom row: the name the home view shows, then the Mochi's own
             // body colour. The outfit grid above scrolls; this strip stays put.
-            // An empty name falls back to the project folder's name.
+            // An empty name falls back to the session's own title.
             Divider().overlay(Color.white.opacity(0.08))
                 .padding(.top, 4)
-            HStack(spacing: 10) {
-                // The name reads as plain text until you point at it, when it
-                // gains a background and brightens. The TextField is always in
-                // the hierarchy — swapping a Text for a TextField on hover made
-                // the pointer bounce in and out of hover, the same trap the
-                // pill's jump button fell into.
-                ZStack(alignment: .leading) {
-                    // The hint is drawn by hand rather than left to the
-                    // TextField's own placeholder: that one takes its colour
-                    // from the system appearance, so on a black island in
-                    // light mode it comes out black — invisible.
-                    if (state.overviewSession?.customName ?? "").isEmpty {
-                        Text(emptyNameHint)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 10) {
+                    // The name reads as plain text until you point at it, when it
+                    // gains a background and brightens. The TextField is always in
+                    // the hierarchy — swapping a Text for a TextField on hover made
+                    // the pointer bounce in and out of hover, the same trap the
+                    // pill's jump button fell into.
+                    ZStack(alignment: .leading) {
+                        // The hint is drawn by hand rather than left to the
+                        // TextField's own placeholder: that one takes its colour
+                        // from the system appearance, so on a black island in
+                        // light mode it comes out black — invisible.
+                        if nameDraft.isEmpty {
+                            Text(emptyNameHint)
+                                .font(.system(size: 12.5))
+                                .foregroundColor(Color(hex: "#7B8089"))
+                                .lineLimit(1)
+                                .allowsHitTesting(false)
+                        }
+                        TextField("", text: nameBinding)
+                            .textFieldStyle(.plain)
                             .font(.system(size: 12.5))
-                            .foregroundColor(Color(hex: "#7B8089"))
+                            .foregroundColor(Color(hex: nameHovered ? "#F5F6F8" : "#8E939C"))
                             .lineLimit(1)
-                            .allowsHitTesting(false)
+                            .focused($nameFocused)
+                            .onSubmit { commitName() }
+                            .onChange(of: nameFocused) { _, focused in
+                                if !focused { commitName() }
+                            }
                     }
-                    TextField("", text: nameBinding)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12.5))
-                        .foregroundColor(Color(hex: nameHovered ? "#F5F6F8" : "#8E939C"))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(nameHovered ? 0.06 : 0),
+                                in: RoundedRectangle(cornerRadius: 8))
+                    .frame(width: 180)
+                    .onHover { nameHovered = $0 }
+                    .help(emptyNameHint)
+                    HStack(spacing: 8) {
+                        ForEach(ClaudeSession.palette) { option in
+                            ColorSwatchView(
+                                hex: option.hex,
+                                isSelected: option.hex == currentBodyColor,
+                                isHovered: hoveredColor == option.hex,
+                                onHover: { hoveredColor = $0 ? option.hex : nil },
+                                onTap: {
+                                    guard let s = state.overviewSession, option.hex != currentBodyColor else { return }
+                                    state.setSessionBodyColor(s.sessionId, option.hex)
+                                    SoundEngine.shared.play("pop")
+                                    NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
+                                })
+                        }
+                    }
+                    .fixedSize()
+                }
+                // The name didn't make it into the session. It stays in the
+                // field, so the user's words aren't lost — say so, though.
+                if let error = state.renameError {
+                    Text(error)
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hex: "#F4B400"))
                         .lineLimit(1)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(Color.white.opacity(nameHovered ? 0.06 : 0),
-                            in: RoundedRectangle(cornerRadius: 8))
-                .frame(width: 180)
-                .onHover { nameHovered = $0 }
-                .help(emptyNameHint)
-                HStack(spacing: 8) {
-                    ForEach(ClaudeSession.palette) { option in
-                        ColorSwatchView(
-                            hex: option.hex,
-                            isSelected: option.hex == currentBodyColor,
-                            isHovered: hoveredColor == option.hex,
-                            onHover: { hoveredColor = $0 ? option.hex : nil },
-                            onTap: {
-                                guard let s = state.overviewSession, option.hex != currentBodyColor else { return }
-                                state.setSessionBodyColor(s.sessionId, option.hex)
-                                SoundEngine.shared.play("pop")
-                                NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.proud)
-                            })
-                    }
-                }
-                .fixedSize()
             }
             .padding(.horizontal, 8)
             .padding(.top, 5)
@@ -3412,6 +3475,14 @@ struct WardrobeView: View {
         .padding(.leading, 108)
         .padding(.trailing, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { loadName() }
+        .onChange(of: state.overviewSession?.sessionId) { _, _ in loadName() }
+        .onChange(of: state.overviewSession?.displayName) { _, _ in
+            // The session was renamed somewhere else — in the terminal, or by
+            // the write this field just made. Follow it, unless the user is
+            // halfway through typing a name of their own.
+            if !nameFocused { loadName() }
+        }
         .onDisappear {
             state.wardrobePreviewOutfit = nil
             hoveredOutfit = nil
@@ -3708,12 +3779,26 @@ extension CardBackground where Content == EmptyView {
 
 struct AgentWho: View {
     let task: AgentTask?
+    /// The session's own name, when there is one. "Claude Code" is the name of
+    /// the tool every session comes from; the session's name is what tells two
+    /// of them apart.
+    let name: String?
     let label: String
+
+    init(task: AgentTask?, name: String? = nil, label: String) {
+        self.task = task
+        self.name = name
+        self.label = label
+    }
 
     var body: some View {
         HStack(spacing: 7) {
             if let task = task {
                 Circle().fill(Color(hex: task.color)).frame(width: 8, height: 8)
+            }
+            if let name = name, !name.isEmpty {
+                Text(name).font(.system(size: 12, weight: .semibold)).foregroundColor(Color(hex: "#F5F6F8"))
+            } else if let task = task {
                 Text(task.name).font(.system(size: 12, weight: .semibold)).foregroundColor(Color(hex: "#F5F6F8"))
             }
             Text(LocalizedStringKey(label)).font(.system(size: 12)).foregroundColor(Color(hex: "#8E939C"))

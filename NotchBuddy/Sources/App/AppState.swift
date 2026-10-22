@@ -8,11 +8,13 @@ import Combine
 ///
 /// These live on `ClaudeSession`, which is rebuilt from scratch on every launch
 /// — the process scan and the hook events are what populate it — so without a
-/// record of its own a restart silently renamed the session back to its folder
-/// and restyled the character. Keyed on the session id alone: Claude Code mints
-/// a new id per session, so a name does not follow the project to the next one.
+/// record of its own a restart silently restyled the character. Keyed on the
+/// session id alone: Claude Code mints a new id per session, so a look does
+/// not follow the project to the next one.
+///
+/// The session's *name* isn't here: it belongs to the session, and renaming
+/// writes it into the session's own transcript.
 struct SavedLook: Codable {
-    var name: String = ""
     var outfit: String = Outfit.none.rawValue
     var color: String = "#F5F6F8"
 
@@ -289,6 +291,14 @@ final class AppState: ObservableObject {
         case .finished: return finishingSession
         default: return overviewSession
         }
+    }
+
+    /// The name of a session, as the views show it. The notification cards
+    /// name the session that raised them, not the tool every one of them
+    /// comes from.
+    func sessionName(for sessionId: String?) -> String? {
+        guard let sessionId, !sessionId.isEmpty else { return nil }
+        return claudeSessions.first { $0.sessionId == sessionId }?.displayName
     }
 
     /// Whether the overview has something real to show.
@@ -819,6 +829,60 @@ final class AppState: ObservableObject {
 
     // MARK: - Claude session list (right-side overview)
 
+    /// What each session's transcript has told us about its title, and how
+    /// far we've read into it. The transcript only grows, so a refresh reads
+    /// only what was written since the last one.
+    private var titleScans: [String: SessionHistoryLoader.SessionTitle] = [:]
+    /// Where each session's transcript lives, once we've found it. Looking it
+    /// up means listing every project directory, so it's done once.
+    private var transcriptURLs: [String: URL] = [:]
+    /// Set when a name couldn't be written into the session, so the wardrobe
+    /// can say so. The name itself stays in the wardrobe.
+    @Published var renameError: String? = nil
+
+    /// Read the session's title out of its transcript and put it on the
+    /// session.
+    ///
+    /// The title arrives after the session does — Claude Code names it once
+    /// there's a message to summarise — so this runs again on every scan
+    /// rather than once when the session appears.
+    func refreshTitle(for sessionId: String, cwd: String) {
+        let url: URL
+        if let known = transcriptURLs[sessionId] {
+            url = known
+        } else if let found = SessionHistoryLoader.transcriptURL(sessionId: sessionId, cwd: cwd) {
+            transcriptURLs[sessionId] = found
+            url = found
+        } else {
+            return
+        }
+        let previous = titleScans[sessionId] ?? SessionHistoryLoader.SessionTitle()
+        Task.detached(priority: .utility) { [weak self] in
+            let scanned = SessionHistoryLoader.scanTitle(in: url, from: previous)
+            await MainActor.run {
+                guard let self else { return }
+                self.titleScans[sessionId] = scanned
+                self.applyTitle(scanned, to: sessionId)
+            }
+        }
+    }
+
+    /// Put the titles the transcript gave us on the session.
+    private func applyTitle(_ title: SessionHistoryLoader.SessionTitle, to sessionId: String) {
+        guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
+        // A manual name wins over the generated one, the way `/resume` shows
+        // them: the user renamed this, so that is what it is called.
+        let custom = title.custom ?? ""
+        let ai = title.ai ?? ""
+        let prompt = title.firstPrompt ?? ""
+        guard claudeSessions[idx].customTitle != custom
+                || claudeSessions[idx].aiTitle != ai
+                || claudeSessions[idx].firstPrompt != prompt else { return }
+        claudeSessions[idx].customTitle = custom
+        claudeSessions[idx].aiTitle = ai
+        claudeSessions[idx].firstPrompt = prompt
+    }
+
     /// Insert or refresh a Claude Code session. Empty / "unknown" session ids are no-ops.
     /// Existing sessions are updated in place and promoted to the front; new sessions
     /// are prepended so the list stays sorted by recency. Sessions the user has
@@ -850,11 +914,12 @@ final class AppState: ObservableObject {
                 projectName: projectName, state: state,
                 startedAt: s.startedAt, lastEventAt: eventTime,
                 pid: pid, bodyColor: s.bodyColor, outfit: s.outfit,
-                sessionName: s.sessionName, customName: s.customName,
+                sessionName: s.sessionName,
                 scanned: s.scanned
             )
             claudeSessions.remove(at: idx)
             claudeSessions.insert(s, at: 0)
+            refreshTitle(for: sessionId, cwd: cwd)
             // The chat can be focused on the placeholder id (tapping a scanned
             // card opens it). Carry that focus over to the real id, or the open
             // chat silently loses its session and never fills in.
@@ -869,12 +934,16 @@ final class AppState: ObservableObject {
 
         }
 
+        // A session we've seen before already has a title or is waiting for
+        // one; a new one has to go and look for it.
+        let isNew = !claudeSessions.contains { $0.sessionId == sessionId }
         claudeSessions.upsert(
             sessionId: sessionId, cwd: cwd, hostApp: hostApp,
             sessionBundleId: sessionBundleId, projectName: projectName,
             state: state, eventTime: eventTime, pid: pid
         )
         applySavedLook(sessionId)
+        if isNew { refreshTitle(for: sessionId, cwd: cwd) }
     }
 
     /// Orca-managed worktrees, loaded when the project picker opens. nil until
@@ -986,6 +1055,9 @@ final class AppState: ObservableObject {
         // A process that has since died shouldn't linger as a card.
         claudeSessions.removeAll { $0.provisional && ($0.pid.map { !live.contains($0) } ?? true) }
         for p in found {
+            // Claude's registry knows the cwd, the name and whether the agent
+            // is busy; prefer those over what the process table could tell us.
+            let cwd = p.descriptor?.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? p.cwd
             // A card already on the books means a hook event got here first,
             // and a hook carries no name — Claude Code's session name lives
             // only in the registry this scan just read. Skipping the card left
@@ -993,6 +1065,9 @@ final class AppState: ObservableObject {
             // session, so top the name up instead.
             if let idx = claudeSessions.firstIndex(where: { $0.pid == p.pid }) {
                 claudeSessions[idx].adoptSessionName(p.descriptor?.name ?? "")
+                if let sid = p.descriptor?.sessionId, !sid.isEmpty {
+                    refreshTitle(for: sid, cwd: cwd)
+                }
                 continue
             }
             if let key = p.paneKey { orcaPaneByPid[p.pid] = key }
@@ -1004,7 +1079,6 @@ final class AppState: ObservableObject {
 
             // Claude's registry knows the cwd, the name and whether the agent
             // is busy; prefer those over what the process table could tell us.
-            let cwd = p.descriptor?.cwd.flatMap { $0.isEmpty ? nil : $0 } ?? p.cwd
             let raw = URL(fileURLWithPath: cwd).lastPathComponent
             let projectName = HookServer.aliasProjectName(raw.isEmpty ? "Claude" : raw)
 
@@ -1020,6 +1094,7 @@ final class AppState: ObservableObject {
                 )
                 appendAppLog("nb.log", "scan: pid=\(p.pid) sid=\(sid) cwd=\(cwd) status=\(d.status ?? "?")")
                 applySavedLook(sid)
+                refreshTitle(for: sid, cwd: cwd)
             } else {
                 // No registry entry — an older Claude Code, or the file wasn't
                 // readable. Fall back to a placeholder that a hook will adopt.
@@ -1120,7 +1195,6 @@ final class AppState: ObservableObject {
         if let idx {
             claudeSessions[idx].bodyColor = s.bodyColor
             claudeSessions[idx].outfit = s.outfit
-            claudeSessions[idx].customName = s.customName
             claudeSessions[idx].sessionName = s.sessionName
             claudeSessions[idx].scanned = s.scanned
         }
@@ -1153,25 +1227,51 @@ final class AppState: ObservableObject {
         rememberLook(sessionId, color: hex)
     }
 
-    /// Set the name shown on the home view for a Claude session, from the
-    /// wardrobe. Empty restores the project folder's name.
-    func setSessionName(_ sessionId: String, _ name: String) {
+    /// Rename a Claude Code session, the way Claude Code's own `/rename`
+    /// does: into the session's transcript, so the two agree on what the
+    /// session is called.
+    ///
+    /// There is no name of our own to fall back on. If the write fails the
+    /// session keeps the name it had, `renameError` says so, and the name the
+    /// user typed stays in the wardrobe until they leave it.
+    func renameSession(_ sessionId: String, to name: String) {
         guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
-        claudeSessions[idx].customName = name
-        rememberLook(sessionId, name: name)
+        let cwd = claudeSessions[idx].cwd
+        guard let url = transcriptURLs[sessionId]
+                ?? SessionHistoryLoader.transcriptURL(sessionId: sessionId, cwd: cwd)
+        else {
+            renameError = String(localized: "Couldn't save the name to the session")
+            return
+        }
+        transcriptURLs[sessionId] = url
+        renameError = nil
+        Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                try SessionTitleWriter.rename(sessionId: sessionId, to: name, transcript: url)
+                await MainActor.run { self?.applyRenamedSession(sessionId: sessionId, name: name) }
+            } catch {
+                await MainActor.run {
+                    self?.renameError = String(localized: "Couldn't save the name to the session")
+                }
+            }
+        }
     }
 
-    /// Persist one part of a session's look, leaving the other two as they are
-    /// on the session itself. Called on every wardrobe change and on creation,
-    /// so the record always matches what is on screen.
+    /// The name is in the transcript now.
+    private func applyRenamedSession(sessionId: String, name: String) {
+        guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
+        claudeSessions[idx].customTitle = name
+    }
+
+    /// Persist one part of a session's look, leaving the other as it is on the
+    /// session itself. Called on every wardrobe change and on creation, so the
+    /// record always matches what is on screen.
     private func rememberLook(_ sessionId: String,
-                              name: String? = nil,
                               outfit: Outfit? = nil,
                               color: String? = nil) {
         guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }
         let s = claudeSessions[idx]
-        savedLooks[sessionId] = SavedLook(name: name ?? s.customName,
-                                          outfit: (outfit ?? s.outfit).rawValue,
+        savedLooks[sessionId] = SavedLook(outfit: (outfit ?? s.outfit).rawValue,
                                           color: color ?? s.bodyColor)
     }
 
@@ -1182,7 +1282,6 @@ final class AppState: ObservableObject {
         guard let saved = savedLooks[sessionId],
               let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId })
         else { return }
-        claudeSessions[idx].customName = saved.name
         claudeSessions[idx].outfit = saved.outfitValue
         claudeSessions[idx].bodyColor = saved.color
     }

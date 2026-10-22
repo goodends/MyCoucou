@@ -34,6 +34,7 @@
 		38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */; };
 		3CF69605BB03E567C2DB0935 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
 		40F7576FC56ED7BC1D2B717E /* PillColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37564F5F041B38C976DF3DEF /* PillColors.swift */; };
+		447C1B53A34AAB4553F69E8F /* SessionTitleWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBFF6AE6054961F3F57BD4E /* SessionTitleWriter.swift */; };
 		490A3F9723DE11D7D7FF945E /* SessionHistoryLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8458EAFC88088FDD09E3BBBD /* SessionHistoryLoader.swift */; };
 		4976F8BF814D6F817370F1D8 /* ChatMarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE88A53AEAA637F866D479D /* ChatMarkdownView.swift */; };
 		4B6AC00F22EC75E90E0157D5 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6D7015D6A77AA59323C0E7 /* AppLog.swift */; };
@@ -80,6 +81,7 @@
 		9E34044A001B01C3A514D20A /* IslandDisplayChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A09E73F1E58019EF6EA2A62 /* IslandDisplayChoice.swift */; };
 		9EA178EA395B116336C1FA10 /* TerminalTarget+AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244A7909EEDA4BFF4C2EA9B5 /* TerminalTarget+AppKit.swift */; };
 		9ECEE890D4486B6E83BD5B7F /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACB4350729C6513824D1ADF /* ColorHex.swift */; };
+		A2EED98EA494F6DB4FA03C09 /* SessionTitleWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBFF6AE6054961F3F57BD4E /* SessionTitleWriter.swift */; };
 		A7733EE60694EA3E2A86C37A /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0365DDE3C554F5E8570055F4 /* IslandTypes.swift */; };
 		A885B7E6DC43231BECE36E3D /* MochiWardrobe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */; };
 		ADBB9C15DDA4044625B325BE /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
@@ -140,6 +142,7 @@
 		6309C6217F7B05F3F4FDF0BF /* StatusLineInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusLineInstaller.swift; sourceTree = "<group>"; };
 		6544ED02D945CF9F00647AD1 /* MacDictation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDictation.swift; sourceTree = "<group>"; };
 		66E6F5FC81429871B6F766A8 /* BotEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotEngine.swift; sourceTree = "<group>"; };
+		6FBFF6AE6054961F3F57BD4E /* SessionTitleWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTitleWriter.swift; sourceTree = "<group>"; };
 		79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiWardrobe.swift; sourceTree = "<group>"; };
 		79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookServer.swift; sourceTree = "<group>"; };
 		7C1A7D5CBE2AC084A10C5FF3 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -215,6 +218,7 @@
 				EC9F8AC746870E16805A6D63 /* OrcaCLIBridge.swift */,
 				B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */,
 				8458EAFC88088FDD09E3BBBD /* SessionHistoryLoader.swift */,
+				6FBFF6AE6054961F3F57BD4E /* SessionTitleWriter.swift */,
 				7C1A7D5CBE2AC084A10C5FF3 /* SettingsView.swift */,
 				FA51E5B140C20812641168EA /* ShortcutLogic.swift */,
 				62CF42AE7611EF212CA0458F /* ShortcutsSettingsView.swift */,
@@ -432,6 +436,7 @@
 				07EC91820A69E8BF11EC778D /* PillColors.swift in Sources */,
 				6FC65C190ED614C664C9BC17 /* SafeWebURL.swift in Sources */,
 				2BE3B4CBF7028A6097EBD51E /* SessionHistoryLoader.swift in Sources */,
+				447C1B53A34AAB4553F69E8F /* SessionTitleWriter.swift in Sources */,
 				56BE8C733F10A030A638FB60 /* SettingsView.swift in Sources */,
 				C07E9A04E827284FDF33DB16 /* ShortcutLogic.swift in Sources */,
 				1EAFEE80A8066B77F9410025 /* ShortcutsSettingsView.swift in Sources */,
@@ -490,6 +495,7 @@
 				40F7576FC56ED7BC1D2B717E /* PillColors.swift in Sources */,
 				FEFEF1EBAB0E6CA74A33C10B /* SafeWebURL.swift in Sources */,
 				490A3F9723DE11D7D7FF945E /* SessionHistoryLoader.swift in Sources */,
+				A2EED98EA494F6DB4FA03C09 /* SessionTitleWriter.swift in Sources */,
 				8D1C01F283FA7806119A1C85 /* SettingsView.swift in Sources */,
 				6CCEC73ED68E9F253C22D692 /* ShortcutLogic.swift in Sources */,
 				908043F62E2C31F5FBC0A0C4 /* ShortcutsSettingsView.swift in Sources */,

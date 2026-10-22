@@ -214,7 +214,7 @@ enum ClaudeSessionTests {
               named.first?.displayName == "proj-named-52",
               failures: &failures)
 
-        // A name typed in the wardrobe outranks Claude's own.
+        // The session's title outranks the name Claude Code gave it.
         var custom: [ClaudeSession] = []
         custom.upsert(
             sessionId: "sid-custom",
@@ -223,9 +223,9 @@ enum ClaudeSessionTests {
             projectName: "proj-custom",
             state: .working, eventTime: Date(timeIntervalSince1970: 3003)
         )
-        custom[0].customName = "Review the diff"
+        custom[0].customTitle = "Review the diff"
         custom[0].adoptSessionName("proj-custom-7")
-        check("a customName outranks the session name",
+        check("a title outranks the session name",
               custom.first?.displayName == "Review the diff",
               failures: &failures)
 
@@ -258,16 +258,30 @@ enum ClaudeSessionTests {
               share.first?.copyableName == "session: proj-share-4",
               failures: &failures)
 
-        // Two different names: the one the user typed leads, because it is the
+        // Two different names: the session's title leads, because it is the
         // one they know it by, and Claude's follows as the address.
-        share[0].customName = "Fix the island"
+        share[0].customTitle = "Fix the island"
         check("a renamed session labels Claude's name, visible name first",
               share.first?.copyableName == "Fix the island (session: proj-share-4)",
               failures: &failures)
 
-        // A session we only know from a hook event has no Claude Code name to
-        // copy — the folder name is all there is, and labelling it one would
-        // claim an address it doesn't have.
+        // A session the user renamed has a name of its own and an address —
+        // both are copied, whatever kind of name the address happens to be.
+        var userNamed: [ClaudeSession] = []
+        userNamed.upsert(
+            sessionId: "sid-user", cwd: "/Users/me/proj-user",
+            hostApp: nil, sessionBundleId: nil,
+            projectName: "proj-user", state: .working,
+            eventTime: Date(timeIntervalSince1970: 3004)
+        )
+        userNamed[0].customTitle = "改名字"
+        userNamed[0].adoptSessionName("修改名称")
+        check("a renamed session is copied with its address",
+              userNamed.first?.copyableName == "改名字 (session: 修改名称)",
+              failures: &failures)
+
+        // A session we only know from a hook event has no registry name to
+        // address it by — its own id is the address then.
         var namelessShare: [ClaudeSession] = []
         namelessShare.upsert(
             sessionId: "sid-share-2", cwd: "/Users/me/proj-share-2",
@@ -275,8 +289,8 @@ enum ClaudeSessionTests {
             projectName: "proj-share-2", state: .working,
             eventTime: Date(timeIntervalSince1970: 3001)
         )
-        check("a session with no Claude Code name copies its folder name alone",
-              namelessShare.first?.copyableName == "proj-share-2",
+        check("a session with no Claude Code name is copied with its id",
+              namelessShare.first?.copyableName == "proj-share-2 (session: sid-share-2)",
               failures: &failures)
 
         // Nothing to copy is not a state a pill can reach — projectName is
