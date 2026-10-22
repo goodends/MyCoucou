@@ -779,6 +779,14 @@ final class IslandWindowController: NSWindowController {
                 // instead of slapping — clicking the left card should never be
                 // read as a poke at the character.
                 if self.state.mode == .expanded && self.state.view == .overview {
+                    // The empty home has no agent to talk to: the chat can't
+                    // start one, so the avatar does what the "Ask Claude"
+                    // button does — it opens the project list.
+                    if !self.state.hasOverviewContent {
+                        self.state.showProjectPicker = true
+                        Task { await self.state.loadOrcaWorktrees() }
+                        return
+                    }
                     // Lock the chat to the session this card is showing. Without
                     // this the chat falls back to whatever tasks[] remembers, and
                     // two sessions in one folder can end up on the wrong one.

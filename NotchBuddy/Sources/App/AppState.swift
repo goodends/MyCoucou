@@ -297,12 +297,15 @@ final class AppState: ObservableObject {
     /// "Claude Code is wired up", not "a session is running". Rendering it as
     /// the left card's character painted an empty Mochi under a host name
     /// Coucou knew nothing about, so the home view claimed an agent that
-    /// didn't exist. It only counts once a hook event has given it steps to
-    /// report; any other pill (Codex, Copilot…) counts on its own.
+    /// didn't exist. Its steps don't make it real either: they outlive the
+    /// session that wrote them, so a home page whose left card is this
+    /// placeholder next to an empty session list reads as a broken home.
+    /// Only a visible Claude session or another agent's pill (Codex,
+    /// Copilot…) counts.
     var hasOverviewContent: Bool {
         if overviewSession != nil { return true }
         guard let task = focusTask else { return false }
-        return task.id != "integration_claude" || !task.steps.isEmpty
+        return task.id != "integration_claude"
     }
 
     /// Synthesise an `AgentTask` for a Claude session so we can feed existing
