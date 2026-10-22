@@ -896,27 +896,6 @@ final class IslandWindowController: NSWindowController {
             finishDrag()
         }
 
-        NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
-            guard let self else { return event }
-            MainActor.assumeIsolated {
-                guard self.wasInIsland, self.isBotHit(event.locationInWindow) else { return }
-                guard !self.state.mochiOnDesktop else { return }
-                // The notification list draws a Mochi per card and those own
-                // their right-click. The big Mochi is not on screen there, but
-                // its hit circle still covers the first card's avatar — it
-                // would open the wardrobe underneath that card's own menu.
-                if self.state.mode == .expanded && self.state.view == .finished { return }
-                if self.state.mode == .expanded && self.state.view == .wardrobe {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        self.state.view = .overview
-                    }
-                } else {
-                    self.expand(to: .wardrobe)
-                }
-            }
-            return event
-        }
-
         // Track last external app for window context capture
         let ourBundle = Bundle.main.bundleIdentifier ?? ""
         NSWorkspace.shared.notificationCenter.addObserver(
