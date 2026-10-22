@@ -867,6 +867,19 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Re-read the title of every session we know about.
+    ///
+    /// A name can change without us: a `/rename` in the terminal, another
+    /// tool, a second window. The name lives in the session's transcript, so
+    /// the way to see it is to read the transcript's new bytes — nothing here
+    /// spawns a process or looks at the process table, which is what made
+    /// the periodic scan too expensive to run for this.
+    func refreshAllTitles() {
+        for session in claudeSessions {
+            refreshTitle(for: session.sessionId, cwd: session.cwd)
+        }
+    }
+
     /// Put the titles the transcript gave us on the session.
     private func applyTitle(_ title: SessionHistoryLoader.SessionTitle, to sessionId: String) {
         guard let idx = claudeSessions.firstIndex(where: { $0.sessionId == sessionId }) else { return }

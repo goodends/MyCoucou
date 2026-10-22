@@ -434,6 +434,18 @@ struct IslandContentView: View {
         // to home; on home, another upward swipe collapses the island.
         // Implementation in ChatOverscrollBackGesture.swift.
         .overscrollBackGesture(state: state)
+        // Names live in the sessions' transcripts, and something else can
+        // change them — a `/rename` in the terminal, another tool. Read the
+        // new bytes of each transcript so the names follow along. This view
+        // only exists while the island is expanded, so a hidden island stays
+        // at 0% CPU.
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                guard !Task.isCancelled else { return }
+                state.refreshAllTitles()
+            }
+        }
     }
 }
 
