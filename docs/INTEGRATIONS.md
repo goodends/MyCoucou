@@ -52,14 +52,14 @@ Vérifier dans la doc la liste exacte des événements et leurs champs.
 - Non disponible en version App Store : le wrapper y vivrait dans le conteneur de l'app, inatteignable pour le Claude Code qui tourne sur la machine.
 
 ### Approuver depuis le notch
-- Sur `PermissionRequest`, `nb-hook` **attend** la décision de l'app (défaut 110 s, réglable) puis écrit sur stdout le JSON de décision du hook (d'après la doc actuelle : `hookSpecificOutput` avec `decision.behavior` = `allow` ou `deny`). Timeout du hook dans settings.json : décision + 10 s.
+- Sur `PermissionRequest`, `nb-hook` **attend** la décision de l'app (30 min) puis écrit sur stdout le JSON de décision du hook (d'après la doc actuelle : `hookSpecificOutput` avec `decision.behavior` = `allow` ou `deny`). Timeout du hook dans settings.json : 30 min aussi — c'est lui qui tue la demande, l'app rend la main quelques secondes avant.
 - Pas de réponse avant le délai, ou app fermée → aucune sortie, le terminal affiche sa demande habituelle. Si Louis répond dans le terminal, l'app retire l'alerte au prochain événement de la session.
 - Un bug a été signalé où `deny` était ignoré sur `PermissionRequest` (issue GitHub anthropics/claude-code #19298). **Tester allow et deny** ; si deny ne marche pas, basculer la décision sur `PreToolUse` (`permissionDecision`) pour les outils concernés.
 - « Toujours autoriser » : si la doc permet de renvoyer une règle de permission persistante, l'utiliser. Sinon l'app garde sa propre liste (projet + outil + motif de commande) et répond `allow` automatiquement ensuite. Liste visible et supprimable dans les réglages.
 - Raccourcis Y / N quand la vue `approval` est ouverte.
 
 ### Répondre aux questions (`AskUserQuestion`)
-- **Claude Code 2.1.85+** : `AskUserQuestion` arrive en `PreToolUse` (avec `matcher: "AskUserQuestion"`), non plus en `PermissionRequest`. Un hook dédié avec `--ask` et un timeout de 130 s est requis dans `settings.json`. Si ce hook manque, l'app affiche la bannière « Hooks outdated — update them to answer Claude's questions from the notch » dans les réglages et propose la mise à jour.
+- **Claude Code 2.1.85+** : `AskUserQuestion` arrive en `PreToolUse` (avec `matcher: "AskUserQuestion"`), non plus en `PermissionRequest`. Un hook dédié avec `--ask` et un timeout de 30 min est requis dans `settings.json`. Si ce hook manque, l'app affiche la bannière « Hooks outdated — update them to answer Claude's questions from the notch » dans les réglages et propose la mise à jour.
 - `PermissionRequest` pour `AskUserQuestion` : l'app répond `{"permissionDecision":"ask"}` immédiatement (no-op) et n'affiche pas de carte.
 - `PreToolUse` général pour `AskUserQuestion` : l'app ignore l'événement (pas de mise à jour de l'état `.working`).
 - `tool_input.questions` : tableau de 1 à 4 questions, chacune avec `question` (texte), `header` (≤ 12 car.), `options` (2 à 4, chacune `label` + `description`), `multiSelect`.
@@ -68,7 +68,7 @@ Vérifier dans la doc la liste exacte des événements et leurs champs.
 - Single-select : clic = réponse immédiate (pas de bouton Send). Multi-select : toggles + bouton Send/Next, désactivé tant qu'aucun choix.
 - Réponse via socket : `{"decision":"answer","answers":{"<question>":"<label>"}}`. Multi-select : valeur `[String]` (tableau, Claude Code 2.1.136+). Single-select et « Other… » : valeur `String`.
 - nb-hook.py `--ask` : si `decision == 'answer'` → émet `hookSpecificOutput` avec `hookEventName: "PreToolUse"`, `permissionDecision: "allow"` et `updatedInput: {questions, answers}` — Claude Code reçoit les réponses et continue.
-- Fallback : si l'app ne répond pas (absente, timeout 125 s) ou renvoie `ask`, nb-hook n'émet rien → Claude Code re-pose la question dans le terminal.
+- Fallback : si l'app ne répond pas (absente, timeout 29 min 55 s) ou renvoie `ask`, nb-hook n'émet rien → Claude Code re-pose la question dans le terminal.
 
 ### Sauter au terminal
 | Contexte capté | Action |

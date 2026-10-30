@@ -35,9 +35,20 @@ final class HookServer: @unchecked Sendable {
     private static let receiveTimeoutSeconds: Int = 5   // SO_RCVTIMEO on client sockets
     private static let maxConnections = 32              // concurrent connection ceiling
 
+    /// How long a blocking request may wait for the user: 30 minutes.
+    ///
+    /// The agent's own hook timeout is the hard ceiling — Claude Code kills
+    /// the hook when it expires, and the request dies with it. The relay's
+    /// socket timeout and the app's deadline sit just under it, in that
+    /// order, so the request is handed back cleanly instead of vanishing
+    /// mid-flight.
+    static let hookWaitSeconds = 1800      // the hook timeout we install
+    static let relayWaitSeconds = 1795     // the relay's socket timeout
+    static let appWaitSeconds = 1790       // the app hands the request back
+
     /// How long a question keeps its hook fd open before the island hands it
-    /// back. Matches the 130s `--ask` hook timeout with a little margin.
-    private static let questionTimeout: Double = 120
+    /// back. Matches the `--ask` hook timeout with a little margin.
+    private static let questionTimeout: Double = Double(appWaitSeconds)
 
     private var serverFD: Int32 = -1
     private let connectionLock = NSLock()
@@ -421,7 +432,7 @@ final class HookServer: @unchecked Sendable {
         let eventName = payload["hook_event_name"] as? String ?? ""
 
         if eventName == "PermissionRequest" {
-            // Hold fd open — Claude Code waits for our decision (up to 120s)
+            // Hold fd open — Claude Code waits for our decision (up to the hook timeout)
             Task { @MainActor in self.processPermissionRequest(fd: fd, payload: payload) }
         } else {
             Task { @MainActor in self.processEvent(name: eventName, payload: payload) }
@@ -991,8 +1002,10 @@ final class HookServer: @unchecked Sendable {
         // and its own deadline; the clock starts now, so a request that waits
         // its turn can still run out — the inbox shows what's left of it.
         let id = "a\(fd)-\(UUID().uuidString.prefix(8))"
-        // Copilot/Muse use 110s (their relay waits 118s but their hook timeout is 120s, leaving little margin).
-        let waitTimeout: Double = (isCopilotRequest || isMuseRequest) ? 110 : 115
+        // Every agent gets the same ceiling: the hook timeout we install for
+        // them all is `hookWaitSeconds`, and the app hands the request back a
+        // few seconds before that.
+        let waitTimeout: Double = Double(Self.appWaitSeconds)
         state.pendingApprovals.append(PendingApproval(
             id: id,
             info: ApprovalInfo(sessionId: sessionId, tool: tool, command: command,
@@ -1117,7 +1130,7 @@ final class HookServer: @unchecked Sendable {
         state.isPinned = true
         SoundEngine.shared.play("approval")
 
-        // Queue, don't displace — see processPermissionRequest. The 120s clock
+        // Queue, don't displace — see processPermissionRequest. The 30-minute clock
         // starts now, so a question that waits its turn can still run out; the
         // inbox shows how much of it is left.
         let id = "q\(fd)-\(UUID().uuidString.prefix(8))"
@@ -1461,7 +1474,7 @@ final class HookServer: @unchecked Sendable {
     // MARK: - Outdated hook detection
 
     /// Returns true if settings.json has a Coucou hook that needs updating:
-    /// either a PermissionRequest hook with timeout < 120s, or the AskUserQuestion
+    /// either a PermissionRequest hook with a shorter timeout than ours, or the AskUserQuestion
     /// PreToolUse matcher is missing (requires Claude Code 2.1.85+).
     static func hooksNeedUpdate() -> Bool {
         let settingsURL = FileManager.default.homeDirectoryForCurrentUser
@@ -1481,7 +1494,7 @@ final class HookServer: @unchecked Sendable {
                         if let cmd = hook["command"] as? String,
                            cmd.contains("NotchBuddy") || cmd.contains("coucou") {
                             hasCoucouHooks = true
-                            if let timeout = hook["timeout"] as? Int, timeout < 120 { return true }
+                            if let timeout = hook["timeout"] as? Int, timeout < Self.hookWaitSeconds { return true }
                         }
                     }
                 }
@@ -1566,7 +1579,7 @@ func previewClaudeHooks(statusLine: Bool) throws -> String {
             ("SessionStart", 10), ("SessionEnd", 10),
             ("UserPromptSubmit", 10),
             ("PreToolUse", 10), ("PostToolUse", 10), ("PostToolUseFailure", 10),
-            ("PermissionRequest", 120),
+            ("PermissionRequest", Self.hookWaitSeconds),
             ("Notification", 10),
             ("Stop", 10), ("StopFailure", 10),
             ("SubagentStart", 10), ("SubagentStop", 10),
@@ -1579,11 +1592,11 @@ func previewClaudeHooks(statusLine: Bool) throws -> String {
             existing.append(["hooks": [["type": "command", "command": quotedCmd, "timeout": timeout]]])
             hooks[event] = existing
         }
-        // Dedicated AskUserQuestion PreToolUse hook (Claude Code 2.1.85+, timeout 130s)
+        // Dedicated AskUserQuestion PreToolUse hook (Claude Code 2.1.85+)
         var preToolUse = hooks["PreToolUse"] as? [[String: Any]] ?? []
         preToolUse.append([
             "matcher": "AskUserQuestion",
-            "hooks": [["type": "command", "command": "\(quotedCmd) --ask", "timeout": 130]],
+            "hooks": [["type": "command", "command": "\(quotedCmd) --ask", "timeout": Self.hookWaitSeconds]],
         ])
         hooks["PreToolUse"] = preToolUse
         settings["hooks"] = hooks
@@ -1726,7 +1739,7 @@ func previewClaudeHooks(statusLine: Bool) throws -> String {
             ("SessionStart", 10), ("SessionEnd", 10),
             ("UserPromptSubmit", 10),
             ("PreToolUse", 10), ("PostToolUse", 10), ("PostToolUseFailure", 10),
-            ("PermissionRequest", 120),
+            ("PermissionRequest", Self.hookWaitSeconds),
             ("Notification", 10),
             ("Stop", 10), ("StopFailure", 10),
             ("SubagentStart", 10), ("SubagentStop", 10),
@@ -1742,11 +1755,11 @@ func previewClaudeHooks(statusLine: Bool) throws -> String {
             existing.append(["hooks": [["type": "command", "command": quotedCmd, "timeout": timeout]]])
             hooks[event] = existing
         }
-        // Dedicated AskUserQuestion PreToolUse hook (Claude Code 2.1.85+, timeout 130s)
+        // Dedicated AskUserQuestion PreToolUse hook (Claude Code 2.1.85+)
         var preToolUse = hooks["PreToolUse"] as? [[String: Any]] ?? []
         preToolUse.append([
             "matcher": "AskUserQuestion",
-            "hooks": [["type": "command", "command": "\(quotedCmd) --ask", "timeout": 130]],
+            "hooks": [["type": "command", "command": "\(quotedCmd) --ask", "timeout": Self.hookWaitSeconds]],
         ])
         hooks["PreToolUse"] = preToolUse
         settings["hooks"] = hooks
@@ -2109,12 +2122,12 @@ func previewClaudeHooks(statusLine: Bool) throws -> String {
         }
         let base = hookBase()
         // Events, timeouts in seconds (Codex format).
-        // PermissionRequest uses 120s + a statusMessage shown in the Codex UI while waiting.
+        // PermissionRequest uses the long hook timeout + a statusMessage shown in the Codex UI while waiting.
         let events: [(String, Int, String?)] = [
             ("SessionStart",    10,  nil),
             ("UserPromptSubmit", 10, nil),
             ("PreToolUse",      10,  nil),
-            ("PermissionRequest", 120, "Waiting for your answer in the notch (Coucou)"),
+            ("PermissionRequest", Self.hookWaitSeconds, "Waiting for your answer in the notch (Coucou)"),
             ("PostToolUse",     10,  nil),
             ("Stop",            10,  nil),
             ("SubagentStart",   10,  nil),
@@ -2246,7 +2259,7 @@ func previewClaudeHooks(statusLine: Bool) throws -> String {
             ("sessionStart",        10),
             ("userPromptSubmitted", 10),
             ("preToolUse",          10),
-            ("permissionRequest",  120),
+            ("permissionRequest",  Self.hookWaitSeconds),
             ("postToolUse",         10),
             ("agentStop",           10),
             ("sessionEnd",           3),
@@ -2360,7 +2373,7 @@ func previewClaudeHooks(statusLine: Bool) throws -> String {
             ("SessionStart",      10),
             ("UserPromptSubmit",   5),
             ("PreToolUse",         5),
-            ("PermissionRequest", 120),
+            ("PermissionRequest", Self.hookWaitSeconds),
             ("PostToolUse",        5),
             ("Stop",               5),
             ("SessionEnd",         3),
@@ -3424,7 +3437,7 @@ def main():
                 payload['cwd'] = os.getcwd()
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(125)
+            s.settimeout(\(HookServer.relayWaitSeconds))
             s.connect(socket_path)
             s.sendall((json.dumps(payload) + '\\n').encode())
             chunks = []
@@ -3509,10 +3522,10 @@ def main():
     # socket_path is already defined above
 
     if event == 'PermissionRequest':
-        # Block and wait for Coucou's decision (Claude Code allows up to 120s)
+        # Block and wait for Coucou's decision (Claude Code allows up to the hook timeout)
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(118)
+            s.settimeout(\(HookServer.relayWaitSeconds))
             s.connect(socket_path)
             s.sendall((json.dumps(payload) + '\\n').encode())
             chunks = []
@@ -3741,7 +3754,7 @@ def main():
                 payload['cwd'] = os.getcwd()
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(125)
+            s.settimeout(\(HookServer.relayWaitSeconds))
             s.connect(socket_path)
             s.sendall((json.dumps(payload) + '\\n').encode())
             chunks = []
@@ -3825,10 +3838,10 @@ def main():
     # socket_path is already defined above
 
     if event == 'PermissionRequest':
-        # Block and wait for Coucou's decision (Claude Code allows up to 120s)
+        # Block and wait for Coucou's decision (Claude Code allows up to the hook timeout)
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.settimeout(118)
+            s.settimeout(\(HookServer.relayWaitSeconds))
             s.connect(socket_path)
             s.sendall((json.dumps(payload) + '\\n').encode())
             chunks = []

@@ -47,7 +47,7 @@ Grille compact : pastilles Ø 9,5 autour du point (largeur − 27, hN/2), écart
 5. **Fermeture auto** : une fois ouverte, l'island se replie après **60 s sans activité** (mouvement de souris sur l'island, clic, frappe). Quitter l'island ne la ferme pas. Pendant les 10 dernières secondes, un trait de 2 pt en bas au centre (160 pt → 0, blanc 35 %) montre le compte à rebours. `Échap` ferme.
 6. **Louis absent** (aucun mouvement de souris depuis 3 min, réglable) → `hidden`, même avec des tâches. Au premier mouvement → retour `compact` si des tâches tournent.
 7. **Alertes** (permission, question, erreur) : l'island s'ouvre seule sur la vue de l'alerte, **même si Louis est absent**, et reste ouverte (pas de fermeture auto) jusqu'à sa réponse.
-8. **Terminé** : l'island s'ouvre sur la vue `finished` pendant 5,2 s, puis retire la tâche et se replie.
+8. **Terminé** : l'island s'ouvre sur la vue `finished`. La carte de fin reste à l'écran **5 s** — si Louis ne clique pas, elle se retire toute seule et l'island se replie. Une carte d'**erreur** ne part pas : elle attend d'être acquittée.
 9. Plusieurs alertes en même temps : file d'attente, une à la fois, l'ordre d'arrivée.
 10. **Focus** : le gros bonhomme représente la tâche en focus (la dernière alerte, sinon la première qui travaille). Les autres tâches sont les mini-bonhommes. Cliquer un mini-bonhomme le met en focus.
 

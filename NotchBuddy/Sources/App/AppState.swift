@@ -28,7 +28,12 @@ final class AppState: ObservableObject {
 
     // Island state
     @Published var mode: IslandMode = .hidden
-    @Published var view: IslandView = .overview
+    @Published var view: IslandView = .overview {
+        didSet {
+            // A finished card that reaches the screen starts counting down.
+            if view == .finished { startFinishedCardClocks() }
+        }
+    }
 
     /// The island's own NSWindow, set once by IslandWindowController at boot.
     /// Used by the overscroll-back gesture to filter NSEvent.scrollWheel to
@@ -728,6 +733,44 @@ final class AppState: ObservableObject {
         return claudeSessions.first { $0.sessionId == id }
     }
 
+    // MARK: - Finished cards take themselves back
+
+    /// How long a finished card stays on screen before it retracts. Long
+    /// enough to read the last line and reach for the button, short enough
+    /// that the island isn't left holding a card nobody asked for.
+    static let finishedCardLifetime: TimeInterval = 5
+
+    /// One clock per card on screen, so a card that arrives while another one
+    /// is counting down doesn't push the first one's deadline back.
+    private var finishedCardClocks: [String: DispatchWorkItem] = [:]
+
+    /// Start the clock on every finished card that is on screen and not
+    /// counting down yet. Errors are left alone — a failure is worth reading
+    /// twice, so it waits to be acknowledged.
+    private func startFinishedCardClocks() {
+        for n in notifications where n.kind == .finished && finishedCardClocks[n.id] == nil {
+            let item = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.finishedCardClocks[n.id] = nil
+                self.retractFinishedCard(id: n.id)
+            }
+            finishedCardClocks[n.id] = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.finishedCardLifetime, execute: item)
+        }
+    }
+
+    /// The card took its 5 s and nobody answered it: take it back. The island
+    /// folds with it when it was the last thing on screen.
+    private func retractFinishedCard(id: String) {
+        guard let n = notifications.first(where: { $0.id == id }) else { return }
+        let wasShowing = view == .finished
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            dismissInboxItem(.finished(n))
+        }
+        guard wasShowing, inbox.isEmpty else { return }
+        NotificationCenter.default.post(name: .islandCollapse, object: nil)
+    }
+
     // MARK: - Inbox
 
     /// Everything waiting on the user — questions and permissions first (they
@@ -780,6 +823,8 @@ final class AppState: ObservableObject {
     /// this used to go home when the *finished* list emptied, which walked away
     /// from a question still waiting on its hook.
     func dismissNotification(id: String) {
+        finishedCardClocks[id]?.cancel()
+        finishedCardClocks[id] = nil
         guard notifications.contains(where: { $0.id == id }) else { return }
         notifications = notifications.removing(id: id)
     }
