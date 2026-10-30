@@ -451,6 +451,11 @@ enum IslandConst {
     static let notchWidth: CGFloat  = IslandScreenGeometry.fallbackNotchWidth
     static let notchHeight: CGFloat = 32
     static let expandedWidth: CGFloat = 640
+    /// The empty state's card keeps a lane on its left for Mochi — he is
+    /// drawn there, and the copy (and the project picker's list) starts
+    /// after it. The swipe gesture needs the same number to know where the
+    /// picker's list begins.
+    static let mochiLaneWidth: CGFloat = 118
     /// Height of the chat (`.prompt`) view when expanded — taller than every
     /// `viewLayouts` entry, because a conversation needs the room. The
     /// notification stack is capped at the same height so a tall pile of

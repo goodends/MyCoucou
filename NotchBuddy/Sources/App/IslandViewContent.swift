@@ -519,7 +519,7 @@ struct EmptyStateView: View {
             if state.showProjectPicker {
                 // The list takes the card over — same panel the + opens on the
                 // home page, so there is one place that looks like this.
-                // The leading 118 is Mochi's lane, same as the copy below: he
+                // The leading gap is Mochi's lane, same as the copy below: he
                 // is drawn at this view's botX, and a full-width panel ran
                 // the first row straight through his face.
                 OrcaProjectPickerList(state: state,
@@ -531,7 +531,7 @@ struct EmptyStateView: View {
                         state.view = .prompt
                     }
                 })
-                .padding(.leading, 118)
+                .padding(.leading, IslandConst.mochiLaneWidth)
                 .padding(.trailing, 12)
                 .padding(.vertical, 8)
                 .transition(.opacity)
@@ -553,7 +553,7 @@ struct EmptyStateView: View {
                         Task { await state.loadOrcaWorktrees() }
                     }
                 }
-                .padding(.leading, 118)
+                .padding(.leading, IslandConst.mochiLaneWidth)
                 .padding(.trailing, 18)
             }
         }

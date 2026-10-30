@@ -209,11 +209,14 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
             guard state.mode == .expanded else { return }
 
             // The project list is a scroll view of its own, and it isn't the
-            // chat thread — a swipe over it is the user reading the list. It
-            // never reported its position through `scrollAtBottom` (only the
-            // chat does), so the "content has reached the bottom" gate below
-            // read it as true and collapsed the island mid-list.
-            guard !state.showProjectPicker else {
+            // chat thread — a swipe over it is the user reading the list.
+            //
+            // This used to switch the whole gesture off while the panel was
+            // open, which meant the island stopped answering to swipes for
+            // as long as the picker was up: no chat → home, no home →
+            // collapse. The panel only claims the area it actually covers —
+            // the rest of the island keeps answering to swipes.
+            if isOverProjectPickerList(event: event, state: state) {
                 accumulated = 0
                 return
             }
@@ -301,11 +304,36 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     state.view = .overview
                 }
-            case .overview:
+            case .overview, .empty:
                 NotificationCenter.default.post(name: .islandCollapse, object: nil)
             default:
                 break
             }
+        }
+
+        /// Whether the wheel event landed on the project picker's own list.
+        ///
+        /// The picker takes over a card: on the home page with a session
+        /// that's the right card (which the right-half rule above already
+        /// keeps out of the gesture), and without one it's the whole card,
+        /// starting after Mochi's lane. A swipe over the list belongs to the
+        /// list; a swipe over the rest of the island is the gesture's.
+        ///
+        /// The picker is only on screen on the home page — the chat renders
+        /// no list — so the chat's swipe (chat → home) is never claimed.
+        private func isOverProjectPickerList(event: NSEvent, state: AppState) -> Bool {
+            guard state.showProjectPicker,
+                  state.view == .overview || state.view == .empty,
+                  let win = state.islandWindow else { return false }
+            // With a session the picker sits in the right card, already
+            // excluded by the right-half rule.
+            guard !state.hasOverviewContent else { return false }
+            // The island is centred in a full-width panel, so the empty
+            // state's card starts at the island's left edge plus the
+            // content padding, and the picker starts after Mochi's lane.
+            let islandLeft = (win.frame.width - IslandConst.expandedWidth) / 2
+            let listLeft = islandLeft + 10 + IslandConst.mochiLaneWidth
+            return event.locationInWindow.x >= listLeft
         }
     }
 }
