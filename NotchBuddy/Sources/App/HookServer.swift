@@ -158,7 +158,7 @@ final class HookServer: @unchecked Sendable {
     @MainActor
     private func presentHeadRequest(note: String? = nil) {
         let state = AppState.shared
-        if state.inboxHasBlockingItem || state.hasUnreadFinished {
+        if state.inboxHasBlockingItem || !state.notifications.isEmpty {
             if state.mode == .expanded {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     state.view = .finished

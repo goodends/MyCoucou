@@ -61,25 +61,13 @@ enum NotificationQueueTests {
         check("empty session id is treated as absent",
               note("agent_codex", "", "x").id == "agent_codex" && note("agent_codex", "", "x").sessionId == nil, failures: &failures)
 
-        // A card that was shown and taken back stays in the tab: it is history
-        // now, not something waiting on the user. It is still a card — it keeps
-        // its own row, its line and its session.
-        var read = note("integration_claude", "sid-r", "shown and taken back")
-        check("a fresh card is unread", !read.isRead, failures: &failures)
-        read.isRead = true
-        let log = q.pushing(read)
-        check("a read card stays in the tab",
-              log.contains { $0.id == "sid-r" && $0.isRead && $0.finalLine == "shown and taken back" },
+        // A card that was shown and taken back stays in the tab: the countdown
+        // gives the screen back, it doesn't take the notification away. It
+        // keeps its own row, its line and its session.
+        let kept = q.pushing(note("integration_claude", "sid-r", "shown and taken back"))
+        check("a card that was taken back stays in the tab",
+              kept.contains { $0.id == "sid-r" && $0.finalLine == "shown and taken back" },
               failures: &failures)
-        check("only the unread cards are still waiting",
-              log.unread.count == log.count - 1 && log.unread.allSatisfy { !$0.isRead },
-              failures: &failures)
-
-        // A session that finishes again is news again: the fresh card takes
-        // the row and comes back unread, even though the old one had been read.
-        let again = log.pushing(note("integration_claude", "sid-r", "finished again"))
-        check("a session that finishes again comes back unread",
-              again.first?.id == "sid-r" && again.first?.isRead == false, failures: &failures)
 
         // Height: the stack reserves exactly what its cards measure plus one
         // fixed margin, so the gap under the last card is the same for one

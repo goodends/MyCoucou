@@ -393,23 +393,9 @@ final class AppState: ObservableObject {
         // stack stays up while one is waiting even if every finished session
         // below it has already been acknowledged. A finished card that was
         // shown and taken back is history — it waits for nobody.
-        case .finished: return hasUnreadFinished || inboxHasBlockingItem
+        case .finished: return !notifications.isEmpty || inboxHasBlockingItem
         default: return false
         }
-    }
-
-    /// Finished cards nobody has looked at yet. The ones that were shown and
-    /// taken back stay in the tab as records, but they are no longer waiting.
-    var hasUnreadFinished: Bool {
-        !notifications.unread.isEmpty
-    }
-
-    /// What the bell tab's badge counts: the requests waiting on the user,
-    /// plus the finished cards nobody has seen yet. The records that were
-    /// already shown are history — the tab holds them, the badge doesn't.
-    var pendingCount: Int {
-        pendingApprovals.count + pendingQuestions.count
-            + notifications.unread.count
     }
 
     /// Rows in the inbox that hold a hook fd open and run on a deadline.
@@ -785,9 +771,10 @@ final class AppState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
-    /// The card took its 5 s and nobody answered it: mark it read and let the
-    /// island go. The record stays in the bell tab — it is history now, not
-    /// something waiting on the user.
+    /// The card took its 5 s and nobody answered it. The card itself stays
+    /// where it is — still in the tab, still waiting to be acknowledged; only
+    /// the screen gives it back. The island folds, the notification doesn't
+    /// go anywhere.
     ///
     /// Not while the pointer is on the island, though: the card is being read,
     /// and taking it away mid-read is the one thing the countdown must not do.
@@ -797,16 +784,10 @@ final class AppState: ObservableObject {
             scheduleFinishedCardClock(id, after: Self.hoverRecheckDelay)
             return
         }
-        guard let idx = notifications.firstIndex(where: { $0.id == id }) else { return }
-        var updated = notifications
-        updated[idx].isRead = true
-        notifications = updated
-        // The island only lets go when nothing is left waiting on it.
+        // The card was acknowledged while the clock ran — nothing to retract.
+        guard notifications.contains(where: { $0.id == id }) else { return }
+        // A permission or a question holds the island open on its own.
         guard view == .finished, !inboxHasBlockingItem else { return }
-        guard !notifications.contains(where: { !$0.isRead }) else { return }
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            view = .overview
-        }
         NotificationCenter.default.post(name: .islandCollapse, object: nil)
     }
 
@@ -820,18 +801,16 @@ final class AppState: ObservableObject {
                           notifications: notifications)
     }
 
-    /// The finished view's height follows what is still waiting, not the whole
-    /// log — a question row is just as tall as a finished card, and sizing off
-    /// one of the three arrays left the stack clipped when the other two grew.
-    /// Cards that were already shown are records: they sit in the tab and
-    /// scroll, but they don't make the island taller. The popup that shows a
-    /// session finishing stays one card high, however long the log gets.
+    /// The finished view's height follows the whole inbox, not just the
+    /// finished sessions — a question row is just as tall as a finished card,
+    /// and sizing off one of the three arrays left the stack clipped when the
+    /// other two grew.
     private func updateInboxHeight(approvals: [PendingApproval]? = nil,
                                    questions: [PendingQuestion]? = nil,
                                    notifications: [AgentNotification]? = nil) {
         let count = (approvals ?? pendingApprovals).count
                + (questions ?? pendingQuestions).count
-               + (notifications ?? self.notifications).unread.count
+               + (notifications ?? self.notifications).count
         NotificationLayout.height = NotificationLayout.height(forCount: count)
     }
 
@@ -856,7 +835,7 @@ final class AppState: ObservableObject {
     /// A session finished: queue its notification. Re-finishing an already
     /// waiting session refreshes its row in place instead of duplicating it.
     /// The tab keeps the last `finishedHistoryLimit` cards — past that the
-    /// oldest ones go, so the log can't grow without end.
+    /// oldest ones go, so it can't grow without end.
     /// Returns the card's id, so a caller that popped it up can start its clock.
     @discardableResult
     func pushNotification(agentId: String, sessionId: String?, kind: AgentNotification.Kind, finalLine: String) -> String {
