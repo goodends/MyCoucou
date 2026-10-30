@@ -849,16 +849,15 @@ final class HookServer: @unchecked Sendable {
     // MARK: - Helpers
 
     /// A `.finished` card is a notification, not something the user reads: it
-    /// closes when they acknowledge it (OK / "Open terminal" / Esc) or when the
-    /// very session that raised it starts running again. Only that session's own
-    /// row goes — the others in the stack keep waiting.
+    /// stops waiting when they acknowledge it (OK / "Open terminal" / Esc) or
+    /// when the very session that raised it starts running again. Only that
+    /// session's own card is touched — the others in the stack keep waiting.
     /// `expandIfNeeded` can't do it: work events aren't alerts, so they never
     /// replace the card while the island is expanded.
     @MainActor
     private func dismissNotificationIfSessionResumed(name: String, agentId: String, sessionId: String) {
         guard name == "UserPromptSubmit" || name == "PreToolUse" || name == "SessionStart" else { return }
         let state = AppState.shared
-        guard state.isShowingNotification else { return }
         // External agents have no session id on their events, so the pill is
         // the only scope we can match on for them.
         let stale: AgentNotification?
@@ -868,8 +867,16 @@ final class HookServer: @unchecked Sendable {
             stale = state.notifications.first { $0.agentId == agentId && $0.sessionId == nil }
         }
         guard let stale else { return }
-        state.setFocus(stale.agentId)
-        state.dismissInboxItem(.finished(stale))
+        // The session is running again, so its card is stale: it stops waiting
+        // on the user. It stays in the tab as a record — the way every
+        // finished session does — but it is no longer one of the things to
+        // answer, and it never sat there waiting in the first place.
+        state.markFinishedNotificationRead(id: stale.id)
+        // The card was on screen and the session that raised it is the one
+        // the user is working with now.
+        if state.isShowingNotification {
+            state.setFocus(stale.agentId)
+        }
     }
 
     @MainActor
