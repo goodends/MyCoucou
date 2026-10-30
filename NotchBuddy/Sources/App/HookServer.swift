@@ -849,9 +849,9 @@ final class HookServer: @unchecked Sendable {
     // MARK: - Helpers
 
     /// A `.finished` card is a notification, not something the user reads: it
-    /// stops waiting when they acknowledge it (OK / "Open terminal" / Esc) or
-    /// when the very session that raised it starts running again. Only that
-    /// session's own card is touched — the others in the stack keep waiting.
+    /// closes when they acknowledge it (OK / "Open terminal" / Esc) or when the
+    /// very session that raised it starts running again. Only that session's own
+    /// card goes — the others in the stack keep waiting.
     /// `expandIfNeeded` can't do it: work events aren't alerts, so they never
     /// replace the card while the island is expanded.
     @MainActor
@@ -867,14 +867,14 @@ final class HookServer: @unchecked Sendable {
             stale = state.notifications.first { $0.agentId == agentId && $0.sessionId == nil }
         }
         guard let stale else { return }
-        // The session is running again, so its card is stale: it stops waiting
-        // on the user. It stays in the tab as a record — the way every
-        // finished session does — but it is no longer one of the things to
-        // answer, and it never sat there waiting in the first place.
-        state.markFinishedNotificationRead(id: stale.id)
-        // The card was on screen and the session that raised it is the one
+        // The session is back at work, so the card it left behind is stale and
+        // goes — the way it always went. Only that session's card: the rest
+        // of the stack keeps waiting.
+        let wasShowing = state.isShowingNotification
+        state.dismissInboxItem(.finished(stale))
+        // The card was on screen, and the session that raised it is the one
         // the user is working with now.
-        if state.isShowingNotification {
+        if wasShowing {
             state.setFocus(stale.agentId)
         }
     }

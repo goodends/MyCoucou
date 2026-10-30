@@ -879,20 +879,6 @@ final class AppState: ObservableObject {
         notifications = notifications.removing(id: id)
     }
 
-    /// The session that raised this card is running again: the card stops
-    /// waiting on the user. It stays in the tab as a record — the way every
-    /// finished session does — but it is no longer one of the things to
-    /// answer, and it never sits there waiting in the first place.
-    func markFinishedNotificationRead(id: String) {
-        finishedCardClocks[id]?.cancel()
-        finishedCardClocks[id] = nil
-        guard let idx = notifications.firstIndex(where: { $0.id == id }) else { return }
-        guard !notifications[idx].isRead else { return }
-        var updated = notifications
-        updated[idx].isRead = true
-        notifications = updated
-    }
-
     // MARK: - Task management
 
     func addTask(_ task: AgentTask) {
