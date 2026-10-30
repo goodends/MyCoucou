@@ -158,7 +158,7 @@ final class HookServer: @unchecked Sendable {
     @MainActor
     private func presentHeadRequest(note: String? = nil) {
         let state = AppState.shared
-        if state.inboxHasBlockingItem || !state.notifications.isEmpty {
+        if state.inboxHasBlockingItem || state.hasUnreadFinished {
             if state.mode == .expanded {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     state.view = .finished
@@ -680,6 +680,7 @@ final class HookServer: @unchecked Sendable {
             }
 
         case "Stop":
+            var cardId: String? = nil
             state.updateTask(id: agentId, state: .finished)
             let rawFinal = (payload["last_assistant_message"] as? String)
                 ?? (payload["message"] as? String) ?? ""
@@ -700,10 +701,10 @@ final class HookServer: @unchecked Sendable {
             // Steps and session state land either way — unticking the app back
             // must reveal the session with its history, not a hole.
             if !isHiddenHostSession {
-                state.pushNotification(agentId: agentId,
-                                       sessionId: sessionId,
-                                       kind: .finished,
-                                       finalLine: finalText)
+                cardId = state.pushNotification(agentId: agentId,
+                                               sessionId: sessionId,
+                                               kind: .finished,
+                                               finalLine: finalText)
             }
             if isClaudeSession {
                 updateClaudeSession(state: .finished, sessionId: sessionId, cwd: cwd, hostApp: hostApp, bundleId: bundleId, projectName: projectName, pid: agentPid)
@@ -715,6 +716,13 @@ final class HookServer: @unchecked Sendable {
                 // stack is already on screen this one belongs in it.
                 if focused || state.view == .finished {
                     expandIfNeeded(to: .finished)
+                    // The card that just popped up takes itself back after 5 s
+                    // if nobody answers it. Only the popup starts a clock: a
+                    // card the user opened from the bell tab waits to be
+                    // acknowledged, the way it always did.
+                    if state.mode == .expanded && state.view == .finished, let id = cardId {
+                        state.startFinishedCardClock(id)
+                    }
                 } else {
                     setPillBadge(id: agentId, badge: .finished)
                 }

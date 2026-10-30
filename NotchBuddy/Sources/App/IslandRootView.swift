@@ -115,9 +115,10 @@ struct IslandContainer: View {
         // Another session finishing — or a question arriving — stacks one more
         // card onto the inbox without changing the view or the mode, so neither
         // onChange above fires. Without this the cards pile up behind a frozen
-        // height. Counts the inbox, not just the finished sessions: a question
-        // row is just as tall.
-        .onChange(of: state.inbox.count) { _, _ in
+        // height. Counts what is still waiting, not the whole log: a card that
+        // was already shown is a record, and records don't make the island
+        // taller. A question row is just as tall.
+        .onChange(of: state.pendingCount) { _, _ in
             guard state.mode == .expanded, state.view == .finished else { return }
             let (_, h) = islandSize(mode: .expanded, view: .finished,
                                     nw: state.notchWidth, nh: state.notchHeight)
@@ -473,8 +474,8 @@ struct IslandHeader: View {
                 // from any page.
                 TabButton(icon: "bell", view: .finished, state: state)
                     .overlay(alignment: .topTrailing) {
-                        if !state.inbox.isEmpty {
-                            NotificationBadge(count: state.inbox.count)
+                        if state.pendingCount > 0 {
+                            NotificationBadge(count: state.pendingCount)
                                 .offset(x: 4, y: -3)
                         }
                     }

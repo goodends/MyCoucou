@@ -361,6 +361,10 @@ struct AgentNotification: Identifiable, Equatable {
     /// The session's last assistant line, shown under its name.
     var finalLine: String
     var createdAt: Date = .now
+    /// True once the card has been shown and taken back, or acknowledged.
+    /// A read card stays in the bell tab as a record — it is history, not
+    /// something waiting on the user any more.
+    var isRead: Bool = false
 
     init(agentId: String, sessionId: String?, kind: Kind, finalLine: String) {
         self.id = (sessionId?.isEmpty == false) ? sessionId! : agentId
@@ -372,6 +376,11 @@ struct AgentNotification: Identifiable, Equatable {
 }
 
 extension Array where Element == AgentNotification {
+    /// The cards nobody has looked at yet — the ones still waiting on the
+    /// user. The others were shown and taken back: they stay in the tab as
+    /// records, but they don't wait for anything.
+    var unread: [AgentNotification] { filter { !$0.isRead } }
+
     /// Newest first — the finished card lists them top-down, so a new
     /// notification lands above the ones already waiting.
     func pushing(_ n: AgentNotification) -> [AgentNotification] {

@@ -28,12 +28,7 @@ final class AppState: ObservableObject {
 
     // Island state
     @Published var mode: IslandMode = .hidden
-    @Published var view: IslandView = .overview {
-        didSet {
-            // A finished card that reaches the screen starts counting down.
-            if view == .finished { startFinishedCardClocks() }
-        }
-    }
+    @Published var view: IslandView = .overview
 
     /// The island's own NSWindow, set once by IslandWindowController at boot.
     /// Used by the overscroll-back gesture to filter NSEvent.scrollWheel to
@@ -396,10 +391,25 @@ final class AppState: ObservableObject {
         case .question: return true
         // A queued question or permission holds a hook open on a clock, so the
         // stack stays up while one is waiting even if every finished session
-        // below it has already been acknowledged.
-        case .finished: return !notifications.isEmpty || inboxHasBlockingItem
+        // below it has already been acknowledged. A finished card that was
+        // shown and taken back is history — it waits for nobody.
+        case .finished: return hasUnreadFinished || inboxHasBlockingItem
         default: return false
         }
+    }
+
+    /// Finished cards nobody has looked at yet. The ones that were shown and
+    /// taken back stay in the tab as records, but they are no longer waiting.
+    var hasUnreadFinished: Bool {
+        !notifications.unread.isEmpty
+    }
+
+    /// What the bell tab's badge counts: the requests waiting on the user,
+    /// plus the finished cards nobody has seen yet. The records that were
+    /// already shown are history — the tab holds them, the badge doesn't.
+    var pendingCount: Int {
+        pendingApprovals.count + pendingQuestions.count
+            + notifications.unread.count
     }
 
     /// Rows in the inbox that hold a hook fd open and run on a deadline.
@@ -740,34 +750,42 @@ final class AppState: ObservableObject {
     /// that the island isn't left holding a card nobody asked for.
     static let finishedCardLifetime: TimeInterval = 5
 
+    /// How many finished cards the tab keeps. Past that the oldest ones go:
+    /// the tab is a log, not an archive.
+    static let finishedHistoryLimit = 50
+
     /// One clock per card on screen, so a card that arrives while another one
     /// is counting down doesn't push the first one's deadline back.
     private var finishedCardClocks: [String: DispatchWorkItem] = [:]
 
-    /// Start the clock on every finished card that is on screen and not
-    /// counting down yet. Errors are left alone — a failure is worth reading
-    /// twice, so it waits to be acknowledged.
-    private func startFinishedCardClocks() {
-        for n in notifications where n.kind == .finished && finishedCardClocks[n.id] == nil {
-            let item = DispatchWorkItem { [weak self] in
-                guard let self else { return }
-                self.finishedCardClocks[n.id] = nil
-                self.retractFinishedCard(id: n.id)
-            }
-            finishedCardClocks[n.id] = item
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.finishedCardLifetime, execute: item)
+    /// Start the clock on a card that just popped up on its own. Only the
+    /// auto-popup starts one: a card the user opened from the bell tab waits
+    /// to be acknowledged, the way it always did.
+    func startFinishedCardClock(_ id: String) {
+        finishedCardClocks[id]?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.finishedCardClocks[id] = nil
+            self.retractFinishedCard(id: id)
         }
+        finishedCardClocks[id] = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.finishedCardLifetime, execute: item)
     }
 
-    /// The card took its 5 s and nobody answered it: take it back. The island
-    /// folds with it when it was the last thing on screen.
+    /// The card took its 5 s and nobody answered it: mark it read and let the
+    /// island go. The record stays in the bell tab — it is history now, not
+    /// something waiting on the user.
     private func retractFinishedCard(id: String) {
-        guard let n = notifications.first(where: { $0.id == id }) else { return }
-        let wasShowing = view == .finished
+        guard let idx = notifications.firstIndex(where: { $0.id == id }) else { return }
+        var updated = notifications
+        updated[idx].isRead = true
+        notifications = updated
+        // The island only lets go when nothing is left waiting on it.
+        guard view == .finished, !inboxHasBlockingItem else { return }
+        guard !notifications.contains(where: { !$0.isRead }) else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            dismissInboxItem(.finished(n))
+            view = .overview
         }
-        guard wasShowing, inbox.isEmpty else { return }
         NotificationCenter.default.post(name: .islandCollapse, object: nil)
     }
 
@@ -781,16 +799,18 @@ final class AppState: ObservableObject {
                           notifications: notifications)
     }
 
-    /// The finished view's height follows the whole inbox, not just the
-    /// finished sessions — a question row is as tall as a finished card, and
-    /// sizing off one of the three arrays left the stack clipped when the
-    /// other two grew.
+    /// The finished view's height follows what is still waiting, not the whole
+    /// log — a question row is just as tall as a finished card, and sizing off
+    /// one of the three arrays left the stack clipped when the other two grew.
+    /// Cards that were already shown are records: they sit in the tab and
+    /// scroll, but they don't make the island taller. The popup that shows a
+    /// session finishing stays one card high, however long the log gets.
     private func updateInboxHeight(approvals: [PendingApproval]? = nil,
                                    questions: [PendingQuestion]? = nil,
                                    notifications: [AgentNotification]? = nil) {
         let count = (approvals ?? pendingApprovals).count
                + (questions ?? pendingQuestions).count
-               + (notifications ?? self.notifications).count
+               + (notifications ?? self.notifications).unread.count
         NotificationLayout.height = NotificationLayout.height(forCount: count)
     }
 
@@ -814,9 +834,18 @@ final class AppState: ObservableObject {
 
     /// A session finished: queue its notification. Re-finishing an already
     /// waiting session refreshes its row in place instead of duplicating it.
-    func pushNotification(agentId: String, sessionId: String?, kind: AgentNotification.Kind, finalLine: String) {
+    /// The tab keeps the last `finishedHistoryLimit` cards — past that the
+    /// oldest ones go, so the log can't grow without end.
+    /// Returns the card's id, so a caller that popped it up can start its clock.
+    @discardableResult
+    func pushNotification(agentId: String, sessionId: String?, kind: AgentNotification.Kind, finalLine: String) -> String {
         let n = AgentNotification(agentId: agentId, sessionId: sessionId, kind: kind, finalLine: finalLine)
-        notifications = notifications.pushing(n)
+        var updated = notifications.pushing(n)
+        if updated.count > Self.finishedHistoryLimit {
+            updated.removeLast(updated.count - Self.finishedHistoryLimit)
+        }
+        notifications = updated
+        return n.id
     }
 
     /// Drop one finished notification. Navigation is `dismissInboxItem`'s job —
