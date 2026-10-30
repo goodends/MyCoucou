@@ -341,6 +341,9 @@ final class IslandWindowController: NSWindowController {
         let hoverRect = !hasNotch && state.mode != .expanded
             ? islandRect : islandRect.insetBy(dx: -6, dy: -6)
         let inIsland = hoverRect.contains(local)
+        // The app needs to know when the pointer is on the island: a finished
+        // card the user is reading is not taken back from under their eyes.
+        state.isPointerOverIsland = inIsland
         // A shrink this tick moved the bottom edge up under the pointer. Read
         // before anything else uses `inIsland`.
         let shrankThisTick = lastIslandHeight > 0 && islandRect.height < lastIslandHeight

@@ -417,6 +417,10 @@ final class AppState: ObservableObject {
         !pendingApprovals.isEmpty || !pendingQuestions.isEmpty
     }
 
+    /// True while the pointer is over the island. A finished card the user is
+    /// looking at is not taken back from under their eyes.
+    var isPointerOverIsland: Bool = false
+
     /// The finished stack is on screen with something waiting on it.
     var isShowingNotification: Bool {
         mode == .expanded && view == .finished && !inbox.isEmpty
@@ -750,6 +754,10 @@ final class AppState: ObservableObject {
     /// that the island isn't left holding a card nobody asked for.
     static let finishedCardLifetime: TimeInterval = 5
 
+    /// How often the countdown looks again while the pointer is on the island.
+    /// Small enough that the card goes as soon as the pointer leaves.
+    static let hoverRecheckDelay: TimeInterval = 0.5
+
     /// How many finished cards the tab keeps. Past that the oldest ones go:
     /// the tab is a log, not an archive.
     static let finishedHistoryLimit = 50
@@ -762,6 +770,11 @@ final class AppState: ObservableObject {
     /// auto-popup starts one: a card the user opened from the bell tab waits
     /// to be acknowledged, the way it always did.
     func startFinishedCardClock(_ id: String) {
+        scheduleFinishedCardClock(id, after: Self.finishedCardLifetime)
+    }
+
+    /// (Re)arm the clock on a card. `after` is the time left on it.
+    private func scheduleFinishedCardClock(_ id: String, after delay: TimeInterval) {
         finishedCardClocks[id]?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -769,13 +782,21 @@ final class AppState: ObservableObject {
             self.retractFinishedCard(id: id)
         }
         finishedCardClocks[id] = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.finishedCardLifetime, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     /// The card took its 5 s and nobody answered it: mark it read and let the
     /// island go. The record stays in the bell tab — it is history now, not
     /// something waiting on the user.
+    ///
+    /// Not while the pointer is on the island, though: the card is being read,
+    /// and taking it away mid-read is the one thing the countdown must not do.
+    /// It goes as soon as the pointer leaves.
     private func retractFinishedCard(id: String) {
+        if isPointerOverIsland {
+            scheduleFinishedCardClock(id, after: Self.hoverRecheckDelay)
+            return
+        }
         guard let idx = notifications.firstIndex(where: { $0.id == id }) else { return }
         var updated = notifications
         updated[idx].isRead = true
