@@ -87,6 +87,12 @@ final class IslandWindowController: NSWindowController {
     // Island-local key monitor (active only when island is key window)
     private var localKeyMonitor: Any?
 
+    /// A Space of our own for the island. Without it the panel slides with
+    /// the desktop when the user switches Spaces, and the island shows up on
+    /// every one of them.
+    private let overlaySpace = IslandOverlaySpace.shared
+    private var islandInOverlaySpace = false
+
     convenience init() {
         let screen = Self.targetScreen(for: AppState.shared.islandDisplay)
         Self.currentScreen = screen
@@ -112,6 +118,25 @@ final class IslandWindowController: NSWindowController {
         self.notchH = nH
         self.hasNotch = geometry.hasNotch
         setupPanel(screen: screen)
+        putIslandInOverlaySpace()
+    }
+
+    /// Puts the island in the Space of our own.
+    ///
+    /// The panel has to join it before it is first shown: a panel that is
+    /// already on screen keeps the desktop it was shown on, and slides with
+    /// it. The window server only knows a window it has already seen, so the
+    /// move is repeated when the panel is shown and did not have a number yet.
+    private func putIslandInOverlaySpace() {
+        guard !islandInOverlaySpace, let panel = window as? IslandPanel else { return }
+        guard panel.windowNumber > 0 else { return }
+        overlaySpace?.add(panel)
+        islandInOverlaySpace = true
+    }
+
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        putIslandInOverlaySpace()
     }
 
     private func setupPanel(screen: NSScreen) {
@@ -1016,6 +1041,7 @@ final class IslandWindowController: NSWindowController {
         hosting.frame = NSRect(x: 0, y: 0, width: s, height: s)
         panel.contentView = hosting
         panel.alphaValue = 0
+        overlaySpace?.add(panel)
         panel.orderFront(nil)
         dragGhostPanel = panel
         AppState.shared.isDraggingBot = true
@@ -1098,6 +1124,7 @@ final class IslandWindowController: NSWindowController {
             hosting.autoresizingMask = [.width, .height]
             panel.contentView = hosting
             panel.alphaValue = 0
+            overlaySpace?.add(panel)
             panel.orderFront(nil)
             highlightPanel = panel
 

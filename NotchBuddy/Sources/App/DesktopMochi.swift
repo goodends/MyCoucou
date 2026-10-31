@@ -188,15 +188,13 @@ final class DesktopMochiController {
         hosting.autoresizingMask = [.width, .height]
         p.contentView = hosting
 
-        p.level = OverlayLevel.value(.island, alwaysOnTop: AppState.shared.alwaysOnTop)
         p.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         p.ignoresMouseEvents = true
+        configureLevel(of: p)
+        // The bot lives in the app's own Space, so it stays on screen when
+        // the user switches desktops instead of sliding away with them.
+        IslandOverlaySpace.shared?.add(p)
         if !p.isVisible { p.orderFront(nil) }
-
-        // Keep the level in sync while Mochi stays on the desktop.
-        levelSubscription = AppState.shared.$alwaysOnTop.sink { [weak self] on in
-            self?.panel?.level = OverlayLevel.value(.island, alwaysOnTop: on)
-        }
 
         // Squash emote + sound on landing
         eng.triggerEmote(.happy, duration: 0.6, silent: true)
@@ -260,6 +258,8 @@ final class DesktopMochiController {
 
         let p = makeBlankPanel()
         p.setFrame(NSRect(origin: startOrigin, size: CGSize(width: s, height: s)), display: false)
+        p.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        configureLevel(of: p)
 
         let eng = BotEngine()
         eng.setState(AppState.shared.effectiveState, force: true)
@@ -277,6 +277,7 @@ final class DesktopMochiController {
         hosting.autoresizingMask = [.width, .height]
         p.contentView = hosting
         p.alphaValue = 0
+        IslandOverlaySpace.shared?.add(p)
         p.orderFront(nil)
 
         AppState.shared.mochiOnDesktop = true
@@ -404,6 +405,15 @@ final class DesktopMochiController {
     }
 
     // MARK: - Panel factory
+
+    /// The bot floats over the other apps, and follows the "always on top"
+    /// setting while it stays on the desktop.
+    private func configureLevel(of panel: NSPanel) {
+        panel.level = OverlayLevel.value(.island, alwaysOnTop: AppState.shared.alwaysOnTop)
+        levelSubscription = AppState.shared.$alwaysOnTop.sink { [weak self] on in
+            self?.panel?.level = OverlayLevel.value(.island, alwaysOnTop: on)
+        }
+    }
 
     private func makeBlankPanel() -> NSPanel {
         let p = NSPanel(contentRect: .zero,

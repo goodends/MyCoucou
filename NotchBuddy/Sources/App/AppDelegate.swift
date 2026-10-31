@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         HotKeyCenter.shared.unregisterAll()
+        // The Space of our own goes with the app.
+        IslandOverlaySpace.shared?.close()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

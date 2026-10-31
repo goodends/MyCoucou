@@ -32,6 +32,7 @@
 		34D4444634675439A753FB3C /* AppActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC05464806D51DACBE941B1A /* AppActivation.swift */; };
 		3756B7E1A55D9CEC8C4D34A4 /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		378BF7A3B16C93463C6B1AD8 /* ChatOverscrollBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9CCB64C0031DBA1E2A2BD8 /* ChatOverscrollBackGesture.swift */; };
+		37E93BEB604062758EE664BF /* IslandOverlaySpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21333F8656BA93E52210E909 /* IslandOverlaySpace.swift */; };
 		38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */; };
 		3CF69605BB03E567C2DB0935 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
 		40F7576FC56ED7BC1D2B717E /* PillColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37564F5F041B38C976DF3DEF /* PillColors.swift */; };
@@ -108,6 +109,7 @@
 		CD8DECA66B9E09C97E469DB9 /* BotCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A29F4C0B02BE91654D02AA0C /* BotCanvasView.swift */; };
 		CDD36B01BF50F64A2A3180EF /* IslandScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */; };
 		D3FCE5533F5D8A87B9DC2D80 /* StatusLineInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6309C6217F7B05F3F4FDF0BF /* StatusLineInstaller.swift */; };
+		D87F99FDDDF240F345356620 /* IslandOverlaySpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21333F8656BA93E52210E909 /* IslandOverlaySpace.swift */; };
 		D9EEB1079ACBCEEF74439C44 /* ClaudeSettingsFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */; };
 		D9FF132804EB458F6FA69116 /* GitHubActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168A9A73B519018FAB0AA465 /* GitHubActivity.swift */; };
 		DCAC390FF9EC65B945A15B24 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 506824380E9C80B9BC6DCE72 /* Assets.xcassets */; };
@@ -135,6 +137,7 @@
 		192844E7299DEED5C2372067 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1BE21C2B315D37AA70ED45E9 /* SoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEngine.swift; sourceTree = "<group>"; };
 		1EA7D927F6BB2667D37AA963 /* ClaudeHookDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookDetection.swift; sourceTree = "<group>"; };
+		21333F8656BA93E52210E909 /* IslandOverlaySpace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandOverlaySpace.swift; sourceTree = "<group>"; };
 		244A7909EEDA4BFF4C2EA9B5 /* TerminalTarget+AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalTarget+AppKit.swift"; sourceTree = "<group>"; };
 		37564F5F041B38C976DF3DEF /* PillColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillColors.swift; sourceTree = "<group>"; };
 		3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeSettingsFile.swift; sourceTree = "<group>"; };
@@ -217,6 +220,7 @@
 				1218B86E249691AF44F819AC /* HotKeyCenter.swift */,
 				B0437ECB26D5F1310D561EC5 /* Inbox.swift */,
 				4A09E73F1E58019EF6EA2A62 /* IslandDisplayChoice.swift */,
+				21333F8656BA93E52210E909 /* IslandOverlaySpace.swift */,
 				15A1A8206F73376F4CAF2057 /* IslandRootView.swift */,
 				D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */,
 				FA02B08886939FF6FE0475DD /* IslandViewContent.swift */,
@@ -430,6 +434,7 @@
 				B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */,
 				779187EDB5DE90CB70187854 /* Inbox.swift in Sources */,
 				9E34044A001B01C3A514D20A /* IslandDisplayChoice.swift in Sources */,
+				D87F99FDDDF240F345356620 /* IslandOverlaySpace.swift in Sources */,
 				CA3321C14A11FED94E48B3E3 /* IslandRootView.swift in Sources */,
 				C67B690DFC0A294C0E65FCBB /* IslandScreenGeometry.swift in Sources */,
 				5B9A00AFB0837731FA678E4E /* IslandStateMachine.swift in Sources */,
@@ -491,6 +496,7 @@
 				530443F46F896F037A56F663 /* HotKeyCenter.swift in Sources */,
 				85229871E7FE584755F626AC /* Inbox.swift in Sources */,
 				1D23613B270FE8B11C5E27A7 /* IslandDisplayChoice.swift in Sources */,
+				37E93BEB604062758EE664BF /* IslandOverlaySpace.swift in Sources */,
 				B605F976F4141435F27CF266 /* IslandRootView.swift in Sources */,
 				CDD36B01BF50F64A2A3180EF /* IslandScreenGeometry.swift in Sources */,
 				3756B7E1A55D9CEC8C4D34A4 /* IslandStateMachine.swift in Sources */,
