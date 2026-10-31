@@ -259,11 +259,7 @@ struct ClaudeHost: Equatable {
     @discardableResult
     static func activate(_ hostBundleId: String?) -> Bool {
         guard let id = hostBundleId, terminals[id] != nil else { return false }
-        if let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == id }) {
-            running.activate()
-        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
-            NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-        }
+        AppActivation.activate(bundleId: id)
         return true
     }
 }

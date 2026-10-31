@@ -29,6 +29,7 @@
 		273FC0FA14AAF6CE62FD14AE /* DesktopMochi.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */; };
 		2BE3B4CBF7028A6097EBD51E /* SessionHistoryLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8458EAFC88088FDD09E3BBBD /* SessionHistoryLoader.swift */; };
 		2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */; };
+		34D4444634675439A753FB3C /* AppActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC05464806D51DACBE941B1A /* AppActivation.swift */; };
 		3756B7E1A55D9CEC8C4D34A4 /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		378BF7A3B16C93463C6B1AD8 /* ChatOverscrollBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9CCB64C0031DBA1E2A2BD8 /* ChatOverscrollBackGesture.swift */; };
 		38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */; };
@@ -93,6 +94,7 @@
 		BA65FC4A40F7227837C26214 /* DesktopMochiLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C086E1932F86B9C2B559BE03 /* DesktopMochiLogic.swift */; };
 		BDD8A210DD6D9DA2D15BC5EE /* PillCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C64C4C5D705CE486221B74 /* PillCatalog.swift */; };
 		BEC5DDB55B3DA67C61CA8470 /* DesktopMochi.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */; };
+		C03D3078376467CB9E470890 /* AppActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC05464806D51DACBE941B1A /* AppActivation.swift */; };
 		C07E9A04E827284FDF33DB16 /* ShortcutLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA51E5B140C20812641168EA /* ShortcutLogic.swift */; };
 		C0E18D0F6F5F6D131E6066B8 /* GreetingCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C581F7B1A9F14B281B60063E /* GreetingCanvasView.swift */; };
 		C61DDE2EC5FDDB39E4AA3B34 /* IslandWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D710BD7834228045869D0184 /* IslandWindowController.swift */; };
@@ -155,6 +157,7 @@
 		9F6D7015D6A77AA59323C0E7 /* AppLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLog.swift; sourceTree = "<group>"; };
 		A14A61070D293AB4BBA303F7 /* NotchBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A29F4C0B02BE91654D02AA0C /* BotCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotCanvasView.swift; sourceTree = "<group>"; };
+		AC05464806D51DACBE941B1A /* AppActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppActivation.swift; sourceTree = "<group>"; };
 		B0437ECB26D5F1310D561EC5 /* Inbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inbox.swift; sourceTree = "<group>"; };
 		B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopMochi.swift; sourceTree = "<group>"; };
 		B2AA83D80260660475FAB052 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -186,6 +189,7 @@
 		2D4550630644796DA0649B81 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				AC05464806D51DACBE941B1A /* AppActivation.swift */,
 				192844E7299DEED5C2372067 /* AppDelegate.swift */,
 				9F6D7015D6A77AA59323C0E7 /* AppLog.swift */,
 				C2E4F18AA940EFF7E047B9F7 /* AppState.swift */,
@@ -394,6 +398,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				34D4444634675439A753FB3C /* AppActivation.swift in Sources */,
 				C940B651C6CA952D99388E04 /* AppDelegate.swift in Sources */,
 				4B6AC00F22EC75E90E0157D5 /* AppLog.swift in Sources */,
 				1F11EC4E6F604C612A1ADAD1 /* AppState.swift in Sources */,
@@ -453,6 +458,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C03D3078376467CB9E470890 /* AppActivation.swift in Sources */,
 				878924960FC0F2B3524D48AC /* AppDelegate.swift in Sources */,
 				61CB7049490F61CFA1B36B64 /* AppLog.swift in Sources */,
 				61F73B27A7E3AFF584B2CC22 /* AppState.swift in Sources */,

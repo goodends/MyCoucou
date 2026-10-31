@@ -177,13 +177,7 @@ final class AppState: ObservableObject {
     }
 
     private func activateOrcaApp() {
-        let bundleId = "com.stablyai.orca"
-        if let running = NSWorkspace.shared.runningApplications
-            .first(where: { $0.bundleIdentifier == bundleId }) {
-            running.activate(options: [.activateIgnoringOtherApps])
-        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
-            NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-        }
+        AppActivation.activate(bundleId: ClaudeHost.orcaBundleId)
     }
 
     /// Orca terminal handle bound per Claude session, keyed by sessionId.

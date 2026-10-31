@@ -42,35 +42,27 @@ enum AgentLauncher {
         // terminal tab instead of merely raising the app.
         Task { @MainActor in
             if await state.jumpToOrcaTerminal(sessionId: task.sessionId) { return }
-            activateHostApp(for: task)
+            activateHostApp(for: task, state: state)
         }
     }
 
     /// Fallback for when Orca doesn't host the session: raise the app that
     /// runs it (VS Code, Cursor, a terminal, …).
-    private static func activateHostApp(for task: AgentTask) {
+    private static func activateHostApp(for task: AgentTask, state: AppState) {
         switch task.id {
         case "integration_claude":
             if ClaudeHost.activate(task.hostApp) { return }
-            let vscodeBundleId = "com.microsoft.VSCode"
-            if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == vscodeBundleId }) {
-                app.activate(options: .activateIgnoringOtherApps)
-            } else {
-                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Visual Studio Code.app"))
-            }
+            // By bundle id, not by a hard-coded path: VS Code installed
+            // anywhere else (~/Applications, a non-standard volume) was
+            // silently not opened at all.
+            AppActivation.activate(bundleId: "com.microsoft.VSCode")
         case "agent_cursor":
             #if !APPSTORE
-            if let url = NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.todesktop.230313mzl4w4u92") {
-                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-            }
+            AppActivation.activate(bundleId: "com.todesktop.230313mzl4w4u92")
             #endif
         case "agent_codex":
             #if !APPSTORE
-            if let url = NSWorkspace.shared.urlForApplication(
-                withBundleIdentifier: "com.openai.codex") {
-                NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-            }
+            AppActivation.activate(bundleId: "com.openai.codex")
             #endif
         case "agent_claude-desktop":
             openClaudeDesktopApp()
