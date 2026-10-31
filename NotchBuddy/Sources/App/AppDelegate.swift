@@ -61,6 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var settingsWindow: NSWindow?
 
+    /// Whether the settings window is on screen. The island must not fold
+    /// itself away while the user is in there.
+    var isSettingsVisible: Bool { settingsWindow?.isVisible ?? false }
+
     @objc private func openSettingsFromNotification(_ notification: Notification) {
         if let section = notification.object as? String {
             UserDefaults.standard.set(section, forKey: "settingsSection")

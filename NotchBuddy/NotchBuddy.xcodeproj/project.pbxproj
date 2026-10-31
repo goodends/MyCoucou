@@ -35,6 +35,7 @@
 		38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */; };
 		3CF69605BB03E567C2DB0935 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
 		40F7576FC56ED7BC1D2B717E /* PillColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37564F5F041B38C976DF3DEF /* PillColors.swift */; };
+		436DF5AF5E70CF46A72C1EA0 /* GlobalClickWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17AA3397CBD3AF9B8C8D98E4 /* GlobalClickWatcher.swift */; };
 		447C1B53A34AAB4553F69E8F /* SessionTitleWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBFF6AE6054961F3F57BD4E /* SessionTitleWriter.swift */; };
 		490A3F9723DE11D7D7FF945E /* SessionHistoryLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8458EAFC88088FDD09E3BBBD /* SessionHistoryLoader.swift */; };
 		4976F8BF814D6F817370F1D8 /* ChatMarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE88A53AEAA637F866D479D /* ChatMarkdownView.swift */; };
@@ -55,6 +56,7 @@
 		68A950E3C23FD612639D9776 /* IslandViewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA02B08886939FF6FE0475DD /* IslandViewContent.swift */; };
 		6CCEC73ED68E9F253C22D692 /* ShortcutLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA51E5B140C20812641168EA /* ShortcutLogic.swift */; };
 		6FC65C190ED614C664C9BC17 /* SafeWebURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */; };
+		72EC7A908DA819D5446B9579 /* GlobalClickWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17AA3397CBD3AF9B8C8D98E4 /* GlobalClickWatcher.swift */; };
 		733FCC6A45DE963EF2024B4E /* ChatMarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE88A53AEAA637F866D479D /* ChatMarkdownView.swift */; };
 		757D5D289AD46F77573F371E /* ClaudeProcessScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA0D9C643134E8FD9FF7234 /* ClaudeProcessScanner.swift */; };
 		779187EDB5DE90CB70187854 /* Inbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0437ECB26D5F1310D561EC5 /* Inbox.swift */; };
@@ -129,6 +131,7 @@
 		1218B86E249691AF44F819AC /* HotKeyCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyCenter.swift; sourceTree = "<group>"; };
 		15A1A8206F73376F4CAF2057 /* IslandRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandRootView.swift; sourceTree = "<group>"; };
 		168A9A73B519018FAB0AA465 /* GitHubActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubActivity.swift; sourceTree = "<group>"; };
+		17AA3397CBD3AF9B8C8D98E4 /* GlobalClickWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalClickWatcher.swift; sourceTree = "<group>"; };
 		192844E7299DEED5C2372067 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1BE21C2B315D37AA70ED45E9 /* SoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEngine.swift; sourceTree = "<group>"; };
 		1EA7D927F6BB2667D37AA963 /* ClaudeHookDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookDetection.swift; sourceTree = "<group>"; };
@@ -208,6 +211,7 @@
 				C086E1932F86B9C2B559BE03 /* DesktopMochiLogic.swift */,
 				168A9A73B519018FAB0AA465 /* GitHubActivity.swift */,
 				F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */,
+				17AA3397CBD3AF9B8C8D98E4 /* GlobalClickWatcher.swift */,
 				C581F7B1A9F14B281B60063E /* GreetingCanvasView.swift */,
 				79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */,
 				1218B86E249691AF44F819AC /* HotKeyCenter.swift */,
@@ -420,6 +424,7 @@
 				077ECE0906D8E820BD5FA764 /* DiffEngine.swift in Sources */,
 				D9FF132804EB458F6FA69116 /* GitHubActivity.swift in Sources */,
 				862CE6CB220D55E46F646DA9 /* GitHubPulse.swift in Sources */,
+				72EC7A908DA819D5446B9579 /* GlobalClickWatcher.swift in Sources */,
 				8C32A0C3EAF536D3836F61D5 /* GreetingCanvasView.swift in Sources */,
 				2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */,
 				B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */,
@@ -480,6 +485,7 @@
 				4D958F2DDCE9504490FDA357 /* DiffEngine.swift in Sources */,
 				63093DC288B68F7F17249517 /* GitHubActivity.swift in Sources */,
 				38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */,
+				436DF5AF5E70CF46A72C1EA0 /* GlobalClickWatcher.swift in Sources */,
 				C0E18D0F6F5F6D131E6066B8 /* GreetingCanvasView.swift in Sources */,
 				9DD56C95ECABDDCE23652D50 /* HookServer.swift in Sources */,
 				530443F46F896F037A56F663 /* HotKeyCenter.swift in Sources */,

@@ -153,6 +153,7 @@ final class IslandWindowController: NSWindowController {
         startLocalKeyMonitor()
         startHotKeys()
         wireFSM()
+        startGlobalClickWatcher()
 
         // Make panel key whenever the prompt/chat view becomes active
         // (nonactivatingPanel never auto-becomes key, but TextField needs it)
@@ -515,6 +516,44 @@ final class IslandWindowController: NSWindowController {
         fsm.collapse()
         setMode(.compact)
         window?.resignKey()
+    }
+
+    // MARK: - Clicking away
+
+    /// The island's rectangle in screen coordinates — where a click has to
+    /// land to count as "on the island".
+    func islandScreenRect() -> CGRect {
+        guard let panel = window as? IslandPanel else { return .zero }
+        let local = panel.currentIslandFrame(nw: notchW, nh: notchH)
+        return local.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY)
+    }
+
+    /// A click outside the island folds it, the way clicking away from a
+    /// popover closes it. A click *on* the island — a notification card, a
+    /// button — leaves it alone, and "keep expanded" outranks both.
+    private func handleClickAway(at location: CGPoint) {
+        guard state.mode == .expanded else { return }
+        guard !state.keepExpanded else { return }
+        // The settings window is ours, not the desktop: clicking in it must
+        // not fold the island out from under the user.
+        let settingsOpen = (NSApp.delegate as? AppDelegate)?.isSettingsVisible ?? false
+        guard !settingsOpen else { return }
+        // The menu bar is a strip of its own — clicking our own status item
+        // there opens the island again right after this.
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(location) }),
+           location.y > screen.frame.maxY - 30 { return }
+        let island = islandScreenRect().insetBy(dx: -6, dy: -6)
+        guard !island.contains(location) else { return }
+        collapse()
+    }
+
+    /// Watch for clicks across the whole session, so a click on another app
+    /// folds the island. See `GlobalClickWatcher` for why `NSEvent` can't.
+    private func startGlobalClickWatcher() {
+        GlobalClickWatcher.shared.onClick = { [weak self] location in
+            self?.handleClickAway(at: location)
+        }
+        GlobalClickWatcher.shared.start()
     }
 
     // MARK: - Global hot keys (Carbon)
