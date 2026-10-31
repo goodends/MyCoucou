@@ -20225,6 +20225,29 @@
           }
         }
       }
+    },
+    "Keep island expanded": {
+      "comment": "Tooltip of the header button that keeps the island expanded.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep island expanded"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder l'île ouverte"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持岛屿展开"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

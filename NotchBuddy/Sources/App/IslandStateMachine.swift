@@ -42,10 +42,14 @@ final class IslandStateMachine {
     /// coucou → petit delay when mouse is hovering over the greeting.
     var greetHoverCollapseDelay: TimeInterval = 10
 
+    /// Keep the island expanded — while it is on, the timers that fold it
+    /// away stand down. Set from AppState; a fold the user asks for turns it
+    /// off (see `IslandWindowController.collapse`).
+    var keepExpanded = false
+
     /// Opt-in (Settings → General → Behavior): hovering the island opens it, and an island
     /// opened that way folds shortly after the pointer leaves. Off: hover only peeks (petit).
-    var openOnHover = false
-    /// Grace period after the pointer leaves a hover-opened island (no flicker at the edge).
+    var openOnHover = false    /// Grace period after the pointer leaves a hover-opened island (no flicker at the edge).
     var hoverCloseDelay: TimeInterval = 0.6
     /// True while the island is open because of a hover, until the user clicks inside it.
     private(set) var openedByHover = false
@@ -144,6 +148,9 @@ final class IslandStateMachine {
     func collapse() {
         openedByHover = false
         guard state == .home || state == .coucou else { return }
+        // An island told to stay open does not fold on its own accord; the
+        // caller turns the preference off first when the user asked for it.
+        guard !keepExpanded else { return }
         cancelTimers()
         transition(to: .petit)
     }
@@ -152,6 +159,12 @@ final class IslandStateMachine {
     /// Schedules auto-collapse. Does not override a longer hover timer already running.
     func greetComplete() {
         guard state == .coucou else { return }
+        // Greeting over. With "keep expanded" on, the island goes straight to
+        // the open state instead of the compact bar it would normally fold to.
+        if keepExpanded {
+            transition(to: .home)
+            return
+        }
         // If mouse entered before this fires (hover timer already running), don't override it
         if greetCollapseWork == nil {
             scheduleGreetCollapse(delay: greetAutoCollapseDelay)
@@ -179,6 +192,8 @@ final class IslandStateMachine {
     // MARK: – Timers
 
     private func schedulePetitHide() {
+        // Kept open on purpose: the island stays where the user put it.
+        guard !keepExpanded else { petitHideWork?.cancel(); petitHideWork = nil; return }
         petitHideWork?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self, self.state == .petit, !(self.isHeldOpen?() ?? false) else { return }
@@ -189,6 +204,8 @@ final class IslandStateMachine {
     }
 
     private func scheduleHomeCollapse() {
+        // Kept open on purpose: the island stays where the user put it.
+        guard !keepExpanded else { homeCollapseWork?.cancel(); homeCollapseWork = nil; return }
         guard !(blocksAutoCollapse?() ?? false) else { homeCollapseWork?.cancel(); return }
         homeCollapseWork?.cancel()
         let item = DispatchWorkItem { [weak self] in

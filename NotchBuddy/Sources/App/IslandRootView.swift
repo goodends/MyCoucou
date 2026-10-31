@@ -487,20 +487,23 @@ struct IslandHeader: View {
             // Right: action icons
             HStack(spacing: 8) {
                 HStack(spacing: 14) {
-                    // Settings now pops up as a separate window — the in-island
-                    // settings page (sound toggle, auto-close picker, Claude
-                    // hook badge) is gone.
+                    // Keep the island open — the counterpart of hiding it.
+                    // While it is on, the island never folds itself away; the
+                    // filled pin says so at a glance.
                     Button(action: {
-                        NotificationCenter.default.post(name: .openFullSettings, object: nil)
+                        state.keepExpanded.toggle()
+                        NotificationCenter.default.post(name: .islandKeepExpanded, object: nil)
                     }) {
-                        Image(systemName: "gearshape")
+                        Image(systemName: state.keepExpanded ? "pin.fill" : "pin")
                             .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "#8E939C"))
+                            .foregroundColor(state.keepExpanded ? Color(hex: "#F5F6F8") : Color(hex: "#8E939C"))
                             .frame(width: 22, height: 28)
+                            .background(state.keepExpanded ? Color(hex: "#1D1F23") : Color.clear)
+                            .clipShape(Capsule())
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help(String(localized: "Settings…"))
+                    .help(String(localized: "Keep island expanded"))
 
                     // Hide the island entirely. Routes through the FSM so
                     // expanded → collapse → hiddenExternally is clean.
@@ -515,6 +518,22 @@ struct IslandHeader: View {
                     }
                     .buttonStyle(.plain)
                     .help(String(localized: "Hide island"))
+
+                    // Settings now pops up as a separate window — the in-island
+                    // settings page (sound toggle, auto-close picker, Claude
+                    // hook badge) is gone. Last on the right: it opens a
+                    // window of its own, the way a menu item would.
+                    Button(action: {
+                        NotificationCenter.default.post(name: .openFullSettings, object: nil)
+                    }) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "#8E939C"))
+                            .frame(width: 22, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "Settings…"))
                 }
             }
             .padding(.trailing, 16)

@@ -53,6 +53,7 @@ final class IslandWindowController: NSWindowController {
     private var autoCloseSubscription: AnyCancellable?
     private var absenceSubscription: AnyCancellable?
     private var openOnHoverSubscription: AnyCancellable?
+    private var keepExpandedSubscription: AnyCancellable?
     private var alwaysOnTopSubscription: AnyCancellable?
 
     // Suppress peek sound on next reveal (e.g. musicReveal)
@@ -242,6 +243,9 @@ final class IslandWindowController: NSWindowController {
         }
         openOnHoverSubscription = state.$openOnHover.sink { [weak self] on in
             self?.fsm.openOnHover = on
+        }
+        keepExpandedSubscription = state.$keepExpanded.sink { [weak self] on in
+            self?.fsm.keepExpanded = on
         }
         alwaysOnTopSubscription = state.$alwaysOnTop.sink { [weak self] on in
             self?.applyOverlayLevels(alwaysOnTop: on)
@@ -489,12 +493,25 @@ final class IslandWindowController: NSWindowController {
         state.lastActivity = .now
     }
 
-    func collapse(allowPendingApproval: Bool = false) {
+    /// Fold the island back to its compact bar.
+    ///
+    /// `byUser` marks a fold the user asked for — Escape, the toggle
+    /// shortcut, the views' own buttons, the upward swipe. It turns "keep
+    /// expanded" off, because folding the island by hand is the opposite of
+    /// asking it to stay. A fold the app does on its own (jumping to another
+    /// app, a finished card's clock) leaves the preference alone — and does
+    /// not happen at all while the island is meant to stay expanded.
+    func collapse(allowPendingApproval: Bool = false, byUser: Bool = false) {
+        if state.keepExpanded {
+            if !byUser { return }
+            state.keepExpanded = false
+        }
         let keepsApprovalPending = allowPendingApproval && state.pendingApproval != nil
         guard fsm.isHeldOpen?() != true || keepsApprovalPending else { return }
         if !keepsApprovalPending { state.isPinned = false }
         finishedPinTimer?.cancel()
         // Keep the FSM in step with what is on screen (home/coucou → petit now).
+        fsm.keepExpanded = false
         fsm.collapse()
         setMode(.compact)
         window?.resignKey()
@@ -512,7 +529,7 @@ final class IslandWindowController: NSWindowController {
         switch action {
         case .toggleIsland:
             if state.mode == .expanded {
-                collapse(allowPendingApproval: true)
+                collapse(allowPendingApproval: true, byUser: true)
             } else {
                 islandPanel.makeKey()
                 fsm.openedExternally()
@@ -573,7 +590,7 @@ final class IslandWindowController: NSWindowController {
 
         case .wardrobeToggle:
             if state.mode == .expanded && state.view == .wardrobe {
-                collapse()
+                collapse(byUser: true)
             } else {
                 islandPanel.makeKey()
                 expand(to: .wardrobe)
@@ -641,7 +658,7 @@ final class IslandWindowController: NSWindowController {
             let consumed = NSApp.sendAction(Selector(("cancelOperation:")), to: nil, from: nil)
             let canCollapse = !state.isPinned || state.pendingApproval != nil
             if !consumed && state.mode == .expanded && canCollapse {
-                collapse(allowPendingApproval: true)
+                collapse(allowPendingApproval: true, byUser: true)
             }
             return true
         }
@@ -709,7 +726,7 @@ final class IslandWindowController: NSWindowController {
                     // Escape typed in another app (Claude Code's own interrupt, an editor…)
                     // never folds a pending approval away: only Escape in the notch does.
                     if self.state.mode == .expanded && !self.state.isPinned {
-                        self.collapse()
+                        self.collapse(byUser: true)
                     }
                 }
             }
@@ -737,8 +754,21 @@ final class IslandWindowController: NSWindowController {
         }
 
         // Collapse requests from views (OK button, etc.)
-        NotificationCenter.default.addObserver(forName: .islandCollapse, object: nil, queue: .main) { [weak self] _ in
-            self?.collapse()
+        NotificationCenter.default.addObserver(forName: .islandCollapse, object: nil, queue: .main) { [weak self] note in
+            // Only a fold the user asked for turns "keep expanded" off; the
+            // app's own folds (a card's clock, a note that timed out, a jump
+            // to another app) leave the island standing.
+            let byUser = (note.object as? CollapseSource) == .byUser
+            self?.collapse(byUser: byUser)
+        }
+
+        // "Keep expanded" turned on: stand the island up now. The preference
+        // says it should stay open, and it has to be open right now for that
+        // to mean anything.
+        NotificationCenter.default.addObserver(forName: .islandKeepExpanded, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.state.keepExpanded else { return }
+            self.fsm.openedExternally()
+            self.expand(to: self.state.view)
         }
 
         // Manual hide from the header hide button. Collapse to compact first
@@ -746,6 +776,9 @@ final class IslandWindowController: NSWindowController {
         // hiddenExternally runs, then transition into .hidden.
         NotificationCenter.default.addObserver(forName: .islandHide, object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
+            // Hiding the island and keeping it open are opposite wishes; the
+            // newer one wins.
+            self.state.keepExpanded = false
             self.collapse()
             self.fsm.hiddenExternally()
         }
@@ -1242,6 +1275,14 @@ struct GhostBotView: View {
 
 // MARK: - Notification names
 
+/// Who asked for the island to fold. Carried as the object of an
+/// `.islandCollapse` notification: only a fold the user asked for turns
+/// "keep expanded" off.
+enum CollapseSource {
+    /// The user's own doing — the upward swipe.
+    case byUser
+}
+
 extension Notification.Name {
     static let triggerEmote     = Notification.Name("notchBuddy.triggerEmote")
     static let triggerSlap      = Notification.Name("notchBuddy.triggerSlap")
@@ -1253,6 +1294,7 @@ extension Notification.Name {
     static let islandAction     = Notification.Name("notchBuddy.islandAction")
     static let islandCollapse      = Notification.Name("notchBuddy.islandCollapse")
     static let islandHide          = Notification.Name("notchBuddy.islandHide")
+    static let islandKeepExpanded  = Notification.Name("notchBuddy.islandKeepExpanded")
     static let islandSendMessage   = Notification.Name("notchBuddy.islandSendMessage")
     static let islandNewConversation = Notification.Name("notchBuddy.islandNewConversation")
     static let islandToggleDiff           = Notification.Name("notchBuddy.islandToggleDiff")

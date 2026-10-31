@@ -305,7 +305,9 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
                     state.view = .overview
                 }
             case .overview, .empty:
-                NotificationCenter.default.post(name: .islandCollapse, object: nil)
+                // The user's own swipe: it folds the island, so it also turns
+                // "keep expanded" off.
+                NotificationCenter.default.post(name: .islandCollapse, object: CollapseSource.byUser)
             default:
                 break
             }
